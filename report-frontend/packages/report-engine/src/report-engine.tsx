@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Group } from 'react-resizable-panels';
 import Header from './components/layout/header';
 import Panel from './components/layout/panel';
@@ -14,6 +14,7 @@ import type {
     CellKey,
     LoopBlockConfig,
 } from './components/properties/types';
+import type { CellRange } from '@coding-report/report-univer';
 import { generateId } from './components/properties/types';
 import './index.css';
 
@@ -41,7 +42,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
 
     // ========== 循环块回调 ==========
     const handleCreateLoopBlock = useCallback(
-        (range: { sheetId: string; startRow: number; startColumn: number; endRow: number; endColumn: number }) => {
+        (range: CellRange) => {
             const id = generateId();
             const newBlock: LoopBlockConfig = {
                 id,

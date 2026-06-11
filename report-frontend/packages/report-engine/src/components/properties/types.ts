@@ -114,43 +114,8 @@ export type CellKey = string;
  */
 export type CellPropertyMap = Record<CellKey, CellPropertyConfig>;
 
-/**
- * 当前选中单元格信息
- */
-export interface SelectedCellInfo {
-  sheetId: string;
-  row: number;
-  column: number;
-  /** A1 表示法（如 "B3"） */
-  a1Notation: string;
-  /** 单元格值 */
-  value: unknown;
-  /** 合并单元格信息（非 null 时为合并单元格） */
-  mergeRange: {
-    startRow: number;
-    startColumn: number;
-    endRow: number;
-    endColumn: number;
-    /** 合并区域 A1 表示法（如 "B2:D4"） */
-    a1Notation: string;
-  } | null;
-}
-
-/**
- * 循环块配置
- */
-export interface LoopBlockConfig {
-  id: string;
-  sheetId: string;
-  startRow: number;
-  startColumn: number;
-  endRow: number;
-  endColumn: number;
-  /** 循环块标签 */
-  label?: string;
-  /** 循环变量字段 "tableName.fieldName" */
-  loopVariable: string;
-}
+// SelectedCellInfo 和 LoopBlockConfig 已迁移至 @coding-report/report-univer
+export type { SelectedCellInfo, LoopBlockConfig } from '@coding-report/report-univer';
 
 /**
  * DataType → 可选 CalcMethod 映射

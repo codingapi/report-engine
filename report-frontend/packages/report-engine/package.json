@@ -33,7 +33,8 @@
     "push": "pnpm run build && pnpm publish --access public"
   },
   "dependencies": {
-    "@coding-report/report-univer": "workspace:*"
+    "@coding-report/report-univer": "workspace:*",
+    "react-resizable-panels": "^4.11.2"
   },
   "peerDependencies": {
     "@ant-design/icons": ">=5",
