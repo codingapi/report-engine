@@ -1,0 +1,56 @@
+{
+  "name": "@coding-report/report-engine",
+  "version": "0.0.1",
+  "description": "report-engine components",
+  "keywords": [
+    "coding-report",
+    "report-engine"
+  ],
+  "homepage": "https://github.com/codingapi/report-engine",
+  "bugs": {
+    "url": "https://github.com/codingapi/report-engine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codingapi/report-engine.git"
+  },
+  "license": "Apache-2.0",
+  "author": "1024lorne@gmail.com",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "push": "pnpm run build && pnpm publish --access public"
+  },
+  "dependencies": {
+    "@univerjs/core": "^0.25.0",
+    "@univerjs/design": "^0.25.0",
+    "@univerjs/docs": "^0.25.0",
+    "@univerjs/docs-ui": "^0.25.0",
+    "@univerjs/engine-formula": "^0.25.0",
+    "@univerjs/engine-render": "^0.25.0",
+    "@univerjs/network": "^0.25.0",
+    "@univerjs/presets": "^0.25.0",
+    "@univerjs/sheets": "^0.25.0",
+    "@univerjs/sheets-ui": "^0.25.0",
+    "@univerjs/ui": "^0.25.0",
+    "react-resizable-panels": "^4.11.2",
+    "rxjs": "^7.8.2"
+  },
+  "peerDependencies": {
+    "@ant-design/icons": ">=5",
+    "antd": ">=5",
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}
