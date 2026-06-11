@@ -1,5 +1,5 @@
 {
-  "name": "@coding-report/report-engine",
+  "name": "@coding-report/report-univer",
   "version": "0.0.1",
   "description": "report-engine components",
   "keywords": [
@@ -33,7 +33,19 @@
     "push": "pnpm run build && pnpm publish --access public"
   },
   "dependencies": {
-    "@coding-report/report-univer": "workspace:*"
+    "@univerjs/core": "^0.25.0",
+    "@univerjs/design": "^0.25.0",
+    "@univerjs/docs": "^0.25.0",
+    "@univerjs/docs-ui": "^0.25.0",
+    "@univerjs/engine-formula": "^0.25.0",
+    "@univerjs/engine-render": "^0.25.0",
+    "@univerjs/network": "^0.25.0",
+    "@univerjs/presets": "^0.25.0",
+    "@univerjs/sheets": "^0.25.0",
+    "@univerjs/sheets-ui": "^0.25.0",
+    "@univerjs/ui": "^0.25.0",
+    "react-resizable-panels": "^4.11.2",
+    "rxjs": "^7.8.2"
   },
   "peerDependencies": {
     "@ant-design/icons": ">=5",

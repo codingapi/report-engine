@@ -4,11 +4,14 @@
   "description": "report-engine",
   "main": "index.js",
   "scripts": {
+    "build:report-univer": "pnpm -F @coding-report/report-univer build",
     "build:report-engine": "pnpm -F @coding-report/report-engine build",
-    "build": "pnpm run build:report-engine",
+    "build": "pnpm run build:report-univer && pnpm run build:report-engine",
     "watch:report-engine": "pnpm -F @coding-report/report-engine dev",
+    "watch:report-univer": "pnpm -F @coding-report/report-univer dev",
     "push:report-engine": "pnpm -F @coding-report/report-engine push",
-    "push": "pnpm run push:report-engine",
+    "push:report-univer": "pnpm -F @coding-report/report-univer push",
+    "push": "pnpm run push:report-univer && pnpm run push:report-engine",
     "dev:app-pc": "pnpm -F @report-example/app-pc dev",
     "clean": "pnpm cleaninstall-node"
   },

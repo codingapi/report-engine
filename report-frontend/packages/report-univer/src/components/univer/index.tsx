@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core';
 import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/locales/zh-CN';
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
 import '@univerjs/preset-sheets-core/lib/index.css';
 import { UniverSheetProps } from './type';
 
-const UniverSheet: React.FC<UniverSheetProps> = (props) => {
+export const UniverSheet: React.FC<UniverSheetProps> = (props) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const style = props.style || {
@@ -79,4 +79,3 @@ const UniverSheet: React.FC<UniverSheetProps> = (props) => {
     )
 };
 
-export default UniverSheet;

@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BehaviorSubject } from 'rxjs';
 import { MessageType } from '@univerjs/design';
 import type { FUniver } from '@univerjs/presets';
-import UniverSheet from './univer';
+import {UniverSheet} from '@coding-report/report-univer';
 import type { SelectedCellInfo, LoopBlockConfig } from '../properties/types';
 
 export interface SheetPanelProps {
