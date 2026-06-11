@@ -1,4 +1,4 @@
-import { DataConfig, DataType } from '@coding-report/report-engine';
+import {type DataConfig, DataType } from '@coding-report/report-engine';
 
 export const mockDataConfig: DataConfig = {
   name: '报表数据源',

@@ -1,15 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import "./index.css";
-import HomePage from "@/pages/home.tsx";
-
+import routes from './config/routes';
 
 const App = () => {
-
-    return (
-        <HomePage/>
-    )
-}
+  return (
+    <BrowserRouter>
+      <Routes>
+        {routes.map((route) => (
+          <Route key={route.path} path={route.path} element={route.element} />
+        ))}
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
 const rootEl = document.getElementById('root');
 if (rootEl) {
