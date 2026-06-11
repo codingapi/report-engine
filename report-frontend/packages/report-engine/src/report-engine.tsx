@@ -14,7 +14,7 @@ import type {
     CellKey,
     LoopBlockConfig,
 } from './components/properties/types';
-import type { CellRange } from '@coding-report/report-univer';
+import type { CellRange, FieldDropInfo } from '@coding-report/report-univer';
 import { generateId } from './components/properties/types';
 import './index.css';
 
@@ -90,6 +90,24 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
         setEditingLoopBlock(null);
     }, []);
 
+    // ========== 循环块属性面板回调 ==========
+    const handleLoopBlockChange = useCallback((id: string, config: LoopBlockConfig) => {
+        setLoopBlocks((prev) => ({ ...prev, [id]: config }));
+    }, []);
+
+    // ========== 字段拖入回调 ==========
+    const handleFieldDrop = useCallback((info: FieldDropInfo): string | undefined => {
+        try {
+            const parsed = JSON.parse(info.data);
+            if (parsed.table && parsed.field) {
+                return `${parsed.table}.${parsed.field}`;
+            }
+        } catch {
+            // 非 JSON 格式，直接使用原始数据
+        }
+        return info.data;
+    }, []);
+
     return (
         <div className="report-engine">
             <Header
@@ -110,6 +128,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
                             onEditLoopBlock={handleEditLoopBlock}
                             onRemoveLoopBlock={handleRemoveLoopBlock}
                             loopBlocks={loopBlocks}
+                            onFieldDrop={handleFieldDrop}
                         />
                     </Panel>
 
@@ -119,6 +138,9 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
                             dataConfig={dataConfig}
                             cellProperties={cellProperties}
                             onCellPropertyChange={handleCellPropertyChange}
+                            loopBlocks={loopBlocks}
+                            onLoopBlockChange={handleLoopBlockChange}
+                            onLoopBlockRemove={handleRemoveLoopBlock}
                         />
                     </Panel>
                 </Group>

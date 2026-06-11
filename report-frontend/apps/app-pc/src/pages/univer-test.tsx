@@ -3,12 +3,13 @@
  *
  * 验证目标：
  * 1. 手动 plugins 方式初始化 Univer（不使用 preset），去除自带公式插件
- * 2. 获取工作表快照数据（单元格内容 + 样式 + 合并信息）
+ * 2. 获取工作表快照数据（单元格内容 + 样式 + 合并信息 + 边框 + 行列尺寸）
+ * 3. 循环块高亮覆盖（highlight API，不修改单元格样式）
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Tag } from 'antd';
-import { DatabaseOutlined } from '@ant-design/icons';
+import { Button, Tag, Space } from 'antd';
+import { DatabaseOutlined, HighlightOutlined, DeleteOutlined } from '@ant-design/icons';
 
 // Univer 核心
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
@@ -55,7 +56,7 @@ import '@univerjs/docs-ui/facade';
 import '@univerjs/sheets-formula/facade';
 import '@univerjs/sheets-formula-ui/facade';
 
-// CSS（使用 preset 的合并 CSS，确保所有样式完整）
+// CSS
 import '@univerjs/preset-sheets-core/lib/index.css';
 
 // 数据提取工具
@@ -67,6 +68,26 @@ const VALUE_TYPE_MAP: Record<number, { label: string; color: string }> = {
   1: { label: '数字', color: 'green' },
   2: { label: '布尔', color: 'orange' },
 };
+
+/** 高亮样式（半透明覆盖，不修改单元格样式） */
+const HIGHLIGHT_STYLE = {
+  fill: 'rgba(22, 119, 255, 0.08)',
+  stroke: '#1677ff',
+  strokeWidth: 1,
+  strokeDash: 8,
+  widgets: {
+    top: false, bottom: false, left: false, right: false,
+    topLeft: false, topRight: false, bottomLeft: false, bottomRight: false,
+  },
+};
+
+/** 记录高亮区域，用于在 selection 变更后重新应用 */
+interface HighlightRegion {
+  row: number;
+  col: number;
+  height: number;
+  width: number;
+}
 
 interface CellInfo {
   position: string;
@@ -81,6 +102,31 @@ const UniverTestPage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const univerAPIRef = useRef<FUniver | null>(null);
   const [cellInfo, setCellInfo] = useState<CellInfo | null>(null);
+  const highlightDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+  const highlightRegionsRef = useRef<HighlightRegion[]>([]);
+  const [highlightCount, setHighlightCount] = useState(0);
+
+  /** 重新应用所有高亮（selection 变更后调用） */
+  const reapplyHighlights = () => {
+    const api = univerAPIRef.current;
+    if (!api || highlightRegionsRef.current.length === 0) return;
+
+    // 释放旧的
+    highlightDisposablesRef.current.forEach(d => { try { d.dispose(); } catch {} });
+    highlightDisposablesRef.current = [];
+
+    const workbook = api.getActiveWorkbook();
+    if (!workbook) return;
+    const sheet = workbook.getActiveSheet();
+    if (!sheet) return;
+
+    const ranges = highlightRegionsRef.current.map(r =>
+      sheet.getRange(r.row, r.col, r.height, r.width)
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const disposable = (sheet as any).highlightRanges(ranges, HIGHLIGHT_STYLE);
+    highlightDisposablesRef.current = [disposable];
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -89,26 +135,21 @@ const UniverTestPage: React.FC = () => {
       locale: LocaleType.ZH_CN,
       locales: {
         [LocaleType.ZH_CN]: mergeLocales(
-          UniverUIZhCN,
-          UniverDocsUIZhCN,
-          UniverSheetsZhCN,
-          UniverSheetsUIZhCN,
-          UniverSheetsNumfmtUIZhCN,
-          UniverSheetsFormulaZhCN,
-          UniverSheetsFormulaUIZhCN,
+          UniverUIZhCN, UniverDocsUIZhCN, UniverSheetsZhCN,
+          UniverSheetsUIZhCN, UniverSheetsNumfmtUIZhCN,
+          UniverSheetsFormulaZhCN, UniverSheetsFormulaUIZhCN,
         ),
       },
-      presets: [], // 不使用任何 preset
+      presets: [],
       plugins: [
-        [UniverNetworkPlugin],
-        [UniverDocsPlugin],
-        [UniverRenderEnginePlugin],
+        UniverNetworkPlugin,
+        UniverDocsPlugin,
+        UniverRenderEnginePlugin,
         [UniverUIPlugin, {
           container: containerRef.current,
           ribbonType: 'simple' as const,
-          formulaBar: false, // 隐藏公式栏
+          formulaBar: false,
           menu: {
-            // 隐藏常用函数菜单
             'formula-ui.operation.insert-function.common': { hidden: true },
             'formula-ui.operation.insert-function.financial': { hidden: true },
             'formula-ui.operation.insert-function.logical': { hidden: true },
@@ -121,23 +162,17 @@ const UniverTestPage: React.FC = () => {
             'formula-ui.operation.insert-function.information': { hidden: true },
             'formula-ui.operation.insert-function.database': { hidden: true },
             'formula-ui.operation.more-functions': { hidden: true },
-            // 隐藏文本转数字
             'sheet.toolbar.text-to-number': { hidden: true },
             'sheet.contextMenu.text-to-number': { hidden: true },
           },
         }],
-        [UniverDocsUIPlugin],
-        // 公式引擎：正常加载（单元格编辑依赖其数据管道）
-        [UniverFormulaEnginePlugin],
-        // 电子表格核心
-        [UniverSheetsPlugin],
+        UniverDocsUIPlugin,
+        UniverFormulaEnginePlugin,
+        UniverSheetsPlugin,
         [UniverSheetsUIPlugin, { formulaBar: false }],
-        // 数字格式
-        [UniverSheetsNumfmtPlugin],
-        [UniverSheetsNumfmtUIPlugin],
-        // 公式插件：必须保留（单元格编辑依赖其数据管道）
-        // 公式功能通过隐藏菜单 UI 禁用，notExecuteFormula 仅适用于 Web Worker 模式
-        [UniverSheetsFormulaPlugin],
+        UniverSheetsNumfmtPlugin,
+        UniverSheetsNumfmtUIPlugin,
+        UniverSheetsFormulaPlugin,
         [UniverSheetsFormulaUIPlugin, { functionScreenTips: false }],
       ],
     });
@@ -145,18 +180,19 @@ const UniverTestPage: React.FC = () => {
     univerAPI.createWorkbook({});
     univerAPIRef.current = univerAPI;
 
-    // 监听单元格选中事件，更新标题栏信息
+    // 监听单元格选中事件
     univerAPI.addEvent(univerAPI.Event.SelectionChanged, (params) => {
-      const { worksheet: ws, selections } = params as { worksheet: FWorksheet; selections: Array<{ startRow: number; startColumn: number }> };
+      const { worksheet: ws, selections } = params as {
+        worksheet: FWorksheet;
+        selections: Array<{ startRow: number; startColumn: number }>;
+      };
       if (!selections || selections.length === 0) return;
 
       const { startRow: row, startColumn: col } = selections[0];
-
       const fRange = ws.getRange(row, col);
       const value = fRange.getValue();
       const a1 = fRange.getA1Notation();
 
-      // 读取原始单元格数据（含类型信息）
       let valueType: number | null = null;
       let hasRichText = false;
       let hasFormula = false;
@@ -175,15 +211,23 @@ const UniverTestPage: React.FC = () => {
         hasFormula,
         jsType: value === null || value === undefined ? 'null' : typeof value,
       });
+
+      // selection 变更后重新应用高亮（编辑单元格后 highlight 会被清除）
+      if (highlightRegionsRef.current.length > 0) {
+        requestAnimationFrame(() => reapplyHighlights());
+      }
     });
 
     console.log('✅ [Univer 验证] 手动 plugins 模式初始化完成');
 
     return () => {
+      highlightDisposablesRef.current.forEach(d => { try { d.dispose(); } catch {} });
+      highlightRegionsRef.current = [];
       univerAPI.dispose();
     };
   }, []);
 
+  /** 获取快照 */
   const handleSnapshot = () => {
     const fWorkbook = univerAPIRef.current?.getActiveWorkbook();
     if (!fWorkbook) {
@@ -191,6 +235,43 @@ const UniverTestPage: React.FC = () => {
       return;
     }
     extractWorkbookSnapshot(fWorkbook);
+  };
+
+  /** 高亮当前选区（模拟循环块） */
+  const handleHighlight = () => {
+    const api = univerAPIRef.current;
+    if (!api) return;
+
+    const workbook = api.getActiveWorkbook();
+    if (!workbook) return;
+    const sheet = workbook.getActiveSheet();
+    if (!sheet) return;
+
+    const activeRange = sheet.getActiveRange();
+    if (!activeRange) return;
+
+    const row = activeRange.getRow();
+    const col = activeRange.getColumn();
+    const height = activeRange.getHeight();
+    const width = activeRange.getWidth();
+
+    // 记录区域（用于 selection 变更后重新应用）
+    highlightRegionsRef.current.push({ row, col, height, width });
+
+    // 重新应用所有高亮
+    reapplyHighlights();
+    setHighlightCount(highlightRegionsRef.current.length);
+
+    console.log(`✅ [高亮] 已添加高亮: ${row},${col} → ${row + height - 1},${col + width - 1} (共 ${highlightRegionsRef.current.length} 个)`);
+  };
+
+  /** 清除所有高亮 */
+  const handleClearHighlights = () => {
+    highlightDisposablesRef.current.forEach(d => { try { d.dispose(); } catch {} });
+    highlightDisposablesRef.current = [];
+    highlightRegionsRef.current = [];
+    setHighlightCount(0);
+    console.log('✅ [高亮] 已清除所有高亮');
   };
 
   return (
@@ -204,9 +285,19 @@ const UniverTestPage: React.FC = () => {
         alignItems: 'center',
         gap: 12,
       }}>
-        <Button type="primary" icon={<DatabaseOutlined />} onClick={handleSnapshot}>
-          获取快照
-        </Button>
+        <Space>
+          <Button type="primary" icon={<DatabaseOutlined />} onClick={handleSnapshot}>
+            获取快照
+          </Button>
+          <Button icon={<HighlightOutlined />} onClick={handleHighlight}>
+            高亮选区
+          </Button>
+          {highlightCount > 0 && (
+            <Button icon={<DeleteOutlined />} danger onClick={handleClearHighlights}>
+              清除高亮 ({highlightCount})
+            </Button>
+          )}
+        </Space>
 
         {cellInfo && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>

@@ -1,6 +1,8 @@
-import type { WorkbookSnapshot, SnapshotSheet, SnapshotCell } from '../types';
+import type {
+    WorkbookSnapshot, SnapshotSheet, SnapshotCell,
+    CellBorderData, BorderSide, RowDimension, ColumnDimension,
+} from '../types';
 
-// FWorkbook 类型仅在内部使用，不对外暴露
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FWorkbook = any;
 
@@ -45,6 +47,33 @@ const STYLE_FIELD_NAMES: Record<string, string> = {
     pd: 'padding',
 };
 
+/** 解析单条边框样式 */
+function parseBorderSide(side: Record<string, unknown> | undefined): BorderSide | undefined {
+    if (!side) return undefined;
+    const s = side.s as number | undefined;
+    if (s === undefined || s === 0) return undefined;
+    const cl = side.cl as Record<string, unknown> | undefined;
+    return {
+        style: s,
+        color: (cl?.rgb as string) || '#000000',
+    };
+}
+
+/** 解析边框数据 bd 字段 */
+function parseBorderData(bd: Record<string, unknown> | undefined): CellBorderData | undefined {
+    if (!bd || typeof bd !== 'object') return undefined;
+    const borders: CellBorderData = {};
+    const t = parseBorderSide(bd.t as Record<string, unknown> | undefined);
+    const r = parseBorderSide(bd.r as Record<string, unknown> | undefined);
+    const b = parseBorderSide(bd.b as Record<string, unknown> | undefined);
+    const l = parseBorderSide(bd.l as Record<string, unknown> | undefined);
+    if (t) borders.top = t;
+    if (r) borders.right = r;
+    if (b) borders.bottom = b;
+    if (l) borders.left = l;
+    return Object.keys(borders).length > 0 ? borders : undefined;
+}
+
 /** 解析富文本 IDocumentData */
 function parseRichText(docData: Record<string, unknown>): {
     text: string;
@@ -86,9 +115,43 @@ function parseStyleData(style: Record<string, unknown> | undefined): Record<stri
     return Object.keys(result).length > 0 ? result : null;
 }
 
+/** 从原始样式中提取边框数据 */
+function extractBordersFromStyle(rawStyle: Record<string, unknown> | undefined): CellBorderData | undefined {
+    if (!rawStyle || typeof rawStyle !== 'object') return undefined;
+    const bd = rawStyle.bd as Record<string, unknown> | undefined;
+    return parseBorderData(bd);
+}
+
+/** 解析行尺寸数据 */
+function parseRowDimensions(rawRowData: Record<string, unknown> | undefined): Record<string, RowDimension> {
+    const rows: Record<string, RowDimension> = {};
+    if (!rawRowData) return rows;
+    for (const [idx, row] of Object.entries(rawRowData)) {
+        const r = row as Record<string, unknown>;
+        rows[idx] = {
+            height: (r.h as number) ?? 0,
+            hidden: r.hd === 1,
+        };
+    }
+    return rows;
+}
+
+/** 解析列尺寸数据 */
+function parseColumnDimensions(rawColData: Record<string, unknown> | undefined): Record<string, ColumnDimension> {
+    const columns: Record<string, ColumnDimension> = {};
+    if (!rawColData) return columns;
+    for (const [idx, col] of Object.entries(rawColData)) {
+        const c = col as Record<string, unknown>;
+        columns[idx] = {
+            width: (c.w as number) ?? 0,
+            hidden: c.hd === 1,
+        };
+    }
+    return columns;
+}
+
 /**
  * 从 FWorkbook 提取完整工作簿快照
- * 返回结构化的 WorkbookSnapshot 数据
  */
 export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
     const snapshot = fWorkbook.save();
@@ -103,14 +166,23 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
         }
     }
 
+    // 工作表顺序
+    const sheetOrder = ((snapshot as Record<string, unknown>).sheetOrder as string[]) || [];
+
     // 遍历所有工作表
     const rawSheets = (snapshot as Record<string, unknown>).sheets as Record<string, Record<string, unknown>> | undefined;
     const sheets: SnapshotSheet[] = [];
 
-    if (!rawSheets) return { styles, sheets };
+    if (!rawSheets) return { styles, sheets, sheetOrder };
 
     for (const [sheetId, sheetData] of Object.entries(rawSheets)) {
         const sheetName = (sheetData.name as string) || sheetId;
+
+        // 工作表尺寸
+        const defaultRowHeight = (sheetData.defaultRowHeight as number) ?? 20;
+        const defaultColumnWidth = (sheetData.defaultColumnWidth as number) ?? 73;
+        const rowCount = (sheetData.rowCount as number) ?? 1000;
+        const columnCount = (sheetData.columnCount as number) ?? 26;
 
         // 合并单元格信息
         const rawMergeData = sheetData.mergeData as Array<Record<string, number>> | undefined;
@@ -121,7 +193,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
             endColumn: m.endColumn,
         }));
 
-        // 构建 slave 查找表（跳过合并区域内的非 master 单元格）
+        // slave 查找表
         const slavePositions = new Set<string>();
         for (const m of mergeData) {
             for (let r = m.startRow; r <= m.endRow; r++) {
@@ -133,7 +205,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
             }
         }
 
-        // 构建 master 合并信息查找表
+        // master 合并信息查找表
         const mergeLookup = new Map<string, SnapshotCell['merge']>();
         for (const m of mergeData) {
             const rangeLabel = `${rowColToA1(m.startRow, m.startColumn)}:${rowColToA1(m.endRow, m.endColumn)}`;
@@ -162,13 +234,19 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
                     // 解析样式
                     const rawStyle = cell.s;
                     let styleData: Record<string, unknown> | null = null;
+                    let resolvedStyle: Record<string, unknown> | undefined;
                     if (rawStyle) {
                         if (typeof rawStyle === 'string') {
-                            styleData = stylesMap ? parseStyleData(stylesMap[rawStyle]) : null;
+                            resolvedStyle = stylesMap ? stylesMap[rawStyle] : undefined;
+                            styleData = parseStyleData(resolvedStyle);
                         } else if (typeof rawStyle === 'object') {
-                            styleData = parseStyleData(rawStyle as Record<string, unknown>);
+                            resolvedStyle = rawStyle as Record<string, unknown>;
+                            styleData = parseStyleData(resolvedStyle);
                         }
                     }
+
+                    // 提取边框数据
+                    const borders = extractBordersFromStyle(resolvedStyle);
 
                     // 解析富文本
                     let richText: SnapshotCell['richText'] | undefined;
@@ -182,7 +260,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
                     }
 
                     const value = (cell.v != null && cell.v !== '') ? cell.v : richTextValue;
-                    if (value == null && !cell.f && !richText) continue;
+                    if (value == null && !cell.f && !richText && !borders) continue;
 
                     const mergeInfo = mergeLookup.get(key) || undefined;
 
@@ -193,6 +271,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
                     if (richText) snapshotCell.richText = richText;
                     if (cell.f) snapshotCell.formula = cell.f as string;
                     if (styleData) snapshotCell.style = styleData;
+                    if (borders) snapshotCell.borders = borders;
                     if (mergeInfo) snapshotCell.merge = mergeInfo;
 
                     cells.push(snapshotCell);
@@ -207,20 +286,25 @@ export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
             return ar - br || ac - bc;
         });
 
-        const sheet: SnapshotSheet = {
+        // 行/列尺寸
+        const rawRowData = sheetData.rowData as Record<string, unknown> | undefined;
+        const rawColumnData = sheetData.columnData as Record<string, unknown> | undefined;
+        const rows = parseRowDimensions(rawRowData);
+        const columns = parseColumnDimensions(rawColumnData);
+
+        sheets.push({
             sheetId,
             name: sheetName,
             cells,
             mergeData,
-        };
-
-        const rowData = sheetData.rowData as Record<string, unknown> | undefined;
-        const columnData = sheetData.columnData as Record<string, unknown> | undefined;
-        if (rowData) sheet.rowData = rowData;
-        if (columnData) sheet.columnData = columnData;
-
-        sheets.push(sheet);
+            defaultRowHeight,
+            defaultColumnWidth,
+            rowCount,
+            columnCount,
+            rows,
+            columns,
+        });
     }
 
-    return { styles, sheets };
+    return { styles, sheets, sheetOrder };
 }

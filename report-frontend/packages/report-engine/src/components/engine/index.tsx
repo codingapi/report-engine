@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { UniverSheet, MessageType, findBlockAtCell } from '@coding-report/report-univer';
-import type { MenuGroupDef, CellRange, MessageConfig } from '@coding-report/report-univer';
+import type { MenuGroupDef, CellRange, MessageConfig, FieldDropInfo, UniverSheetHandle } from '@coding-report/report-univer';
 import type { SelectedCellInfo, LoopBlockConfig } from '../properties/types';
 
 export interface SheetPanelProps {
@@ -14,6 +14,8 @@ export interface SheetPanelProps {
     onRemoveLoopBlock?: (id: string) => void;
     /** 循环块数据 */
     loopBlocks?: Record<string, LoopBlockConfig>;
+    /** 字段拖入回调 — 返回要写入单元格的值 */
+    onFieldDrop?: (info: FieldDropInfo) => string | undefined;
 }
 
 const SheetPanel: React.FC<SheetPanelProps> = ({
@@ -22,8 +24,10 @@ const SheetPanel: React.FC<SheetPanelProps> = ({
     onEditLoopBlock,
     onRemoveLoopBlock,
     loopBlocks = {},
+    onFieldDrop,
 }) => {
     const [message, setMessage] = useState<MessageConfig | null>(null);
+    const sheetRef = useRef<UniverSheetHandle>(null);
 
     // 声明式右键菜单定义
     const contextMenuGroups = useMemo<MenuGroupDef[]>(() => ([
@@ -74,13 +78,24 @@ const SheetPanel: React.FC<SheetPanelProps> = ({
         },
     ]), [onCreateLoopBlock, onEditLoopBlock, onRemoveLoopBlock, loopBlocks]);
 
+    // 处理字段拖入
+    const handleFieldDrop = (info: FieldDropInfo) => {
+        if (!onFieldDrop) return;
+        const value = onFieldDrop(info);
+        if (value != null && sheetRef.current) {
+            sheetRef.current.setCellValue(info.sheetId, info.row, info.column, value);
+        }
+    };
+
     return (
         <div style={{ height: '100%', position: 'relative' }}>
             <UniverSheet
+                ref={sheetRef}
                 style={{ height: '100%' }}
                 onCellSelect={onCellSelect}
                 contextMenuGroups={contextMenuGroups}
                 loopBlocks={loopBlocks}
+                onFieldDrop={handleFieldDrop}
                 message={message}
                 onMessageConsumed={() => setMessage(null)}
             />

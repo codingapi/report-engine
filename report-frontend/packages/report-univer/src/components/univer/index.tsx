@@ -3,25 +3,29 @@ import { setupUniver } from '../../core/setup';
 import type { UniverAPI } from '../../core/setup';
 import { registerCellSelection } from '../../core/cell-selection';
 import { buildContextMenus, updateMenuGroups } from '../../core/context-menu';
-import { syncLoopBlockBorders } from '../../core/borders';
+import { syncHighlights, disposeAllHighlights } from '../../core/highlight';
+import { registerDragDrop } from '../../core/drag-drop';
 import { extractSnapshot } from '../../core/snapshot';
 import type { UniverSheetProps, UniverSheetHandle } from './type';
-import type { LoopBlockConfig, MenuGroupDef } from '../../types';
+import type { LoopBlockConfig, FieldDropInfo } from '../../types';
 
 export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
     (props, ref) => {
         const containerRef = useRef<HTMLDivElement>(null);
         const univerAPIRef = useRef<UniverAPI>(null);
-        const prevLoopBlocksRef = useRef<Record<string, LoopBlockConfig>>({});
+        const highlightDisposablesRef = useRef<Map<string, unknown>>(new Map());
         const menusBuiltRef = useRef(false);
 
         // 用 ref 保存最新回调，避免闭包过期
         const onCellSelectRef = useRef(props.onCellSelect);
         onCellSelectRef.current = props.onCellSelect;
 
+        const onFieldDropRef = useRef(props.onFieldDrop);
+        onFieldDropRef.current = props.onFieldDrop;
+
         const style = props.style || { height: '100vh' };
 
-        // 暴露命令式句柄（getSnapshot）
+        // 暴露命令式句柄
         useImperativeHandle(ref, () => ({
             getSnapshot: () => {
                 const api = univerAPIRef.current;
@@ -29,6 +33,15 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 const workbook = api.getActiveWorkbook();
                 if (!workbook) return null;
                 return extractSnapshot(workbook);
+            },
+            setCellValue: (sheetId: string, row: number, column: number, value: string) => {
+                const api = univerAPIRef.current;
+                if (!api) return;
+                const workbook = api.getActiveWorkbook();
+                if (!workbook) return;
+                const sheet = workbook.getSheetBySheetId(sheetId);
+                if (!sheet) return;
+                sheet.getRange(row, column).setValue(value);
             },
         }));
 
@@ -48,15 +61,25 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 menusBuiltRef.current = true;
             }
 
-            return dispose;
+            // 注册拖拽事件
+            const cleanupDragDrop = registerDragDrop(
+                containerRef.current,
+                univerAPI,
+                () => onFieldDropRef.current,
+            );
+
+            return () => {
+                cleanupDragDrop();
+                disposeAllHighlights(highlightDisposablesRef.current);
+                dispose();
+            };
         }, []);
 
-        // 同步菜单定义（当 props 变化时更新模块级引用）
+        // 同步菜单定义
         useEffect(() => {
             if (props.contextMenuGroups) {
                 updateMenuGroups(props.contextMenuGroups);
 
-                // 首次如果菜单还没构建，则构建
                 if (!menusBuiltRef.current && props.contextMenuGroups.length && univerAPIRef.current) {
                     buildContextMenus(univerAPIRef.current, props.contextMenuGroups);
                     menusBuiltRef.current = true;
@@ -64,14 +87,17 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             }
         }, [props.contextMenuGroups]);
 
-        // 同步循环块边框
+        // 同步循环块高亮
         useEffect(() => {
             const api = univerAPIRef.current;
             if (!api) return;
 
             const nextBlocks = props.loopBlocks || {};
-            syncLoopBlockBorders(api, prevLoopBlocksRef.current, nextBlocks);
-            prevLoopBlocksRef.current = nextBlocks;
+            highlightDisposablesRef.current = syncHighlights(
+                api,
+                highlightDisposablesRef.current,
+                nextBlocks,
+            );
         }, [props.loopBlocks]);
 
         // 显示消息提示

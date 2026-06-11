@@ -74,6 +74,66 @@ export interface MenuGroupDef {
     items: MenuItemDef[];
 }
 
+// ─── 字段拖拽 ────────────────────────────────────────────────
+
+/** 字段拖入事件信息 */
+export interface FieldDropInfo {
+    sheetId: string;
+    row: number;
+    column: number;
+    /** 原始拖拽数据，格式由消费者决定 */
+    data: string;
+}
+
+// ─── 边框样式 ────────────────────────────────────────────────
+
+/** 边框线型（与 Univer BorderStyleTypes 对应） */
+export enum BorderStyleType {
+    NONE = 0,
+    THIN = 1,
+    HAIR = 2,
+    DOTTED = 3,
+    DASHED = 4,
+    DASH_DOT = 5,
+    DASH_DOT_DOT = 6,
+    DOUBLE = 7,
+    MEDIUM = 8,
+    MEDIUM_DASHED = 9,
+    MEDIUM_DASH_DOT = 10,
+    MEDIUM_DASH_DOT_DOT = 11,
+    SLANT_DASH_DOT = 12,
+    THICK = 13,
+}
+
+/** 单条边框信息 */
+export interface BorderSide {
+    style: BorderStyleType;
+    /** RGB 颜色值（如 "#000000"） */
+    color: string;
+}
+
+/** 单元格四边边框 */
+export interface CellBorderData {
+    top?: BorderSide;
+    right?: BorderSide;
+    bottom?: BorderSide;
+    left?: BorderSide;
+}
+
+// ─── 行列尺寸 ────────────────────────────────────────────────
+
+/** 行尺寸信息 */
+export interface RowDimension {
+    height: number;
+    hidden: boolean;
+}
+
+/** 列尺寸信息 */
+export interface ColumnDimension {
+    width: number;
+    hidden: boolean;
+}
+
 // ─── 消息提示 ────────────────────────────────────────────────
 
 /** 消息类型 */
@@ -112,6 +172,8 @@ export interface SnapshotCell {
     formula?: string;
     /** 解析后的样式数据 */
     style?: Record<string, unknown>;
+    /** 边框样式数据 */
+    borders?: CellBorderData;
     /** 合并区域信息（仅 master 单元格） */
     merge?: {
         mergeRange: string;
@@ -133,12 +195,24 @@ export interface SnapshotSheet {
         endRow: number;
         endColumn: number;
     }>;
-    rowData?: Record<string, unknown>;
-    columnData?: Record<string, unknown>;
+    /** 默认行高 */
+    defaultRowHeight: number;
+    /** 默认列宽 */
+    defaultColumnWidth: number;
+    /** 总行数 */
+    rowCount: number;
+    /** 总列数 */
+    columnCount: number;
+    /** 自定义行尺寸（仅包含非默认行） */
+    rows: Record<string, RowDimension>;
+    /** 自定义列尺寸（仅包含非默认列） */
+    columns: Record<string, ColumnDimension>;
 }
 
 /** 完整工作簿快照 */
 export interface WorkbookSnapshot {
     styles: Record<string, Record<string, unknown>>;
     sheets: SnapshotSheet[];
+    /** 工作表显示顺序 */
+    sheetOrder: string[];
 }

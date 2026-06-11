@@ -1,5 +1,6 @@
 import type {
     SelectedCellInfo,
+    FieldDropInfo,
     LoopBlockConfig,
     MenuGroupDef,
     MessageConfig,
@@ -16,8 +17,11 @@ export interface UniverSheetProps {
     /** 声明式右键菜单分组 */
     contextMenuGroups?: MenuGroupDef[];
 
-    /** 循环块数据 — 变化时自动同步蓝色虚线边框 */
+    /** 循环块数据 — 变化时自动同步半透明高亮覆盖 */
     loopBlocks?: Record<string, LoopBlockConfig>;
+
+    /** 字段拖入回调 */
+    onFieldDrop?: (info: FieldDropInfo) => void;
 
     /** 消息提示（非 null 时显示，消费后调用 onMessageConsumed） */
     message?: MessageConfig | null;
@@ -29,4 +33,6 @@ export interface UniverSheetProps {
 export interface UniverSheetHandle {
     /** 提取当前工作簿的结构化快照 */
     getSnapshot: () => WorkbookSnapshot | null;
+    /** 设置指定单元格的值 */
+    setCellValue: (sheetId: string, row: number, column: number, value: string) => void;
 }
