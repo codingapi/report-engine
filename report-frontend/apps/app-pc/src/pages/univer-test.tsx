@@ -10,8 +10,8 @@
  */
 
 import React, { useRef, useState, useMemo, useCallback } from 'react';
-import { Button, Tag, Space, Select, Input, Empty, Divider } from 'antd';
-import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { Button, Tag, Space, Select, Input, Empty, Divider, message as antdMessage } from 'antd';
+import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, ExperimentOutlined } from '@ant-design/icons';
 
 // report-univer 组件和类型
 import {
@@ -37,7 +37,10 @@ import type { PropKindTemplate } from './univer-test-props';
 import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 
 // 测试数据
-import { MOCK_SNAPSHOT } from './univer-test-utils';
+import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
+
+// API
+import { exportExcel } from '@/api/example';
 import { mockDataConfig } from '../data/mock-data';
 
 // ─── 字段选项构建 ──────────────────────────────────────
@@ -86,6 +89,9 @@ const UniverTestPage: React.FC = () => {
 
   // 消息提示
   const [message, setMessage] = useState<{ content: string; type?: MessageType } | null>(null);
+
+  // 导出 Excel 加载状态
+  const [exporting, setExporting] = useState(false);
 
   // ─── 右键菜单（循环块） ──────────────────────────
 
@@ -309,6 +315,52 @@ const UniverTestPage: React.FC = () => {
     }
   }, []);
 
+  // ─── 加载样式测试数据 ──────────────────────────
+
+  const handleLoadStyleTest = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = sheetRef.current?.loadSnapshot(STYLE_TEST_SNAPSHOT as any);
+    if (result) {
+      setPropStore((prev) => ({
+        cellProps: { ...prev.cellProps, ...result.cellProps },
+        mergeProps: { ...prev.mergeProps, ...result.mergeProps },
+        loopBlockProps: { ...prev.loopBlockProps, ...result.loopBlockProps },
+      }));
+      antdMessage.success('样式测试数据已加载');
+    }
+  }, []);
+
+  // ─── 导出 Excel ──────────────────────────────
+
+  const handleExportExcel = useCallback(async () => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) {
+      antdMessage.warning('无法获取快照数据');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const blob = await exportExcel(snapshot);
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'report.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      antdMessage.success('Excel 导出成功');
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误';
+      antdMessage.error(`导出失败: ${errMsg}`);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
   // ─── 样式操作（通过 CellHandle） ──────────────────
 
   const handle = cellHandleRef.current;
@@ -332,6 +384,18 @@ const UniverTestPage: React.FC = () => {
           </Button>
           <Button icon={<PlayCircleOutlined />} onClick={handleRender}>
             渲染快照
+          </Button>
+          <Button icon={<ExperimentOutlined />} onClick={handleLoadStyleTest}>
+            样式测试数据
+          </Button>
+          <Button
+            type="primary"
+            ghost
+            icon={<DownloadOutlined />}
+            loading={exporting}
+            onClick={handleExportExcel}
+          >
+            导出 Excel
           </Button>
           <Button icon={<HighlightOutlined />} onClick={handleCreateLoopBlock}>
             创建循环块
