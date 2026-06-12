@@ -7,7 +7,7 @@ import type {
     ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelFont,
     ExcelBorders, ExcelBorder, ExcelBorderStyle,
     ExcelRichText, ExcelMerge, ExcelRow, ExcelColumn,
-} from '../types';
+} from '@/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FWorkbook = any;

@@ -1,4 +1,4 @@
-import type { LoopBlockConfig } from '../types';
+import type { LoopBlockConfig } from '@/types';
 
 /**
  * 在 loopBlocks 中查找包含指定行列的循环块

@@ -3,7 +3,7 @@
  * 从声明式 MenuGroupDef[] 构建 Univer 右键菜单
  */
 
-import type { MenuGroupDef, CellRange } from '../types';
+import type { MenuGroupDef, CellRange } from '@/types';
 import type { UniverAPI } from './setup';
 
 // 模块级 ref：存储最新的菜单定义（action 回调通过此间接调用，避免闭包过期）

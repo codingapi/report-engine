@@ -3,7 +3,7 @@
  * 使用 Univer highlightRanges API，支持 selection 变更后自动重应用
  */
 
-import type { LoopBlockConfig } from '../types';
+import type { LoopBlockConfig } from '@/types';
 import type { UniverAPI } from './setup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,7 +5,8 @@ import type {
     MenuGroupDef,
     MessageConfig,
     ExcelWorkbook,
-} from '../../types';
+} from '@/types';
+import React from "react";
 
 export interface UniverSheetProps {
     /** 容器样式 */

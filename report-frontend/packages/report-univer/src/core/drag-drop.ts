@@ -3,7 +3,7 @@
  * 监听容器 dragover/drop 事件，提取目标单元格信息并回调
  */
 
-import type { FieldDropInfo } from '../types';
+import type { FieldDropInfo } from '@/types';
 import type { UniverAPI } from './setup';
 
 /**

@@ -3,7 +3,7 @@
  * 注册 SelectionChanged 事件，提取干净的 SelectedCellInfo
  */
 
-import type { SelectedCellInfo } from '../types';
+import type { SelectedCellInfo } from '@/types';
 import type { UniverAPI } from './setup';
 import type { HighlightManager } from './highlight';
 

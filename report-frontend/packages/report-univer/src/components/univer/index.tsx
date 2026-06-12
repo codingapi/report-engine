@@ -1,12 +1,12 @@
 import React, { useEffect, useImperativeHandle, useRef, forwardRef } from 'react';
-import { setupUniver } from '../../core/setup';
-import type { UniverAPI } from '../../core/setup';
-import { registerCellSelection } from '../../core/cell-selection';
-import { buildContextMenus, updateMenuGroups } from '../../core/context-menu';
-import { createHighlightManager } from '../../core/highlight';
-import type { HighlightManager } from '../../core/highlight';
-import { registerDragDrop } from '../../core/drag-drop';
-import { extractSnapshot } from '../../core/snapshot';
+import { setupUniver } from '@/core/setup';
+import type { UniverAPI } from '@/core/setup';
+import { registerCellSelection } from '@/core/cell-selection';
+import { buildContextMenus, updateMenuGroups } from '@/core/context-menu';
+import { createHighlightManager } from '@/core/highlight';
+import type { HighlightManager } from '@/core/highlight';
+import { registerDragDrop } from '@/core/drag-drop';
+import { extractSnapshot } from '@/core/snapshot';
 import type { UniverSheetProps, UniverSheetHandle } from './type';
 
 export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
