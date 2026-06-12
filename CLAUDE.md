@@ -75,14 +75,17 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 ### 后端 (Java 17 + Maven)
 
 ```bash
-# 编译全部模块（framework + example）
+# 编译全部模块（framework + excel + example）
 ./mvnw clean compile
+
+# 运行 excel 模块测试（纯 POI 测试，无外部依赖）
+./mvnw test -pl report-engine-excel
 
 # 运行 framework 模块测试（需要本地 PostgreSQL: localhost:5432/report）
 ./mvnw test -pl report-engine-framework
 
 # 运行单个测试类
-./mvnw test -pl report-engine-framework -Dtest=DataServiceTest
+./mvnw test -pl report-engine-excel -Dtest=ExcelImporterTest
 
 # 仅编译 travis profile（framework 模块 + JaCoCo 覆盖率）
 ./mvnw clean test -P travis
@@ -90,7 +93,7 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 # 发布到 Maven Central（需要 GPG 签名）
 ./mvnw clean deploy -P ossrh
 
-# 启动 example 应用（端口 8090，目前为空壳）
+# 启动 example 应用（端口 8080）
 ./mvnw spring-boot:run -pl report-engine-example
 ```
 
@@ -121,6 +124,7 @@ pnpm push
 ```
 report-engine/
 ├── report-engine-framework/     # 后端核心框架（可发布到 Maven Central）
+├── report-engine-excel/         # Excel 构建与解析模块（Apache POI 封装）
 ├── report-engine-example/       # 后端示例 Spring Boot 应用
 └── report-frontend/             # 前端 pnpm monorepo
     ├── packages/report-univer/  # @coding-report/report-univer — Univer 电子表格 React 封装
@@ -132,9 +136,26 @@ report-engine/
 
 ### 模块关系
 
-`report-engine-framework` 是一个 Spring Boot 自动配置库（starter），不依赖任何 Web 框架运行时。`report-engine-example` 是可启动的 Spring Boot 应用（目前仅有启动类，尚未引入 framework 依赖）。
+- `report-engine-framework`：Spring Boot 自动配置库（starter），不依赖任何 Web 框架运行时
+- `report-engine-excel`：独立的 Excel 构建/解析库，封装 Apache POI，提供 JSON ↔ .xlsx 双向转换。不依赖 Spring，纯 Java 实现
+- `report-engine-example`：可启动的 Spring Boot 应用，依赖 `report-engine-excel` 提供 Excel 导入导出 API。目前未依赖 `report-engine-framework`
 
-### 核心包结构 (`com.codingapi.report`)
+### report-engine-excel 模块 (`com.codingapi.report.excel`)
+
+| 类/包 | 职责 |
+|---|---|
+| `ExcelExporter` | `Workbook` POJO → `.xlsx` 字节流（POI 构建） |
+| `ExcelImporter` | `.xlsx` 字节流 → `Workbook` POJO（POI 解析），与 Exporter 互为逆操作 |
+| `FontRegistry` | 字体目录扫描，解析 .ttf/.otf 文件元数据 |
+| `pojo/` | 数据模型：`Workbook` → `Sheet` → `Cell` / `Merge` / `Row` / `Column`；`Style` → `Font` / `Borders` / `Padding` / `RichText` |
+
+POJO 模型同时作为前后端 JSON 契约：前端 `ExcelWorkbook` TypeScript 类型与后端 `Workbook` POJO 的字段名一一对应，Jackson 序列化/反序列化保持兼容。
+
+**样式支持**：字体（family/size/bold/italic/underline/strikethrough/color）、对齐（5 种水平 + 3 种垂直）、边框（13 种线型 + 颜色）、填充、旋转、换行、数字格式、富文本分段样式、缩进。样式构建使用缓存机制（JSON 序列化作为 cache key），避免超出 POI 64K 样式上限。
+
+**单位转换**：行高使用 pixels ↔ points（96DPI → 72DPI），列宽使用 pixels ↔ width units（×256/7）。
+
+### framework 核心包结构 (`com.codingapi.report`)
 
 | 包 | 职责 |
 |---|---|
@@ -193,8 +214,16 @@ app-pc (演示应用, Rsbuild)
 
 状态管理使用纯 React hooks（useState/useCallback），无外部状态库。
 
+### 前后端 Excel 数据流
+
+`report-univer` 包提供双向快照能力，与后端 `report-engine-excel` 共享同一 JSON 结构（`ExcelWorkbook`）：
+
+- **导出**：`sheetRef.getSnapshot()` → `extractSnapshot()` → `ExcelWorkbook` JSON → `POST /api/excel/generate` → `.xlsx` 下载
+- **导入**：上传 `.xlsx` → `POST /api/excel/import` → `ExcelWorkbook` JSON → `sheetRef.loadSnapshot()` → 渲染到 Univer
+
 ### 关键类型系统
 
+- `ExcelWorkbook` / `Workbook`：前后端共享的 Excel 模型，包含 sheets → cells / merges / rows / columns / loopBlocks
 - `DataConfig` → `TableConfig[]` → `FieldConfig[]`：数据源配置，字段包含 dataType（STRING/NUMBER/DATE/DATETIME/BOOLEAN/JSON）和外键引用
 - `ConditionRule`：条件规则，包含字段、运算符（12种 CompareOperator）、值
 - `CalcMethod`：聚合计算方式（COUNT/SUM/AVG/MAX/MIN/COUNT_DISTINCT/COUNT_TRUE/COUNT_FALSE）
@@ -207,7 +236,7 @@ app-pc (演示应用, Rsbuild)
 ## 注意事项
 
 - 后端默认数据库为 PostgreSQL（localhost:5432/report），运行 framework 测试前需确保数据库可用
-- `report-engine-example` 目前未依赖 `report-engine-framework`，example 模块需要补充实际示例代码
+- `report-engine-excel` 的测试不需要外部依赖（纯 POI 单元测试），可独立运行
 - 前端库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力，消费方需要自行处理依赖
 - 后端 `stype` 包名是 `style` 的拼写变体，重命名时需注意
 - 使用 Lombok（`@Data` / `@Builder`），但部分类未加注解导致缺少 getter/setter
