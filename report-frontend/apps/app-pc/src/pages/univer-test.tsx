@@ -40,7 +40,7 @@ import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
 // API
-import { exportExcel, importExcel } from '@/api/example';
+import { exportExcel, importExcel, fetchFonts } from '@/api/example';
 import { mockDataConfig } from '../data/mock-data';
 
 // ─── 字段选项构建 ──────────────────────────────────────
@@ -169,6 +169,17 @@ const UniverTestPage: React.FC = () => {
       ],
     },
   ]), [loopBlocks]);
+
+  // ─── 字体请求（框架内部处理缓存和注入，这里只负责 API 调用）───
+
+  const handleFontRequest = useCallback(async () => {
+    try {
+      return await fetchFonts();
+    } catch {
+      console.warn('加载后端字体列表失败');
+      return null;
+    }
+  }, []);
 
   // ─── 单元格选中回调 ──────────────────────────────────
 
@@ -514,6 +525,7 @@ const UniverTestPage: React.FC = () => {
         <UniverSheet
           ref={sheetRef}
           style={{ flex: 1, height: '100%' }}
+          onFontRequest={handleFontRequest}
           onCellSelect={handleCellSelect}
           onFieldDrop={handleFieldDrop}
           contextMenuGroups={contextMenuGroups}

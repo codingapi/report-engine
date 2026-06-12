@@ -1,6 +1,6 @@
 // 组件
 export { UniverSheet } from '@/components/univer';
-export type { UniverSheetProps, UniverSheetHandle } from '@/components/univer/type';
+export type { UniverSheetProps, UniverSheetHandle, FontConfig, FontItem } from '@/components/univer/type';
 export { DefaultLoopBlockPanel } from '@/components/loop-block-panel';
 
 // 工具函数

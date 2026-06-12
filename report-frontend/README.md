@@ -1,51 +1,73 @@
-# Report Engine
+# Report Engine Frontend
 
 基于 [Univer](https://univer.ai) 的 React 电子表格/报表组件库。
 
 ## 项目结构
 
 ```
-report-engine/
+report-frontend/
 ├── packages/
-│   └── report-engine/    # 组件库 (@coding-report/report-engine)
+│   ├── report-univer/     # @coding-report/report-univer — Univer 封装层
+│   └── report-engine/     # @coding-report/report-engine — 报表设计器组件库
 └── apps/
-    └── app-pc/           # Demo 应用
+    └── app-pc/            # @report-example/app-pc — 演示应用
 ```
+
+### 包依赖关系
+
+```
+app-pc → report-engine → report-univer → @univerjs/* v0.25
+```
+
+构建顺序：report-univer → report-engine（`pnpm build` 脚本已处理）。
 
 ## 快速开始
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 启动组件库 watch 模式
-pnpm run watch:report-engine
-
-# 启动 Demo 应用开发服务器（新终端）
-pnpm run dev:app-pc
-
-# 构建组件库
-pnpm run build
+pnpm install        # 安装依赖
+pnpm build          # 构建所有库包
+pnpm dev:app-pc     # 启动演示应用
 ```
 
-## 当前状态
+### 开发模式
 
-项目处于早期开发阶段，主要功能：
+```bash
+pnpm watch:report-univer   # 库包变更后自动重编译（终端 1）
+pnpm dev:app-pc            # 启动应用（终端 2）
+```
 
-- [x] 三栏布局（数据源配置 / 表格 / 属性设置）
-- [x] 可拖拽调整面板宽度
-- [x] 左右面板折叠/展开
-- [ ] 数据源配置面板
-- [ ] 属性设置面板
-- [ ] 更多表格功能扩展
+## 核心包说明
+
+### @coding-report/report-univer
+
+Univer 电子表格的 React 封装层，提供：
+
+- `UniverSheet` 组件：声明式 props + 命令式 ref（`UniverSheetHandle`）
+- 快照导入/导出：`extractSnapshot()` / `renderSnapshot()` 与后端 `ExcelWorkbook` JSON 互通
+- 字体管理：`onFontRequest` 回调 + localStorage 缓存 + @font-face 注入
+- 循环块高亮、右键菜单、字段拖拽
+
+库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力。
+
+### @coding-report/report-engine
+
+报表设计器组件库，三栏式布局：
+
+- **左面板**：数据源树形浏览
+- **中面板**：Univer 电子表格（报表模板设计）
+- **右面板**：单元格属性配置（条件规则 + 计算方式）
+
+### app-pc
+
+演示应用，基于 Rsbuild 构建，用于验证和展示组件库能力。
 
 ## 技术栈
 
-- React 18 + TypeScript 5.9
-- Univer v0.24（电子表格引擎）
-- antd v6（UI 组件）
-- Rslib / Rsbuild（构建工具）
-- pnpm workspaces
+- React 18 + TypeScript 5.9 + Ant Design 6
+- Univer 0.25（电子表格引擎，插件模式）
+- Rslib（库包构建）+ Rsbuild（应用构建）
+- Rstest + @testing-library/react + happy-dom（测试）
+- pnpm 10 workspaces
 
 ## License
 

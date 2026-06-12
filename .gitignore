@@ -35,3 +35,4 @@ build/
 ### miss ###
 .DS_Store
 .codegraph
+.fonts

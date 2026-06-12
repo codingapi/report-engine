@@ -8,7 +8,10 @@ import type { HighlightManager } from '@/core/highlight';
 import { registerDragDrop } from '@/core/drag-drop';
 import { extractSnapshot } from '@/core/snapshot';
 import { renderSnapshot } from '@/core/render';
-import type { UniverSheetProps, UniverSheetHandle } from './type';
+import type { UniverSheetProps, UniverSheetHandle, FontItem } from './type';
+
+/** localStorage 缓存 key */
+const FONT_CACHE_KEY = 'report-fonts-v2';
 
 export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
     (props, ref) => {
@@ -85,6 +88,12 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 sheet.setRowCount(rowCount);
                 sheet.setColumnCount(columnCount);
             },
+
+            addFonts: (fonts) => {
+                const api = univerAPIRef.current;
+                if (!api || fonts.length === 0) return;
+                api.addFonts(fonts);
+            },
         }));
 
         // 初始化 Univer（仅一次）
@@ -118,6 +127,9 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 () => onFieldDropRef.current,
             );
 
+            // 延迟通知父组件，确保 useImperativeHandle 已执行、ref 可用
+            setTimeout(() => props.onReady?.(), 0);
+
             return () => {
                 cleanupDragDrop();
                 highlightManagerRef.current?.dispose();
@@ -125,6 +137,67 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 dispose();
             };
         }, []);
+
+        // 字体加载（Univer 初始化后自动执行）
+        useEffect(() => {
+            if (!props.onFontRequest) return;
+
+            const loadFonts = async () => {
+                try {
+                    // 优先从 localStorage 读取缓存
+                    let items: FontItem[] | null = null;
+                    try {
+                        const cached = localStorage.getItem(FONT_CACHE_KEY);
+                        if (cached) items = JSON.parse(cached);
+                    } catch { /* 缓存解析失败，走回调 */ }
+
+                    // 缓存未命中，请求父组件提供字体数据
+                    if (!items) {
+                        const result = await props.onFontRequest!();
+                        if (result && result.length > 0) {
+                            items = result;
+                            try { localStorage.setItem(FONT_CACHE_KEY, JSON.stringify(items)); } catch { /* 忽略 */ }
+                        }
+                    }
+
+                    if (!items || items.length === 0) return;
+
+                    // .ttc（TrueType Collection）浏览器 @font-face 无法加载，跳过
+                    const loadable = items.filter(
+                        (item) => !item.filename.toLowerCase().endsWith('.ttc'),
+                    );
+                    if (loadable.length === 0) return;
+
+                    // 注入 @font-face 规则
+                    const styleId = 'report-engine-fonts';
+                    if (!document.getElementById(styleId)) {
+                        const styleEl = document.createElement('style');
+                        styleEl.id = styleId;
+                        styleEl.textContent = loadable.map((item) => `
+@font-face {
+  font-family: '${item.family}';
+  src: url('${item.url}');
+  font-display: swap;
+}`).join('\n');
+                        document.head.appendChild(styleEl);
+                    }
+
+                    // 注册到 Univer 字体下拉菜单
+                    const api = univerAPIRef.current;
+                    if (api) {
+                        api.addFonts(
+                            loadable.map((item) => ({ value: item.family, label: item.family })),
+                        );
+                    }
+                } catch {
+                    console.warn('字体加载失败，将仅使用内置字体');
+                }
+            };
+
+            // 延迟执行，确保 useImperativeHandle 已完成
+            const timer = setTimeout(loadFonts, 0);
+            return () => clearTimeout(timer);
+        }, [props.onFontRequest]);
 
         // 同步菜单定义
         useEffect(() => {

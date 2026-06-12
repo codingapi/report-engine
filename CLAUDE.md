@@ -62,6 +62,13 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. 代码提交纪律
+
+**完成修改后不要立即 git commit/push，等用户确认后再提交。**
+
+- 代码改完后先展示变更摘要，等用户说"提交"或"commit"再执行
+- 除非用户明确允许，不要自动提交和推送
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
@@ -75,14 +82,17 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 ### 后端 (Java 17 + Maven)
 
 ```bash
-# 编译全部模块（framework + example）
+# 编译全部模块（framework + excel + example）
 ./mvnw clean compile
+
+# 运行 excel 模块测试（纯 POI 测试，无外部依赖）
+./mvnw test -pl report-engine-excel
 
 # 运行 framework 模块测试（需要本地 PostgreSQL: localhost:5432/report）
 ./mvnw test -pl report-engine-framework
 
 # 运行单个测试类
-./mvnw test -pl report-engine-framework -Dtest=DataServiceTest
+./mvnw test -pl report-engine-excel -Dtest=ExcelImporterTest
 
 # 仅编译 travis profile（framework 模块 + JaCoCo 覆盖率）
 ./mvnw clean test -P travis
@@ -90,7 +100,7 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 # 发布到 Maven Central（需要 GPG 签名）
 ./mvnw clean deploy -P ossrh
 
-# 启动 example 应用（端口 8090，目前为空壳）
+# 启动 example 应用（端口 8080）
 ./mvnw spring-boot:run -pl report-engine-example
 ```
 
@@ -120,8 +130,10 @@ pnpm push
 
 ```
 report-engine/
-├── report-engine-framework/     # 后端核心框架（可发布到 Maven Central）
-├── report-engine-example/       # 后端示例 Spring Boot 应用
+├── report-engine-framework/     # 后端核心框架（数据源/组件/元数据，可发布到 Maven Central）
+├── report-engine-excel/         # Excel 构建与解析模块（Apache POI 封装 + 字体管理）
+├── report-engine-starter/       # Spring Boot 自动配置模块（Controller + Bean 装配）
+├── report-engine-example/       # 后端示例 Spring Boot 应用（仅含启动类）
 └── report-frontend/             # 前端 pnpm monorepo
     ├── packages/report-univer/  # @coding-report/report-univer — Univer 电子表格 React 封装
     ├── packages/report-engine/  # @coding-report/report-engine — 报表设计器核心组件库
@@ -132,9 +144,57 @@ report-engine/
 
 ### 模块关系
 
-`report-engine-framework` 是一个 Spring Boot 自动配置库（starter），不依赖任何 Web 框架运行时。`report-engine-example` 是可启动的 Spring Boot 应用（目前仅有启动类，尚未引入 framework 依赖）。
+```
+report-engine-example (演示应用)
+  ├── report-engine-starter (自动配置 + REST API)
+  │     └── report-engine-excel (Excel + 字体)
+  └── report-engine-framework (数据源/组件)
+```
 
-### 核心包结构 (`com.codingapi.report`)
+- `report-engine-excel`：独立的 Excel 构建/解析库 + 字体管理。封装 Apache POI，提供 JSON ↔ .xlsx 双向转换。不依赖 Spring，纯 Java 实现
+- `report-engine-starter`：Spring Boot 自动配置模块。注册 FontRegistry Bean、提供 FontController 和 ExcelController REST API。`@ConditionalOnClass(RestController.class)` 控制 Web 组件按需装配
+- `report-engine-framework`：报表核心框架（数据源、组件体系、元数据扫描），自动配置通过 `AutoConfiguration.imports` 注册
+- `report-engine-example`：仅含 `ServerApplication` 启动类，业务逻辑全部在 starter/framework 中
+
+### report-engine-excel 模块 (`com.codingapi.report.excel`)
+
+| 类/包 | 职责 |
+|---|---|
+| `ExcelExporter` | `Workbook` POJO → `.xlsx` 字节流（POI 构建） |
+| `ExcelImporter` | `.xlsx` 字节流 → `Workbook` POJO（POI 解析），与 Exporter 互为逆操作 |
+| `FontRegistry` | 字体管理：双目录扫描（内置 + 自定义）、classpath 资源提取、文件名前缀排序、JVM 注册 |
+| `pojo/` | 数据模型：`Workbook` → `Sheet` → `Cell` / `Merge` / `Row` / `Column`；`Style` → `Font` / `Borders` / `Padding` / `RichText`；`FontInfo` 字体元数据 |
+
+POJO 模型同时作为前后端 JSON 契约：前端 `ExcelWorkbook` TypeScript 类型与后端 `Workbook` POJO 的字段名一一对应，Jackson 序列化/反序列化保持兼容。
+
+**样式支持**：字体（family/size/bold/italic/underline/strikethrough/color）、对齐（5 种水平 + 3 种垂直）、边框（13 种线型 + 颜色）、填充、旋转、换行、数字格式、富文本分段样式、缩进。样式构建使用缓存机制（JSON 序列化作为 cache key），避免超出 POI 64K 样式上限。
+
+**单位转换**：行高使用 pixels ↔ points（96DPI → 72DPI），列宽使用 pixels ↔ width units（×256/7）。
+
+### report-engine-starter 模块 (`com.codingapi.report.starter`)
+
+| 类/包 | 职责 |
+|---|---|
+| `ReportEngineAutoConfiguration` | 主配置类：注册 FontRegistry Bean，内部 WebConfiguration 注册 Controller |
+| `properties/ReportFontProperties` | 配置属性：`report.fonts.dir` 指定用户自定义字体目录 |
+| `controller/FontController` | 字体 API：`GET /api/fonts/list`（MultiResponse）+ `GET /api/fonts/file/{filename}`（文件下载） |
+| `controller/ExcelController` | Excel API：`POST /api/excel/generate`（二进制下载）+ `POST /api/excel/import`（SingleResponse） |
+
+### 字体管理系统
+
+**FontRegistry** 支持双目录模式：
+- **内置字体**（`resources/fonts/`）：通过 `extractBuiltinFonts()` 加载，开发模式直接引用 `target/classes/fonts/`，JAR 部署时提取到临时目录
+- **自定义字体**（`report.fonts.dir` 配置）：扫描用户指定目录
+- **排序**：通过文件名数字前缀（如 `01_微软雅黑.ttf` → order=1），无编号按文件名自然序排后
+- **API**：`FontController.listFonts()` 按族名去重、排除内置字体（避免 @font-face 覆盖系统字体）
+
+**前端字体加载**（`report-univer` 框架内处理）：
+- `UniverSheet` 通过 `onFontRequest` 回调向父组件请求字体数据
+- 内部自动处理：localStorage 缓存 → .ttc 过滤 → @font-face 注入 → `addFonts()` 注册
+- 父组件（如 `univer-test.tsx`）只负责调用 API 返回 `FontItem[]`（含 family/filename/url）
+- 字体文件 URL 由后端 API 返回（`FontItem.url`），框架不硬编码路径
+
+### framework 核心包结构 (`com.codingapi.report`)
 
 | 包 | 职责 |
 |---|---|
@@ -177,7 +237,7 @@ app-pc (演示应用, Rsbuild)
 ### 技术栈
 
 - React 18 + TypeScript 5.9 + Ant Design 6
-- 电子表格引擎：Univer 0.25（`@univerjs/presets` + `UniverSheetsCorePreset`）
+- 电子表格引擎：Univer 0.25（插件模式，手动注册 14 个插件，见 `setup.ts`）
 - 面板布局：`react-resizable-panels`
 - 响应式：RxJS 7.8
 - 构建工具：Rslib（库包）+ Rsbuild（应用）
@@ -193,8 +253,31 @@ app-pc (演示应用, Rsbuild)
 
 状态管理使用纯 React hooks（useState/useCallback），无外部状态库。
 
+### API 响应结构规范
+
+后端 JSON 接口统一使用 `com.codingapi.springboot.framework.dto.response` 包装：
+
+| 场景 | 类型 | JSON 结构 |
+|------|------|----------|
+| 无数据 | `Response` | `{ success, errCode?, errMessage? }` |
+| 单对象 | `SingleResponse<T>` | `{ success, data: T }` |
+| 列表 | `MultiResponse<T>` | `{ success, data: { total, list: T[] } }` |
+| KV 字典 | `MapResponse` | `{ success, data: { key: value } }` |
+
+文件下载接口（Excel 导出、字体文件）使用 `ResponseEntity<byte[]>` / `ResponseEntity<Resource>`，不走 Response 包装。
+
+**前端 axios 拦截器**（`api/index.ts`）自动解包：检测到 `success` 字段时，成功则替换 `response.data` 为 `data` 字段值，失败则 reject `errMessage`。非 JSON 响应（Blob）直接透传。
+
+### 前后端 Excel 数据流
+
+`report-univer` 包提供双向快照能力，与后端 `report-engine-excel` 共享同一 JSON 结构（`ExcelWorkbook`）：
+
+- **导出**：`sheetRef.getSnapshot()` → `extractSnapshot()` → `ExcelWorkbook` JSON → `POST /api/excel/generate` → `.xlsx` 下载
+- **导入**：上传 `.xlsx` → `POST /api/excel/import` → `ExcelWorkbook` JSON → `sheetRef.loadSnapshot()` → 渲染到 Univer
+
 ### 关键类型系统
 
+- `ExcelWorkbook` / `Workbook`：前后端共享的 Excel 模型，包含 sheets → cells / merges / rows / columns / loopBlocks
 - `DataConfig` → `TableConfig[]` → `FieldConfig[]`：数据源配置，字段包含 dataType（STRING/NUMBER/DATE/DATETIME/BOOLEAN/JSON）和外键引用
 - `ConditionRule`：条件规则，包含字段、运算符（12种 CompareOperator）、值
 - `CalcMethod`：聚合计算方式（COUNT/SUM/AVG/MAX/MIN/COUNT_DISTINCT/COUNT_TRUE/COUNT_FALSE）
@@ -204,10 +287,18 @@ app-pc (演示应用, Rsbuild)
 
 `UniverSheet` 组件裁剪了大量菜单项（冻结行列、权限保护、公式栏等），仅保留报表设计所需的最小功能集。循环块通过 Univer 原生 `setBorder()` API 绘制蓝色虚线边框，右键菜单通过 `univerAPI.createMenu()` 注册。
 
+### 前端字体管理
+
+`UniverSheet` 框架内置字体加载能力，与后端解耦：
+- **`onFontRequest` 回调**：框架需要字体时调用，父组件负责 API 调用并返回 `FontItem[]`（含 `family` / `filename` / `url`）
+- **内部自动处理**：localStorage 缓存（`report-fonts-vN`）→ .ttc 文件过滤 → `@font-face` CSS 注入 → `univerAPI.addFonts()` 注册
+- **URL 不硬编码**：字体文件下载地址由后端 `FontItem.url` 提供，框架直接使用
+- 内置 4 个通用字体（Arial / Times New Roman / Tahoma / Verdana）通过 `customFontFamily: { override: true }` 配置，自定义字体通过 API 动态注入
+
 ## 注意事项
 
 - 后端默认数据库为 PostgreSQL（localhost:5432/report），运行 framework 测试前需确保数据库可用
-- `report-engine-example` 目前未依赖 `report-engine-framework`，example 模块需要补充实际示例代码
+- `report-engine-excel` 的测试不需要外部依赖（纯 POI 单元测试），可独立运行
 - 前端库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力，消费方需要自行处理依赖
 - 后端 `stype` 包名是 `style` 的拼写变体，重命名时需注意
 - 使用 Lombok（`@Data` / `@Builder`），但部分类未加注解导致缺少 getter/setter

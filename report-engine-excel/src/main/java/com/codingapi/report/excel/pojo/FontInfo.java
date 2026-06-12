@@ -30,4 +30,10 @@ public class FontInfo {
 
     /** 字体文件格式：ttf / otf / ttc */
     private String format;
+
+    /**
+     * 排序值，从文件名数字前缀解析（如 "01_Arial.ttf" → 1）。
+     * 无前缀的文件默认为 99，排在最后。
+     */
+    private int order;
 }

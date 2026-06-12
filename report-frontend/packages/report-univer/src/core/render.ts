@@ -78,9 +78,13 @@ export function renderSnapshot<TCellProp = unknown, TLoopProp = unknown>(
 
             const s = cell.style;
             if (s) {
+                if (s.font?.family) range.setFontFamily(s.font.family);
                 if (s.font?.color) range.setFontColor(s.font.color);
                 if (s.font?.size) range.setFontSize(s.font.size);
                 if (s.font?.bold) range.setFontWeight('bold');
+                if (s.font?.italic) range.setFontStyle('italic');
+                if (s.font?.underline) range.setFontLine('underline');
+                else if (s.font?.strikethrough) range.setFontLine('line-through');
                 if (s.fill) range.setBackground(s.fill);
                 if (s.align) {
                     range.setHorizontalAlignment(H_ALIGN_REVERSE[s.align] || s.align);

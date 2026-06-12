@@ -77,6 +77,12 @@
 			</dependency>
 
 			<dependency>
+				<groupId>com.codingapi.report</groupId>
+				<artifactId>report-engine-starter</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+
+			<dependency>
 				<groupId>org.apache.poi</groupId>
 				<artifactId>poi-ooxml</artifactId>
 				<version>${poi.version}</version>
@@ -231,6 +237,7 @@
 				<module>report-engine-example</module>
 				<module>report-engine-framework</module>
 				<module>report-engine-excel</module>
+				<module>report-engine-starter</module>
 			</modules>
 		</profile>
 		<!-- mvn clean test -P travis-->
@@ -240,6 +247,7 @@
 			<modules>
 				<module>report-engine-framework</module>
 				<module>report-engine-excel</module>
+				<module>report-engine-starter</module>
 			</modules>
 
 			<build>
@@ -289,6 +297,7 @@
 			<modules>
 				<module>report-engine-framework</module>
 				<module>report-engine-excel</module>
+				<module>report-engine-starter</module>
 			</modules>
 
 
