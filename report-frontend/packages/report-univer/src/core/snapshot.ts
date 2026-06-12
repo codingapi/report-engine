@@ -1,16 +1,38 @@
 /**
  * 工作簿快照提取
  * 输出后端友好的 Excel 数据结构，可直接映射到 Apache POI API
+ * 导入导出使用同一数据结构
  */
 
 import type {
     ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelFont,
     ExcelBorders, ExcelBorder, ExcelBorderStyle,
     ExcelRichText, ExcelMerge, ExcelRow, ExcelColumn,
+    ExcelLoopBlock, LoopBlockConfig,
 } from '@/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FWorkbook = any;
+
+/** extractSnapshot 可选参数 */
+export interface ExtractOptions<TCellProp = unknown, TLoopProp = unknown> {
+    /** 单元格属性存储: key = `${sheetId}:${row}:${col}` */
+    cellProps?: Record<string, TCellProp[]>;
+    /** 合并区域属性存储: key = `merge:${sheetId}:${sr}:${sc}:${er}:${ec}` */
+    mergeProps?: Record<string, TCellProp[]>;
+    /** 循环块配置列表 */
+    loopBlocks?: LoopBlockConfig[];
+    /** 循环块属性存储: key = blockId */
+    loopBlockProps?: Record<string, TLoopProp[]>;
+}
+
+// ─── Key 生成 ─────────────────────────────────────────────────
+
+const makeCellKey = (sheetId: string, row: number, col: number): string =>
+    `${sheetId}:${row}:${col}`;
+
+const makeMergeKey = (sheetId: string, sr: number, sc: number, er: number, ec: number): string =>
+    `merge:${sheetId}:${sr}:${sc}:${er}:${ec}`;
 
 // ─── 枚举映射 ────────────────────────────────────────────────
 
@@ -171,18 +193,22 @@ function parseRichText(docData: Record<string, unknown>): ExcelRichText | undefi
 
 /**
  * 从 FWorkbook 提取完整工作簿快照（Excel 友好格式）
+ * 支持附带属性存储和循环块配置
  */
-export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
+export function extractSnapshot<TCellProp = unknown, TLoopProp = unknown>(
+    fWorkbook: FWorkbook,
+    options?: ExtractOptions<TCellProp, TLoopProp>,
+): ExcelWorkbook<TCellProp, TLoopProp> {
     const snapshot = fWorkbook.save();
     const rawSheets = (snapshot as Record<string, unknown>).sheets as Record<string, Record<string, unknown>> | undefined;
     const globalStyles = (snapshot as Record<string, unknown>).styles as Record<string, Record<string, unknown>> | undefined;
 
     if (!rawSheets) return { sheets: [] };
 
-    const sheets: ExcelSheet[] = [];
+    const sheets: ExcelSheet<TCellProp, TLoopProp>[] = [];
 
     for (const [sheetId, sheetData] of Object.entries(rawSheets)) {
-        const sheet: ExcelSheet = {
+        const sheet: ExcelSheet<TCellProp, TLoopProp> = {
             id: sheetId,
             name: (sheetData.name as string) || 'Sheet',
             rowCount: (sheetData.rowCount as number) ?? 1000,
@@ -199,12 +225,18 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
         const mergeData = sheetData.mergeData as Array<Record<string, number>> | undefined;
         if (mergeData) {
             for (const m of mergeData) {
-                const merge: ExcelMerge = {
+                const merge: ExcelMerge<TCellProp> = {
                     startRow: m.startRow,
                     startCol: m.startColumn,
                     rowSpan: m.endRow - m.startRow + 1,
                     colSpan: m.endColumn - m.startColumn + 1,
                 };
+                // 查找合并区域属性
+                if (options?.mergeProps) {
+                    const mk = makeMergeKey(sheetId, m.startRow, m.startColumn, m.endRow, m.endColumn);
+                    const mp = options.mergeProps[mk];
+                    if (mp && mp.length > 0) merge.props = mp;
+                }
                 sheet.merges.push(merge);
             }
         }
@@ -212,7 +244,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
         // slave 集合
         const slavePositions = new Set<string>();
         // 合并区域主单元格映射（用于边框收集）
-        const mergeMasterMap = new Map<string, ExcelMerge>();
+        const mergeMasterMap = new Map<string, ExcelMerge<TCellProp>>();
         for (const m of sheet.merges) {
             mergeMasterMap.set(`${m.startRow},${m.startCol}`, m);
             for (let r = m.startRow; r < m.startRow + m.rowSpan; r++) {
@@ -262,9 +294,18 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
 
                     const style = resolvedStyle ? parseStyle(resolvedStyle) : undefined;
 
-                    if (value == null && !formula && !richText && !style) continue;
+                    // 查找单元格属性
+                    let cellProps: TCellProp[] | undefined;
+                    if (options?.cellProps) {
+                        const ck = makeCellKey(sheetId, row, col);
+                        const cp = options.cellProps[ck];
+                        if (cp && cp.length > 0) cellProps = cp;
+                    }
 
-                    const cell: ExcelCell = {
+                    // 跳过完全空的单元格（无值、无样式、无属性）
+                    if (value == null && !formula && !richText && !style && !cellProps) continue;
+
+                    const cell: ExcelCell<TCellProp> = {
                         row,
                         col,
                         ref: rowColToA1(row, col),
@@ -273,6 +314,7 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
                     if (formula) cell.formula = formula;
                     if (richText) cell.richText = richText;
                     if (style) cell.style = style;
+                    if (cellProps) cell.props = cellProps;
 
                     // 合并单元格边框收集：从从属单元格收集右边框和下边框
                     const mergeInfo = mergeMasterMap.get(`${row},${col}`);
@@ -362,6 +404,29 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
                     index: parseInt(idx),
                     width: (raw.w as number) ?? sheet.defaultColumnWidth,
                     hidden: raw.hd === 1,
+                });
+            }
+        }
+
+        // 循环块
+        if (options?.loopBlocks) {
+            const sheetLoopBlocks = options.loopBlocks.filter((b) => b.sheetId === sheetId);
+            if (sheetLoopBlocks.length > 0) {
+                sheet.loopBlocks = sheetLoopBlocks.map((b) => {
+                    const lb: ExcelLoopBlock<TLoopProp> = {
+                        id: b.id,
+                        label: b.label,
+                        loopVariable: b.loopVariable,
+                        startRow: b.startRow,
+                        startCol: b.startColumn,
+                        endRow: b.endRow,
+                        endCol: b.endColumn,
+                    };
+                    if (options?.loopBlockProps) {
+                        const lp = options.loopBlockProps[b.id];
+                        if (lp && lp.length > 0) lb.props = lp;
+                    }
+                    return lb;
                 });
             }
         }

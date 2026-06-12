@@ -7,6 +7,7 @@ import { createHighlightManager } from '@/core/highlight';
 import type { HighlightManager } from '@/core/highlight';
 import { registerDragDrop } from '@/core/drag-drop';
 import { extractSnapshot } from '@/core/snapshot';
+import { renderSnapshot } from '@/core/render';
 import type { UniverSheetProps, UniverSheetHandle } from './type';
 
 export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
@@ -23,6 +24,14 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
         const onFieldDropRef = useRef(props.onFieldDrop);
         onFieldDropRef.current = props.onFieldDrop;
 
+        // 用 ref 保存最新的属性存储（供 cell-selection 回调查找）
+        const cellPropsRef = useRef(props.cellProps);
+        cellPropsRef.current = props.cellProps;
+
+        // 保存当前组件 props 引用（供 getSnapshot 使用）
+        const propsRef = useRef(props);
+        propsRef.current = props;
+
         const style = props.style || { height: '100vh' };
 
         // 暴露命令式句柄
@@ -32,8 +41,21 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 if (!api) return null;
                 const workbook = api.getActiveWorkbook();
                 if (!workbook) return null;
-                return extractSnapshot(workbook);
+                const p = propsRef.current;
+                return extractSnapshot(workbook, {
+                    cellProps: p.cellProps,
+                    mergeProps: p.mergeProps,
+                    loopBlocks: p.loopBlocks ? Object.values(p.loopBlocks) : undefined,
+                    loopBlockProps: p.loopBlockProps,
+                });
             },
+
+            loadSnapshot: (snapshot) => {
+                const api = univerAPIRef.current;
+                if (!api) return null;
+                return renderSnapshot(api, snapshot);
+            },
+
             setCellValue: (sheetId: string, row: number, column: number, value: string) => {
                 const api = univerAPIRef.current;
                 if (!api) return;
@@ -42,6 +64,26 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 const sheet = workbook.getSheetBySheetId(sheetId);
                 if (!sheet) return;
                 sheet.getRange(row, column).setValue(value);
+            },
+
+            setSheetName: (sheetId: string, name: string) => {
+                const api = univerAPIRef.current;
+                if (!api) return;
+                const workbook = api.getActiveWorkbook();
+                if (!workbook) return;
+                const sheet = workbook.getSheetBySheetId(sheetId);
+                if (sheet) sheet.setName(name);
+            },
+
+            setSheetSize: (sheetId: string, rowCount: number, columnCount: number) => {
+                const api = univerAPIRef.current;
+                if (!api) return;
+                const workbook = api.getActiveWorkbook();
+                if (!workbook) return;
+                const sheet = workbook.getSheetBySheetId(sheetId);
+                if (!sheet) return;
+                sheet.setRowCount(rowCount);
+                sheet.setColumnCount(columnCount);
             },
         }));
 
@@ -55,11 +97,12 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             // 创建高亮管理器
             highlightManagerRef.current = createHighlightManager(univerAPI);
 
-            // 注册单元格选中事件（含高亮重应用）
+            // 注册单元格选中事件（含 CellHandle + cellProps）
             registerCellSelection(
                 univerAPI,
                 () => onCellSelectRef.current,
                 () => highlightManagerRef.current,
+                () => cellPropsRef.current,
             );
 
             // 构建右键菜单
@@ -68,7 +111,7 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 menusBuiltRef.current = true;
             }
 
-            // 注册拖拽事件
+            // 注册拖拽事件（含 CellHandle）
             const cleanupDragDrop = registerDragDrop(
                 containerRef.current,
                 univerAPI,
@@ -100,6 +143,15 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             if (!highlightManagerRef.current) return;
             highlightManagerRef.current.sync(props.loopBlocks || {});
         }, [props.loopBlocks]);
+
+        // 同步只读模式
+        useEffect(() => {
+            const api = univerAPIRef.current;
+            if (!api) return;
+            const workbook = api.getActiveWorkbook();
+            if (!workbook) return;
+            workbook.setEditable(!props.readOnly);
+        }, [props.readOnly]);
 
         // 显示消息提示
         useEffect(() => {

@@ -14,7 +14,7 @@ export interface SheetPanelProps {
     onRemoveLoopBlock?: (id: string) => void;
     /** 循环块数据 */
     loopBlocks?: Record<string, LoopBlockConfig>;
-    /** 字段拖入回调 — 返回要写入单元格的值 */
+    /** 字段拖入回调 — 返回要写入单元格的值（返回 undefined 则不写入） */
     onFieldDrop?: (info: FieldDropInfo) => string | undefined;
 }
 

@@ -1,10 +1,11 @@
 /**
  * 字段拖拽处理
- * 监听容器 dragover/drop 事件，提取目标单元格信息并回调
+ * 监听容器 dragover/drop 事件，提取目标单元格信息并回调（含 CellHandle）
  */
 
-import type { FieldDropInfo } from '@/types';
+import type { FieldDropInfo, CellHandle } from '@/types';
 import type { UniverAPI } from './setup';
+import { createCellHandle } from './cell-handle';
 
 /**
  * 注册拖拽事件监听
@@ -16,7 +17,7 @@ import type { UniverAPI } from './setup';
 export function registerDragDrop(
     container: HTMLDivElement,
     univerAPI: UniverAPI,
-    getCallback: () => ((info: FieldDropInfo) => void) | undefined,
+    getCallback: () => ((info: FieldDropInfo, handle: CellHandle) => void) | undefined,
 ): () => void {
     const handleDragOver = (e: DragEvent) => {
         e.preventDefault();
@@ -46,8 +47,10 @@ export function registerDragDrop(
         const sheetId = sheet.getSheetId?.() as string;
         const row = activeRange.getRow() as number;
         const column = activeRange.getColumn() as number;
+        const a1Notation = activeRange.getA1Notation?.() ?? '';
 
-        callback({ sheetId, row, column, data });
+        const handle = createCellHandle(univerAPI, sheetId, row, column, a1Notation);
+        callback({ sheetId, row, column, data }, handle);
     };
 
     container.addEventListener('dragover', handleDragOver);

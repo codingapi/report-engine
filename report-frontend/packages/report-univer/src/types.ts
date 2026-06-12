@@ -23,6 +23,78 @@ export interface SelectedCellInfo {
     mergeRange: MergeRangeInfo | null;
 }
 
+// ─── 单元格操作句柄 ──────────────────────────────────────────
+
+/** 单元格当前样式快照 */
+export interface CellStyleSnapshot {
+    fontColor?: string;
+    background?: string;
+    fontSize?: number;
+    bold?: boolean;
+}
+
+/**
+ * 单元格操作句柄
+ * 在 onCellSelect 回调中返回，可直接操作选中单元格的值和样式
+ */
+export interface CellHandle {
+    // ─── 单元格信息 ───
+    readonly sheetId: string;
+    readonly row: number;
+    readonly col: number;
+    readonly a1Notation: string;
+
+    // ─── 值操作 ───
+    setValue: (value: string | number | boolean) => void;
+
+    // ─── 样式操作 ───
+    setFontColor: (color: string) => void;
+    setBackground: (color: string) => void;
+    setFontSize: (size: number) => void;
+    setFontWeight: (weight: 'bold' | 'normal') => void;
+    setBorder: (side: 'top' | 'right' | 'bottom' | 'left', style: ExcelBorderStyle, color: string) => void;
+    clearFormat: () => void;
+
+    // ─── 样式读取 ───
+    getStyle: () => CellStyleSnapshot;
+}
+
+// ─── 属性绑定（默认类型，使用方可自定义） ──────────────────
+
+/**
+ * 单元格属性（默认结构，kind 区分类别，data 因类型而异）
+ * 使用方可自定义属性类型，通过泛型参数传入
+ */
+export interface CellProp {
+    /** 属性类别标识 */
+    kind: string;
+    /** 可选的字段引用 "tableName.fieldName" */
+    field?: string;
+    /** 灵活数据（结构因 kind 而异） */
+    data: Record<string, unknown>;
+}
+
+/**
+ * 三层属性存储：单元格 / 合并区域 / 循环块
+ */
+export interface CellPropStore<TCellProp = CellProp, TLoopProp = CellProp> {
+    /** 单元格属性: key = `${sheetId}:${row}:${col}` */
+    cellProps: Record<string, TCellProp[]>;
+    /** 合并区域属性: key = `merge:${sheetId}:${sr}:${sc}:${er}:${ec}` */
+    mergeProps: Record<string, TCellProp[]>;
+    /** 循环块属性: key = blockId */
+    loopBlockProps: Record<string, TLoopProp[]>;
+}
+
+/** 生成单元格属性 key */
+export const makeCellKey = (sheetId: string, row: number, col: number): string =>
+    `${sheetId}:${row}:${col}`;
+
+/** 生成合并区域属性 key */
+export const makeMergeKey = (
+    sheetId: string, sr: number, sc: number, er: number, ec: number,
+): string => `merge:${sheetId}:${sr}:${sc}:${er}:${ec}`;
+
 // ─── 区域范围 ────────────────────────────────────────────────
 
 /** 工作表上的矩形区域 */
@@ -48,6 +120,20 @@ export interface LoopBlockConfig {
     label?: string;
     /** 循环变量字段 "tableName.fieldName" */
     loopVariable: string;
+}
+
+// ─── 循环块动态 UI ──────────────────────────────────────────
+
+/** 循环块组件 Props（动态注册到 UniverSheet） */
+export interface LoopBlockComponentProps<TLoop = CellProp> {
+    /** 循环块配置 */
+    block: LoopBlockConfig;
+    /** 循环块属性 */
+    props: TLoop[];
+    /** 属性变更回调 */
+    onChange: (props: TLoop[]) => void;
+    /** 删除循环块回调 */
+    onDelete: () => void;
 }
 
 // ─── 右键菜单 ────────────────────────────────────────────────
@@ -81,7 +167,7 @@ export interface FieldDropInfo {
     sheetId: string;
     row: number;
     column: number;
-    /** 原始拖拽数据，格式由消费者决定 */
+    /** 原始拖拽数据（text/plain），格式由消费者决定 */
     data: string;
 }
 
@@ -104,6 +190,7 @@ export interface MessageConfig {
 
 // ─── Excel 快照数据结构 ──────────────────────────────────────
 // 后端友好的 Excel 数据格式，可直接映射到 Apache POI API
+// 导入导出使用同一数据结构，保持一致性
 
 /** 边框线型（可读字符串） */
 export type ExcelBorderStyle =
@@ -172,7 +259,7 @@ export interface ExcelRichText {
 }
 
 /** 合并区域 */
-export interface ExcelMerge {
+export interface ExcelMerge<TCellProp = CellProp> {
     /** 起始行（0-based） */
     startRow: number;
     /** 起始列（0-based） */
@@ -181,10 +268,12 @@ export interface ExcelMerge {
     rowSpan: number;
     /** 列数 */
     colSpan: number;
+    /** 合并区域属性 */
+    props?: TCellProp[];
 }
 
 /** 单元格数据 */
-export interface ExcelCell {
+export interface ExcelCell<TCellProp = CellProp> {
     /** 行索引（0-based） */
     row: number;
     /** 列索引（0-based） */
@@ -199,6 +288,8 @@ export interface ExcelCell {
     richText?: ExcelRichText;
     /** 单元格样式 */
     style?: ExcelStyle;
+    /** 单元格属性绑定 */
+    props?: TCellProp[];
 }
 
 /** 自定义行高 */
@@ -215,8 +306,21 @@ export interface ExcelColumn {
     hidden: boolean;
 }
 
+/** 循环块（Excel 快照格式） */
+export interface ExcelLoopBlock<TLoopProp = CellProp> {
+    id: string;
+    label?: string;
+    loopVariable: string;
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+    /** 循环块属性 */
+    props?: TLoopProp[];
+}
+
 /** 工作表数据 */
-export interface ExcelSheet {
+export interface ExcelSheet<TCellProp = CellProp, TLoopProp = CellProp> {
     id: string;
     name: string;
     rowCount: number;
@@ -225,13 +329,29 @@ export interface ExcelSheet {
     defaultRowHeight: number;
     /** 默认列宽（像素） */
     defaultColumnWidth: number;
-    merges: ExcelMerge[];
-    cells: ExcelCell[];
+    merges: ExcelMerge<TCellProp>[];
+    cells: ExcelCell<TCellProp>[];
     rows: ExcelRow[];
     columns: ExcelColumn[];
+    /** 循环块列表 */
+    loopBlocks?: ExcelLoopBlock<TLoopProp>[];
 }
 
-/** 完整工作簿快照 */
-export interface ExcelWorkbook {
-    sheets: ExcelSheet[];
+/** 完整工作簿快照（导入导出共用同一结构） */
+export interface ExcelWorkbook<TCellProp = CellProp, TLoopProp = CellProp> {
+    sheets: ExcelSheet<TCellProp, TLoopProp>[];
+}
+
+// ─── 渲染结果 ────────────────────────────────────────────────
+
+/** loadSnapshot 的返回结果，包含从快照中还原的属性数据 */
+export interface RenderResult<TCellProp = CellProp, TLoopProp = CellProp> {
+    /** 还原的单元格属性: key = `${sheetId}:${row}:${col}` */
+    cellProps: Record<string, TCellProp[]>;
+    /** 还原的合并区域属性: key = `merge:${sheetId}:${sr}:${sc}:${er}:${ec}` */
+    mergeProps: Record<string, TCellProp[]>;
+    /** 还原的循环块属性: key = blockId */
+    loopBlockProps: Record<string, TLoopProp[]>;
+    /** 还原的循环块配置 */
+    loopBlocks: LoopBlockConfig[];
 }
