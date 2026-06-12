@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Empty, Input, Select, Tag, Popconfirm, Button } from 'antd';
+import { Empty, Input, Tag, Popconfirm, Button } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { findBlockAtCell } from '@coding-report/report-univer';
 import type { DataConfig } from '../datasource/types';
@@ -25,18 +25,6 @@ const LoopBlockSection: React.FC<LoopBlockSectionProps> = ({
         if (!selectedCell) return null;
         return findBlockAtCell(loopBlocks, selectedCell.sheetId, selectedCell.row, selectedCell.column);
     }, [selectedCell, loopBlocks]);
-
-    /** 字段选项：按表分组 */
-    const fieldOptions = useMemo(() => {
-        if (!dataConfig) return [];
-        return dataConfig.tables.map((table) => ({
-            label: table.alias || table.name,
-            options: table.fields.map((field) => ({
-                label: field.alias || field.name,
-                value: `${table.name}.${field.name}`,
-            })),
-        }));
-    }, [dataConfig]);
 
     if (!currentBlock) {
         return (
@@ -76,20 +64,6 @@ const LoopBlockSection: React.FC<LoopBlockSectionProps> = ({
                     placeholder="如：部门循环、月份循环"
                     value={currentBlock.label || ''}
                     onChange={(e) => handleChange('label', e.target.value)}
-                />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#666', display: 'block', marginBottom: 4 }}>循环变量字段</label>
-                <Select
-                    size="small"
-                    style={{ width: '100%' }}
-                    placeholder="选择循环迭代的字段"
-                    options={fieldOptions}
-                    value={currentBlock.loopVariable || undefined}
-                    onChange={(value) => handleChange('loopVariable', value)}
-                    showSearch
-                    optionFilterProp="label"
                 />
             </div>
 

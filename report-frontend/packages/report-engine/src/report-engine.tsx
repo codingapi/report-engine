@@ -48,7 +48,6 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
                 id,
                 ...range,
                 label: '循环块',
-                loopVariable: '',
             };
             setLoopBlocks((prev) => ({ ...prev, [id]: newBlock }));
             // 自动打开配置弹窗
@@ -150,7 +149,6 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({ dataConfig, title, o
             <LoopBlockModal
                 open={loopBlockModalOpen}
                 config={editingLoopBlock}
-                dataConfig={dataConfig}
                 onSave={handleSaveLoopBlock}
                 onRemove={handleRemoveLoopBlock}
                 onClose={handleCloseLoopBlockModal}

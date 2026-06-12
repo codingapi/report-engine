@@ -25,10 +25,12 @@
     "@univerjs/sheets-ui": "^0.25.0",
     "@univerjs/ui": "^0.25.0",
     "antd": "^6.2.1",
+    "axios": "^1.7.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^7.17.0",
-    "react-router-dom": "^7.17.0"
+    "react-router-dom": "^7.17.0",
+    "@coding-report/report-univer": "workspace:*"
   },
   "devDependencies": {
     "@coding-report/report-engine": "workspace:*",

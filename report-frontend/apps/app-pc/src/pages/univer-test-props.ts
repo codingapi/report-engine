@@ -1,57 +1,9 @@
 /**
- * Univer 属性绑定验证 — 类型定义与辅助函数
+ * Univer 属性绑定验证 — 领域特定类型（报表属性模板）
+ *
+ * 基础类型（CellProp, CellPropStore, makeCellKey 等）已迁移至 @coding-report/report-univer
+ * 此文件仅保留报表领域特定的属性模板定义
  */
-
-// ─── 属性类型 ──────────────────────────────────────────────
-
-/**
- * 单元格属性（灵活结构，kind 区分类别，data 因类型而异）
- */
-export interface CellProp {
-  /** 属性类别标识 */
-  kind: string;
-  /** 可选的字段引用 "tableName.fieldName" */
-  field?: string;
-  /** 灵活数据（结构因 kind 而异） */
-  data: Record<string, unknown>;
-}
-
-// ─── 存储结构 ──────────────────────────────────────────────
-
-export interface LoopBlock {
-  id: string;
-  sheetId: string;
-  startRow: number;
-  startColumn: number;
-  endRow: number;
-  endColumn: number;
-  label: string;
-  loopVariable: string;
-}
-
-export interface CellPropStore {
-  /** 单元格属性: key = `${sheetId}:${row}:${col}` */
-  cellProps: Record<string, CellProp[]>;
-  /** 合并区域属性: key = `merge:${sheetId}:${sr}:${sc}:${er}:${ec}` */
-  mergeProps: Record<string, CellProp[]>;
-  /** 循环块属性: key = blockId */
-  loopBlockProps: Record<string, CellProp[]>;
-}
-
-export const EMPTY_STORE: CellPropStore = {
-  cellProps: {},
-  mergeProps: {},
-  loopBlockProps: {},
-};
-
-// ─── Key 生成 ──────────────────────────────────────────────
-
-export const makeCellKey = (sheetId: string, row: number, col: number): string =>
-  `${sheetId}:${row}:${col}`;
-
-export const makeMergeKey = (
-  sheetId: string, sr: number, sc: number, er: number, ec: number,
-): string => `merge:${sheetId}:${sr}:${sc}:${er}:${ec}`;
 
 // ─── 预定义属性模板 ────────────────────────────────────────
 

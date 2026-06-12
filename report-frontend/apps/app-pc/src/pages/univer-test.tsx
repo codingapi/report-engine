@@ -1,92 +1,47 @@
 /**
- * Univer 技术验证页面
+ * Univer 技术验证页面（使用 report-univer 组件）
  *
  * 验证目标：
- * 1. 手动 plugins 方式初始化 Univer（不使用 preset），去除自带公式插件
- * 2. 获取工作表快照数据（单元格内容 + 样式 + 合并信息 + 边框 + 行列尺寸）
- * 3. 循环块高亮覆盖（highlight API，不修改单元格样式）
- * 4. 单元格属性绑定（字段绑定 / 数据配置 / 显示格式 / 聚合计算）
+ * 1. UniverSheet 组件封装（初始化、插件、locale 全由组件管理）
+ * 2. 导入导出能力（loadSnapshot / getSnapshot，round-trip 验证）
+ * 3. 循环块管理（高亮 + 外部 CRUD）
+ * 4. CellHandle 操作句柄（样式读写、值设置）
+ * 5. 单元格属性绑定（领域特定的属性模板，由应用层管理）
  */
 
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Button, Tag, Space, Select, Input, Empty, Divider } from 'antd';
-import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
+import { Button, Tag, Space, Select, Input, Empty, Divider, message as antdMessage } from 'antd';
+import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, UploadOutlined, ExperimentOutlined } from '@ant-design/icons';
 
-// Univer 核心
-import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
-import type { FUniver } from '@univerjs/presets';
+// report-univer 组件和类型
+import {
+  UniverSheet,
+  findBlockAtCell,
+} from '@coding-report/report-univer';
+import type {
+  UniverSheetHandle,
+  SelectedCellInfo,
+  CellHandle,
+  CellProp,
+  CellPropStore,
+  CellStyleSnapshot,
+  LoopBlockConfig,
+  FieldDropInfo,
+  MenuGroupDef,
+  CellRange,
+} from '@coding-report/report-univer';
+import { makeCellKey, makeMergeKey, MessageType } from '@coding-report/report-univer';
 
-// 基础插件
-import { UniverNetworkPlugin } from '@univerjs/network';
-import { UniverDocsPlugin } from '@univerjs/docs';
-import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
-import { UniverUIPlugin } from '@univerjs/ui';
-import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
+// 领域特定属性模板
+import type { PropKindTemplate } from './univer-test-props';
+import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 
-// 公式引擎（单元格编辑依赖其数据管道）
-import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
+// 测试数据
+import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
-// 电子表格核心
-import { UniverSheetsPlugin } from '@univerjs/sheets';
-import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
-
-// 数字格式
-import { UniverSheetsNumfmtPlugin } from '@univerjs/sheets-numfmt';
-import { UniverSheetsNumfmtUIPlugin } from '@univerjs/sheets-numfmt-ui';
-
-// 公式与表格交互（单元格编辑依赖，必须保留）
-import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
-import { UniverSheetsFormulaUIPlugin } from '@univerjs/sheets-formula-ui';
-
-// 中文 locale
-import UniverUIZhCN from '@univerjs/ui/locale/zh-CN';
-import UniverDocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN';
-import UniverSheetsZhCN from '@univerjs/sheets/locale/zh-CN';
-import UniverSheetsUIZhCN from '@univerjs/sheets-ui/locale/zh-CN';
-import UniverSheetsNumfmtUIZhCN from '@univerjs/sheets-numfmt-ui/locale/zh-CN';
-import UniverSheetsFormulaZhCN from '@univerjs/sheets-formula/locale/zh-CN';
-import UniverSheetsFormulaUIZhCN from '@univerjs/sheets-formula-ui/locale/zh-CN';
-
-// Facade 模块增强（为 FUniver 扩展方法）
-import '@univerjs/sheets/facade';
-import '@univerjs/ui/facade';
-import '@univerjs/sheets-ui/facade';
-import '@univerjs/network/facade';
-import '@univerjs/docs-ui/facade';
-import '@univerjs/sheets-formula/facade';
-import '@univerjs/sheets-formula-ui/facade';
-
-// CSS
-import '@univerjs/preset-sheets-core/lib/index.css';
-
-// 数据提取工具
-import { extractWorkbookSnapshot, renderWorkbookSnapshot, MOCK_SNAPSHOT } from './univer-test-utils';
-
-// 属性绑定
-import type { CellProp, CellPropStore, LoopBlock, PropKindTemplate } from './univer-test-props';
-import { PROP_KINDS, PROP_KIND_MAP, makeCellKey, makeMergeKey } from './univer-test-props';
-
-// 数据源（用于字段下拉）
+// API
+import { exportExcel, importExcel } from '@/api/example';
 import { mockDataConfig } from '../data/mock-data';
-
-// ─── 常量 ──────────────────────────────────────────────
-
-const VALUE_TYPE_MAP: Record<number, { label: string; color: string }> = {
-  0: { label: '字符串', color: 'blue' },
-  1: { label: '数字', color: 'green' },
-  2: { label: '布尔', color: 'orange' },
-};
-
-const HIGHLIGHT_STYLE = {
-  fill: 'rgba(22, 119, 255, 0.08)',
-  stroke: '#1677ff',
-  strokeWidth: 1,
-  strokeDash: 8,
-  widgets: {
-    top: false, bottom: false, left: false, right: false,
-    topLeft: false, topRight: false, bottomLeft: false, bottomRight: false,
-  },
-};
 
 // ─── 字段选项构建 ──────────────────────────────────────
 
@@ -97,76 +52,6 @@ const fieldOptions = mockDataConfig.tables.flatMap((table) =>
   })),
 );
 
-// ─── 单元格样式控制 ────────────────────────────────────
-
-/**
- * 通过 Univer Facade API 设置单元格样式
- * 支持链式调用，可在任意时机调用
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyCellStyle(api: any, row: number, col: number, style: {
-  fontColor?: string;
-  background?: string;
-  fontSize?: number;
-  fontWeight?: 'bold' | 'normal';
-}) {
-  const ws = api?.getActiveWorkbook?.()?.getActiveSheet?.();
-  if (!ws) return;
-  const range = ws.getRange(row, col);
-  if (!range) return;
-  if (style.fontColor) range.setFontColor(style.fontColor);
-  if (style.background) range.setBackground(style.background);
-  if (style.fontSize) range.setFontSize(style.fontSize);
-  if (style.fontWeight) range.setFontWeight(style.fontWeight);
-}
-
-function clearCellStyle(api: any, row: number, col: number) {
-  const ws = api?.getActiveWorkbook?.()?.getActiveSheet?.();
-  if (!ws) return;
-  const range = ws.getRange(row, col);
-  if (!range) return;
-  range.clearFormat();
-}
-
-/** 读取单元格当前样式，用于回填编辑器 */
-function readCellStyle(api: any, row: number, col: number): {
-  fontColor?: string;
-  background?: string;
-  fontSize?: number;
-  bold?: boolean;
-} {
-  const ws = api?.getActiveWorkbook?.()?.getActiveSheet?.();
-  if (!ws) return {};
-  const range = ws.getRange(row, col);
-  if (!range) return {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = (range as any).getCellStyleData?.('cell');
-  if (!raw) return {};
-  const result: { fontColor?: string; background?: string; fontSize?: number; bold?: boolean } = {};
-  if (raw.cl?.rgb) result.fontColor = raw.cl.rgb;
-  if (raw.bg?.rgb) result.background = raw.bg.rgb;
-  if (raw.fs) result.fontSize = raw.fs;
-  if (raw.bl === 1) result.bold = true;
-  return result;
-}
-
-// ─── 类型 ──────────────────────────────────────────────
-
-interface CellInfo {
-  sheetId: string;
-  position: string;
-  row: number;
-  col: number;
-  value: string | number | boolean | null;
-  valueType: number | null;
-  hasRichText: boolean;
-  hasFormula: boolean;
-  jsType: string;
-  mergeRange: { startRow: number; startColumn: number; endRow: number; endColumn: number } | null;
-  /** 当前单元格样式（选中时读取，用于回填样式编辑器） */
-  currentStyle: { fontColor?: string; background?: string; fontSize?: number; bold?: boolean };
-}
-
 // ─── 辅助 ──────────────────────────────────────────────
 
 let blockIdCounter = 0;
@@ -175,11 +60,15 @@ const genBlockId = () => `loop-${++blockIdCounter}-${Date.now().toString(36)}`;
 // ─── 组件 ──────────────────────────────────────────────
 
 const UniverTestPage: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const univerAPIRef = useRef<FUniver | null>(null);
+  const sheetRef = useRef<UniverSheetHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 单元格选中信息
-  const [cellInfo, setCellInfo] = useState<CellInfo | null>(null);
+  // 当前选中的单元格信息
+  const [selectedInfo, setSelectedInfo] = useState<SelectedCellInfo | null>(null);
+  // 当前选中单元格的样式快照（回填编辑器）
+  const [selectedStyle, setSelectedStyle] = useState<CellStyleSnapshot>({});
+  // CellHandle 引用（用于操作当前选中单元格）
+  const cellHandleRef = useRef<CellHandle | null>(null);
 
   // 属性存储
   const [propStore, setPropStore] = useState<CellPropStore>({
@@ -189,267 +78,125 @@ const UniverTestPage: React.FC = () => {
   });
 
   // 循环块
-  const [loopBlocks, setLoopBlocks] = useState<LoopBlock[]>([]);
-  const loopBlocksRef = useRef<LoopBlock[]>([]);
-  loopBlocksRef.current = loopBlocks;
-  const highlightDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+  const [loopBlocks, setLoopBlocks] = useState<Record<string, LoopBlockConfig>>({});
+
+  // 只读模式
+  const [readOnly, setReadOnly] = useState(false);
 
   // 添加属性表单
   const [addingPropKind, setAddingPropKind] = useState<string | null>(null);
   const [newPropField, setNewPropField] = useState<string>('');
   const [newPropData, setNewPropData] = useState<Record<string, string>>({});
 
-  // ─── 高亮管理 ──────────────────────────────────────
+  // 消息提示
+  const [message, setMessage] = useState<{ content: string; type?: MessageType } | null>(null);
 
-  const reapplyHighlights = useCallback(() => {
-    const api = univerAPIRef.current;
-    const blocks = loopBlocksRef.current;
-    if (!api || blocks.length === 0) return;
+  // 导出 Excel 加载状态
+  const [exporting, setExporting] = useState(false);
 
-    highlightDisposablesRef.current.forEach((d) => {
-      try { d.dispose(); } catch { /* ignore */ }
-    });
-    highlightDisposablesRef.current = [];
+  // 导入 Excel 加载状态
+  const [importing, setImporting] = useState(false);
 
-    const workbook = api.getActiveWorkbook();
-    if (!workbook) return;
-    const sheet = workbook.getActiveSheet();
-    if (!sheet) return;
+  // ─── 右键菜单（循环块） ──────────────────────────
 
-    const ranges = blocks
-      .filter((b) => b.sheetId === sheet.getSheetId())
-      .map((b) => sheet.getRange(
-        b.startRow, b.startColumn,
-        b.endRow - b.startRow + 1, b.endColumn - b.startColumn + 1,
-      ));
+  const contextMenuGroups = useMemo<MenuGroupDef[]>(() => ([
+    {
+      id: 'loop-block',
+      title: '循环块',
+      items: [
+        {
+          id: 'loop-block-set',
+          title: '设置',
+          tooltip: '将选中区域设置为循环块',
+          onClick: (range: CellRange) => {
+            const width = range.endColumn - range.startColumn + 1;
+            const height = range.endRow - range.startRow + 1;
+            if (width <= 1 && height <= 1) {
+              setMessage({ content: '请先选择多个单元格再设置循环块', type: MessageType.Warning });
+              return;
+            }
+            const block: LoopBlockConfig = {
+              id: genBlockId(),
+              sheetId: range.sheetId,
+              startRow: range.startRow,
+              startColumn: range.startColumn,
+              endRow: range.endRow,
+              endColumn: range.endColumn,
+              label: `循环块 ${Object.keys(loopBlocks).length + 1}`,
+            };
+            setLoopBlocks((prev) => ({ ...prev, [block.id]: block }));
+          },
+        },
+        {
+          id: 'loop-block-edit',
+          title: '编辑',
+          tooltip: '编辑当前循环块配置',
+          onClick: (range: CellRange) => {
+            const block = findBlockAtCell(loopBlocks, range.sheetId, range.startRow, range.startColumn);
+            if (block) {
+              // 选中循环块内的单元格，右侧面板会显示循环块配置
+              setSelectedInfo({
+                sheetId: range.sheetId,
+                row: range.startRow,
+                column: range.startColumn,
+                a1Notation: '',
+                value: null,
+                mergeRange: null,
+              });
+            }
+          },
+        },
+        {
+          id: 'loop-block-remove',
+          title: '移除',
+          tooltip: '移除当前循环块',
+          onClick: (range: CellRange) => {
+            const block = findBlockAtCell(loopBlocks, range.sheetId, range.startRow, range.startColumn);
+            if (block) {
+              setLoopBlocks((prev) => {
+                const next = { ...prev };
+                delete next[block.id];
+                return next;
+              });
+              setPropStore((prev) => {
+                const next = { ...prev.loopBlockProps };
+                delete next[block.id];
+                return { ...prev, loopBlockProps: next };
+              });
+            }
+          },
+        },
+      ],
+    },
+  ]), [loopBlocks]);
 
-    if (ranges.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const disposable = (sheet as any).highlightRanges(ranges, HIGHLIGHT_STYLE);
-      highlightDisposablesRef.current = [disposable];
-    }
+  // ─── 单元格选中回调 ──────────────────────────────────
+
+  const handleCellSelect = useCallback((
+    info: SelectedCellInfo,
+    handle: CellHandle,
+    _cellProps: CellProp[] | undefined,
+  ) => {
+    setSelectedInfo(info);
+    setSelectedStyle(handle.getStyle());
+    cellHandleRef.current = handle;
   }, []);
 
-  // loopBlocks 变化时重新应用高亮
-  useEffect(() => {
-    reapplyHighlights();
-  }, [loopBlocks, reapplyHighlights]);
+  // ─── 拖拽回调 ──────────────────────────────────────
 
-  // ─── 初始化 ──────────────────────────────────────
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const { univerAPI } = createUniver({
-      locale: LocaleType.ZH_CN,
-      locales: {
-        [LocaleType.ZH_CN]: mergeLocales(
-          UniverUIZhCN, UniverDocsUIZhCN, UniverSheetsZhCN,
-          UniverSheetsUIZhCN, UniverSheetsNumfmtUIZhCN,
-          UniverSheetsFormulaZhCN, UniverSheetsFormulaUIZhCN,
-        ),
-      },
-      presets: [],
-      plugins: [
-        UniverNetworkPlugin,
-        UniverDocsPlugin,
-        UniverRenderEnginePlugin,
-        [UniverUIPlugin, {
-          container: containerRef.current,
-          ribbonType: 'simple' as const,
-          formulaBar: false,
-          menu: {
-            'formula-ui.operation.insert-function.common': { hidden: true },
-            'formula-ui.operation.insert-function.financial': { hidden: true },
-            'formula-ui.operation.insert-function.logical': { hidden: true },
-            'formula-ui.operation.insert-function.text': { hidden: true },
-            'formula-ui.operation.insert-function.date': { hidden: true },
-            'formula-ui.operation.insert-function.lookup': { hidden: true },
-            'formula-ui.operation.insert-function.math': { hidden: true },
-            'formula-ui.operation.insert-function.statistical': { hidden: true },
-            'formula-ui.operation.insert-function.engineering': { hidden: true },
-            'formula-ui.operation.insert-function.information': { hidden: true },
-            'formula-ui.operation.insert-function.database': { hidden: true },
-            'formula-ui.operation.insert-function.more-functions': { hidden: true },
-            'sheet.toolbar.text-to-number': { hidden: true },
-            'sheet.contextMenu.text-to-number': { hidden: true },
-          },
-        }],
-        UniverDocsUIPlugin,
-        UniverFormulaEnginePlugin,
-        UniverSheetsPlugin,
-        [UniverSheetsUIPlugin, { formulaBar: false }],
-        UniverSheetsNumfmtPlugin,
-        UniverSheetsNumfmtUIPlugin,
-        UniverSheetsFormulaPlugin,
-        [UniverSheetsFormulaUIPlugin, { functionScreenTips: false }],
-      ],
-    });
-
-    univerAPI.createWorkbook({});
-    // 扩展列数到 100（默认 20 列只到 T）
-    univerAPI.getActiveWorkbook()?.getActiveSheet()?.setColumnCount(100);
-    univerAPIRef.current = univerAPI;
-
-    // 监听单元格选中事件
-    univerAPI.addEvent(univerAPI.Event.SelectionChanged, (params) => {
-      const { worksheet: ws, selections } = params as {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        worksheet: any;
-        selections: Array<{ startRow: number; startColumn: number }>;
-      };
-      if (!selections || selections.length === 0) return;
-
-      const { startRow: row, startColumn: col } = selections[0];
-      const fRange = ws.getRange(row, col);
-      const value = fRange.getValue();
-      const a1 = fRange.getA1Notation();
-      const sheetId = ws.getSheetId();
-
-      let valueType: number | null = null;
-      let hasRichText = false;
-      let hasFormula = false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = (ws as any).getCellRaw?.(row, col);
-      if (raw) {
-        valueType = raw.t ?? null;
-        hasRichText = !!raw.p;
-        hasFormula = typeof raw.f === 'string' && raw.f.length > 0;
-      }
-
-      // 检测合并区域 — 使用 getMergedRanges() 遍历所有合并区域
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const wsAny = ws as any;
-      let mergeRange: CellInfo['mergeRange'] = null;
-
-      // 方式1: getMergedRanges() — 返回所有合并区域的 FRange[]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allMerges: any[] = wsAny.getMergedRanges?.() ?? [];
-      for (const mr of allMerges) {
-        const mrRow = mr.getRow() as number;
-        const mrCol = mr.getColumn() as number;
-        const mrHeight = mr.getHeight() as number;
-        const mrWidth = mr.getWidth() as number;
-        if (row >= mrRow && row < mrRow + mrHeight && col >= mrCol && col < mrCol + mrWidth) {
-          mergeRange = {
-            startRow: mrRow,
-            startColumn: mrCol,
-            endRow: mrRow + mrHeight - 1,
-            endColumn: mrCol + mrWidth - 1,
-          };
-          break;
-        }
-      }
-
-      // 方式2: getCellMergeData() — 直接查询指定单元格是否在合并区域内
-      if (!mergeRange) {
-        const mergeFRange = wsAny.getCellMergeData?.(row, col);
-        if (mergeFRange) {
-          const mStartRow = mergeFRange.getRow() as number;
-          const mStartCol = mergeFRange.getColumn() as number;
-          mergeRange = {
-            startRow: mStartRow,
-            startColumn: mStartCol,
-            endRow: mStartRow + (mergeFRange.getHeight() as number) - 1,
-            endColumn: mStartCol + (mergeFRange.getWidth() as number) - 1,
-          };
-        }
-      }
-
-      // 读取当前单元格样式（用于回填样式编辑器）
-      const currentStyle = readCellStyle(univerAPI, row, col);
-
-      setCellInfo({
-        sheetId,
-        position: a1,
-        row,
-        col,
-        value: value as string | number | boolean | null,
-        valueType,
-        hasRichText,
-        hasFormula,
-        jsType: value === null || value === undefined ? 'null' : typeof value,
-        mergeRange,
-        currentStyle,
-      });
-
-      // selection 变更后重新应用高亮
-      requestAnimationFrame(() => reapplyHighlights());
-    });
-
-    // 拖拽事件：支持从外部拖入字段到单元格
-    const container = containerRef.current!;
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    };
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-      const displayText = e.dataTransfer?.getData('text/plain');
-      const fieldCode = e.dataTransfer?.getData('application/x-field-code');
-      if (!displayText) return;
-
-      const wb = univerAPI.getActiveWorkbook();
-      const ws = wb?.getActiveSheet();
-      const range = ws?.getActiveRange();
-      if (!ws || !range) return;
-
-      const sheetId = ws.getSheetId?.() as string;
-      const row = range.getRow() as number;
-      const col = range.getColumn() as number;
-
-      // 写入显示文本到单元格
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (range as any).setValue?.(displayText);
-
-      // 如果有字段编码，自动添加 field 属性绑定
-      if (fieldCode) {
-        const ck = makeCellKey(sheetId, row, col);
-        setPropStore((prev) => {
-          const existing = prev.cellProps[ck] || [];
-          const fieldProp: CellProp = {
-            kind: 'field',
-            field: fieldCode,
-            data: { display: 'value' },
-          };
-          return {
-            ...prev,
-            cellProps: { ...prev.cellProps, [ck]: [...existing, fieldProp] },
-          };
-        });
-        console.log(`✅ [拖入] "${displayText}" → (${row},${col}) 字段: ${fieldCode}`);
-      } else {
-        console.log(`✅ [拖入] "${displayText}" → (${row},${col})`);
-      }
-    };
-    container.addEventListener('dragover', handleDragOver);
-    container.addEventListener('drop', handleDrop);
-
-    console.log('✅ [Univer 验证] 手动 plugins 模式初始化完成');
-
-    return () => {
-      container.removeEventListener('dragover', handleDragOver);
-      container.removeEventListener('drop', handleDrop);
-      highlightDisposablesRef.current.forEach((d) => {
-        try { d.dispose(); } catch { /* ignore */ }
-      });
-      univerAPI.dispose();
-    };
-  }, [reapplyHighlights]);
+  const handleFieldDrop = useCallback((info: FieldDropInfo, handle: CellHandle) => {
+    handle.setValue(info.data);
+  }, []);
 
   // ─── 当前选中的属性上下文 ──────────────────────────
 
   const currentContext = useMemo(() => {
-    if (!cellInfo) return null;
+    if (!selectedInfo) return null;
 
-    const { sheetId, row, col, mergeRange } = cellInfo;
+    const { sheetId, row, column, mergeRange } = selectedInfo;
 
     // 检查是否在循环块内
-    const inLoopBlock = loopBlocks.find(
-      (b) => b.sheetId === sheetId
-        && row >= b.startRow && row <= b.endRow
-        && col >= b.startColumn && col <= b.endColumn,
-    );
+    const inLoopBlock = findBlockAtCell(loopBlocks, sheetId, row, column);
 
     if (mergeRange) {
       const mk = makeMergeKey(sheetId, mergeRange.startRow, mergeRange.startColumn, mergeRange.endRow, mergeRange.endColumn);
@@ -466,21 +213,21 @@ const UniverTestPage: React.FC = () => {
       return {
         type: 'loopBlock' as const,
         key: inLoopBlock.id,
-        label: `循环块: ${inLoopBlock.label}`,
+        label: `循环块: ${inLoopBlock.label || inLoopBlock.id}`,
         props: propStore.loopBlockProps[inLoopBlock.id] || [],
         loopBlock: inLoopBlock,
       };
     }
 
-    const ck = makeCellKey(sheetId, row, col);
+    const ck = makeCellKey(sheetId, row, column);
     return {
       type: 'cell' as const,
       key: ck,
-      label: cellInfo.position,
+      label: selectedInfo.a1Notation,
       props: propStore.cellProps[ck] || [],
       loopBlock: null,
     };
-  }, [cellInfo, propStore, loopBlocks]);
+  }, [selectedInfo, propStore, loopBlocks]);
 
   // ─── 属性 CRUD ──────────────────────────────────
 
@@ -499,20 +246,14 @@ const UniverTestPage: React.FC = () => {
     if (!template) return;
 
     const data: Record<string, unknown> = { ...template.createDefault() };
-    // 覆盖用户在表单中输入的值
     for (const [k, v] of Object.entries(newPropData)) {
       data[k] = v;
     }
 
-    const newProp: CellProp = {
-      kind: addingPropKind,
-      data,
-    };
+    const newProp: CellProp = { kind: addingPropKind, data };
     if (newPropField) newProp.field = newPropField;
 
     updateProps(currentContext.type, currentContext.key, (prev) => [...prev, newProp]);
-
-    // 重置表单
     setAddingPropKind(null);
     setNewPropField('');
     setNewPropData({});
@@ -525,97 +266,147 @@ const UniverTestPage: React.FC = () => {
 
   // ─── 循环块 ──────────────────────────────────
 
-  const handleCreateLoopBlock = () => {
-    const api = univerAPIRef.current;
-    if (!api) return;
+  const handleCreateLoopBlock = useCallback(() => {
+    if (!selectedInfo) return;
+    const { sheetId, row, column } = selectedInfo;
 
-    const workbook = api.getActiveWorkbook();
-    if (!workbook) return;
-    const sheet = workbook.getActiveSheet();
-    if (!sheet) return;
-
-    const activeRange = sheet.getActiveRange();
-    if (!activeRange) return;
-
-    const startRow = activeRange.getRow();
-    const startColumn = activeRange.getColumn();
-    const height = activeRange.getHeight();
-    const width = activeRange.getWidth();
-    const sheetId = sheet.getSheetId();
-
-    const block: LoopBlock = {
+    const block: LoopBlockConfig = {
       id: genBlockId(),
       sheetId,
-      startRow,
-      startColumn,
-      endRow: startRow + height - 1,
-      endColumn: startColumn + width - 1,
-      label: `循环块 ${loopBlocks.length + 1}`,
-      loopVariable: '',
+      startRow: row,
+      startColumn: column,
+      endRow: row + 2,
+      endColumn: column + 1,
+      label: `循环块 ${Object.keys(loopBlocks).length + 1}`,
     };
 
-    setLoopBlocks((prev) => [...prev, block]);
-    console.log(`✅ [循环块] 创建: ${block.label} (${startRow},${startColumn}) → (${block.endRow},${block.endColumn})`);
-  };
+    setLoopBlocks((prev) => ({ ...prev, [block.id]: block }));
+  }, [selectedInfo, loopBlocks]);
 
-  const handleClearLoopBlocks = () => {
-    highlightDisposablesRef.current.forEach((d) => {
-      try { d.dispose(); } catch { /* ignore */ }
-    });
-    highlightDisposablesRef.current = [];
-    setLoopBlocks([]);
+  const handleClearLoopBlocks = useCallback(() => {
+    setLoopBlocks({});
     setPropStore((prev) => ({ ...prev, loopBlockProps: {} }));
-    console.log('✅ [循环块] 已清除所有循环块');
-  };
-
-  const handleLoopBlockVariableChange = useCallback((blockId: string, variable: string) => {
-    setLoopBlocks((prev) => prev.map((b) => b.id === blockId ? { ...b, loopVariable: variable } : b));
   }, []);
 
   // ─── 快照 ──────────────────────────────────
 
-  const handleSnapshot = () => {
-    const fWorkbook = univerAPIRef.current?.getActiveWorkbook();
-    if (!fWorkbook) {
-      console.warn('⚠️ 未找到活动工作簿');
-      return;
+  const handleSnapshot = useCallback(() => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (snapshot) {
+      console.group('📊 [Excel 快照]');
+      console.log(JSON.stringify(snapshot, null, 2));
+      console.groupEnd();
     }
-
-    // 诊断: 打印合并数据和属性统计
-    const sheet = fWorkbook.getActiveSheet();
-    if (sheet) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const merges: any[] = (sheet as any).getMergedRanges?.() ?? [];
-      console.log(`🔍 [诊断] 工作表共有 ${merges.length} 个合并区域`);
-      merges.forEach((mr: { getA1Notation: () => string; getRow: () => number; getColumn: () => number; getHeight: () => number; getWidth: () => number }) => {
-        console.log(`   - ${mr.getA1Notation()} (${mr.getRow()},${mr.getColumn()}) → (${mr.getRow() + mr.getHeight() - 1},${mr.getColumn() + mr.getWidth() - 1})`);
-      });
-    }
-
-    const cellPropCount = Object.keys(propStore.cellProps).length;
-    const mergePropCount = Object.keys(propStore.mergeProps).length;
-    const loopPropCount = Object.keys(propStore.loopBlockProps).length;
-    console.log(`🔍 [诊断] 属性绑定: 单元格 ${cellPropCount} 个, 合并区域 ${mergePropCount} 个, 循环块 ${loopPropCount} 个`);
-    console.log(`🔍 [诊断] 循环块: ${loopBlocks.length} 个`);
-
-    extractWorkbookSnapshot(fWorkbook, propStore, loopBlocks);
-  };
+  }, []);
 
   // ─── 渲染快照 ──────────────────────────────────
 
-  const handleRender = () => {
-    if (!univerAPIRef.current) return;
-    renderWorkbookSnapshot(univerAPIRef.current, MOCK_SNAPSHOT, (result) => {
-      // 合并属性到 propStore
+  const handleRender = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = sheetRef.current?.loadSnapshot(MOCK_SNAPSHOT as any);
+    if (result) {
       setPropStore((prev) => ({
         cellProps: { ...prev.cellProps, ...result.cellProps },
         mergeProps: { ...prev.mergeProps, ...result.mergeProps },
         loopBlockProps: { ...prev.loopBlockProps, ...result.loopBlockProps },
       }));
       // 添加循环块
-      setLoopBlocks((prev) => [...prev, ...result.loopBlocks]);
-    });
-  };
+      const newBlocks: Record<string, LoopBlockConfig> = {};
+      for (const lb of result.loopBlocks) {
+        newBlocks[lb.id] = lb;
+      }
+      setLoopBlocks((prev) => ({ ...prev, ...newBlocks }));
+    }
+  }, []);
+
+  // ─── 加载样式测试数据 ──────────────────────────
+
+  const handleLoadStyleTest = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = sheetRef.current?.loadSnapshot(STYLE_TEST_SNAPSHOT as any);
+    if (result) {
+      setPropStore((prev) => ({
+        cellProps: { ...prev.cellProps, ...result.cellProps },
+        mergeProps: { ...prev.mergeProps, ...result.mergeProps },
+        loopBlockProps: { ...prev.loopBlockProps, ...result.loopBlockProps },
+      }));
+      antdMessage.success('样式测试数据已加载');
+    }
+  }, []);
+
+  // ─── 导出 Excel ──────────────────────────────
+
+  const handleExportExcel = useCallback(async () => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) {
+      antdMessage.warning('无法获取快照数据');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const blob = await exportExcel(snapshot);
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'report.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      antdMessage.success('Excel 导出成功');
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误';
+      antdMessage.error(`导出失败: ${errMsg}`);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  // ─── 导入 Excel ──────────────────────────────
+
+  const handleImportExcel = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 重置 input，以便同一文件可再次选择
+    e.target.value = '';
+
+    setImporting(true);
+    try {
+      const workbook = await importExcel(file);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = sheetRef.current?.loadSnapshot(workbook as any);
+      if (result) {
+        setPropStore((prev) => ({
+          cellProps: { ...prev.cellProps, ...result.cellProps },
+          mergeProps: { ...prev.mergeProps, ...result.mergeProps },
+          loopBlockProps: { ...prev.loopBlockProps, ...result.loopBlockProps },
+        }));
+        const newBlocks: Record<string, LoopBlockConfig> = {};
+        for (const lb of result.loopBlocks) {
+          newBlocks[lb.id] = lb;
+        }
+        setLoopBlocks((prev) => ({ ...prev, ...newBlocks }));
+      }
+      antdMessage.success('Excel 导入成功');
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误';
+      antdMessage.error(`导入失败: ${errMsg}`);
+    } finally {
+      setImporting(false);
+    }
+  }, []);
+
+  // ─── 样式操作（通过 CellHandle） ──────────────────
+
+  const handle = cellHandleRef.current;
 
   // ─── 渲染 ──────────────────────────────────
 
@@ -637,14 +428,40 @@ const UniverTestPage: React.FC = () => {
           <Button icon={<PlayCircleOutlined />} onClick={handleRender}>
             渲染快照
           </Button>
+          <Button icon={<ExperimentOutlined />} onClick={handleLoadStyleTest}>
+            样式测试数据
+          </Button>
+          <Button
+            type="primary"
+            ghost
+            icon={<DownloadOutlined />}
+            loading={exporting}
+            onClick={handleExportExcel}
+          >
+            导出 Excel
+          </Button>
+          <Button
+            icon={<UploadOutlined />}
+            loading={importing}
+            onClick={handleImportExcel}
+          >
+            导入 Excel
+          </Button>
           <Button icon={<HighlightOutlined />} onClick={handleCreateLoopBlock}>
             创建循环块
           </Button>
-          {loopBlocks.length > 0 && (
+          {Object.keys(loopBlocks).length > 0 && (
             <Button icon={<DeleteOutlined />} danger onClick={handleClearLoopBlocks}>
-              清除循环块 ({loopBlocks.length})
+              清除循环块 ({Object.keys(loopBlocks).length})
             </Button>
           )}
+          <Button
+            type={readOnly ? 'primary' : 'default'}
+            danger={readOnly}
+            onClick={() => setReadOnly((v) => !v)}
+          >
+            {readOnly ? '🔒 只读模式' : '✏️ 编辑模式'}
+          </Button>
         </Space>
 
         {/* 可拖拽字段 */}
@@ -660,7 +477,6 @@ const UniverTestPage: React.FC = () => {
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', displayName);
-                    e.dataTransfer.setData('application/x-field-code', fieldCode);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   style={{
@@ -681,33 +497,34 @@ const UniverTestPage: React.FC = () => {
           )}
         </div>
 
-        {cellInfo && (
+        {selectedInfo && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            <Tag color="default" style={{ margin: 0 }}>{cellInfo.position}</Tag>
-
-            {cellInfo.valueType !== null && (
-              <Tag color={VALUE_TYPE_MAP[cellInfo.valueType]?.color || 'default'} style={{ margin: 0 }}>
-                {VALUE_TYPE_MAP[cellInfo.valueType]?.label || `type:${cellInfo.valueType}`}
-              </Tag>
-            )}
-
-            <Tag color="purple" style={{ margin: 0 }}>JS: {cellInfo.jsType}</Tag>
-
-            {cellInfo.hasRichText && <Tag color="cyan" style={{ margin: 0 }}>富文本</Tag>}
-            {cellInfo.hasFormula && <Tag color="red" style={{ margin: 0 }}>公式</Tag>}
-            {cellInfo.mergeRange && <Tag color="orange" style={{ margin: 0 }}>合并单元格</Tag>}
-
+            <Tag color="default" style={{ margin: 0 }}>{selectedInfo.a1Notation}</Tag>
             <span style={{ color: '#666', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {cellInfo.value !== null ? String(cellInfo.value) : '(空)'}
+              {selectedInfo.value !== null ? String(selectedInfo.value) : '(空)'}
             </span>
+            {selectedInfo.mergeRange && <Tag color="orange" style={{ margin: 0 }}>合并单元格</Tag>}
           </div>
         )}
       </div>
 
       {/* 主体：表格 + 属性面板 */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Univer 电子表格容器 */}
-        <div ref={containerRef} style={{ flex: 1, overflow: 'hidden' }} />
+        {/* UniverSheet 组件 */}
+        <UniverSheet
+          ref={sheetRef}
+          style={{ flex: 1, height: '100%' }}
+          onCellSelect={handleCellSelect}
+          onFieldDrop={handleFieldDrop}
+          contextMenuGroups={contextMenuGroups}
+          loopBlocks={loopBlocks}
+          cellProps={propStore.cellProps}
+          mergeProps={propStore.mergeProps}
+          loopBlockProps={propStore.loopBlockProps}
+          readOnly={readOnly}
+          message={message}
+          onMessageConsumed={() => setMessage(null)}
+        />
 
         {/* 右侧属性面板 */}
         <div style={{
@@ -717,7 +534,7 @@ const UniverTestPage: React.FC = () => {
           padding: 12,
           flexShrink: 0,
         }}>
-          {!cellInfo || !currentContext ? (
+          {!selectedInfo || !currentContext ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择单元格" />
           ) : (
             <>
@@ -730,8 +547,7 @@ const UniverTestPage: React.FC = () => {
                   <span style={{ fontWeight: 500 }}>{currentContext.label}</span>
                 </div>
 
-                {/* 合并区域详细信息 */}
-                {cellInfo.mergeRange && (
+                {selectedInfo.mergeRange && (
                   <div style={{
                     padding: '6px 10px',
                     background: '#fff7e6',
@@ -742,17 +558,14 @@ const UniverTestPage: React.FC = () => {
                   }}>
                     <div style={{ fontWeight: 500, marginBottom: 2 }}>合并范围</div>
                     <div style={{ color: '#666' }}>
-                      起始: ({cellInfo.mergeRange.startRow}, {cellInfo.mergeRange.startColumn}) →
-                      结束: ({cellInfo.mergeRange.endRow}, {cellInfo.mergeRange.endColumn})
-                    </div>
-                    <div style={{ color: '#666' }}>
-                      跨 {cellInfo.mergeRange.endRow - cellInfo.mergeRange.startRow + 1} 行 × {cellInfo.mergeRange.endColumn - cellInfo.mergeRange.startColumn + 1} 列
+                      起始: ({selectedInfo.mergeRange.startRow}, {selectedInfo.mergeRange.startColumn}) →
+                      结束: ({selectedInfo.mergeRange.endRow}, {selectedInfo.mergeRange.endColumn})
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 循环块配置（如果选中在循环块内） */}
+              {/* 循环块配置 */}
               {currentContext.loopBlock && currentContext.type !== 'loopBlock' && (
                 <div style={{
                   padding: '8px 10px',
@@ -766,94 +579,67 @@ const UniverTestPage: React.FC = () => {
                   <div style={{ color: '#666' }}>
                     范围: ({currentContext.loopBlock.startRow},{currentContext.loopBlock.startColumn}) → ({currentContext.loopBlock.endRow},{currentContext.loopBlock.endColumn})
                   </div>
-                  {currentContext.loopBlock.loopVariable && (
-                    <div style={{ color: '#666' }}>循环变量: {currentContext.loopBlock.loopVariable}</div>
-                  )}
                 </div>
               )}
 
-              {/* 循环块变量配置（当选中类型为循环块时） */}
-              {currentContext.type === 'loopBlock' && currentContext.loopBlock && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>循环变量</div>
-                  <Select
-                    size="small"
-                    style={{ width: '100%' }}
-                    placeholder="选择循环变量字段"
-                    allowClear
-                    value={currentContext.loopBlock.loopVariable || undefined}
-                    options={fieldOptions}
-                    onChange={(val) => handleLoopBlockVariableChange(currentContext.loopBlock!.id, val || '')}
-                  />
-                </div>
-              )}
-
-              {/* 样式设置 — key 绑定单元格位置，切换时自动重建并回填当前样式 */}
+              {/* 样式设置 */}
               <Divider style={{ margin: '8px 0' }}>样式设置</Divider>
-              <div key={cellInfo.position} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
-                {(() => {
-                  const cs = cellInfo.currentStyle;
-                  return (
-                    <>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>字体颜色</div>
-                          <input
-                            type="color"
-                            defaultValue={cs.fontColor || '#000000'}
-                            onChange={(e) => applyCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col, { fontColor: e.target.value })}
-                            style={{ width: '100%', height: 28, border: '1px solid #d9d9d9', borderRadius: 4, cursor: 'pointer', padding: 2 }}
-                          />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>背景颜色</div>
-                          <input
-                            type="color"
-                            defaultValue={cs.background || '#ffffff'}
-                            onChange={(e) => applyCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col, { background: e.target.value })}
-                            style={{ width: '100%', height: 28, border: '1px solid #d9d9d9', borderRadius: 4, cursor: 'pointer', padding: 2 }}
-                          />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>字号</div>
-                          <Input
-                            size="small"
-                            type="number"
-                            min={8}
-                            max={72}
-                            defaultValue={cs.fontSize}
-                            placeholder="13"
-                            onChange={(e) => {
-                              const size = parseInt(e.target.value);
-                              if (size >= 8) applyCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col, { fontSize: size });
-                            }}
-                          />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>加粗 {cs.bold ? '(当前加粗)' : ''}</div>
-                          <Space size={4}>
-                            <Button size="small" type={cs.bold ? 'primary' : 'default'} onClick={() => applyCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col, { fontWeight: 'bold' })}>
-                              <strong>B</strong>
-                            </Button>
-                            <Button size="small" type={!cs.bold ? 'primary' : 'default'} onClick={() => applyCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col, { fontWeight: 'normal' })}>
-                              取消
-                            </Button>
-                          </Space>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-                <Button size="small" danger onClick={() => clearCellStyle(univerAPIRef.current, cellInfo.row, cellInfo.col)}>
+              <div key={selectedInfo.a1Notation} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>字体颜色</div>
+                    <input
+                      type="color"
+                      defaultValue={selectedStyle.fontColor || '#000000'}
+                      onChange={(e) => handle?.setFontColor(e.target.value)}
+                      style={{ width: '100%', height: 28, border: '1px solid #d9d9d9', borderRadius: 4, cursor: 'pointer', padding: 2 }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>背景颜色</div>
+                    <input
+                      type="color"
+                      defaultValue={selectedStyle.background || '#ffffff'}
+                      onChange={(e) => handle?.setBackground(e.target.value)}
+                      style={{ width: '100%', height: 28, border: '1px solid #d9d9d9', borderRadius: 4, cursor: 'pointer', padding: 2 }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>字号</div>
+                    <Input
+                      size="small"
+                      type="number"
+                      min={8}
+                      max={72}
+                      defaultValue={selectedStyle.fontSize}
+                      placeholder="13"
+                      onChange={(e) => {
+                        const size = parseInt(e.target.value);
+                        if (size >= 8) handle?.setFontSize(size);
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>加粗 {selectedStyle.bold ? '(当前加粗)' : ''}</div>
+                    <Space size={4}>
+                      <Button size="small" type={selectedStyle.bold ? 'primary' : 'default'} onClick={() => handle?.setFontWeight('bold')}>
+                        <strong>B</strong>
+                      </Button>
+                      <Button size="small" type={!selectedStyle.bold ? 'primary' : 'default'} onClick={() => handle?.setFontWeight('normal')}>
+                        取消
+                      </Button>
+                    </Space>
+                  </div>
+                </div>
+                <Button size="small" danger onClick={() => handle?.clearFormat()}>
                   清除样式
                 </Button>
               </div>
 
               <Divider style={{ margin: '8px 0' }}>属性列表 ({currentContext.props.length})</Divider>
 
-              {/* 已有属性列表 */}
               {currentContext.props.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#999', textAlign: 'center', padding: '12px 0' }}>
                   暂无属性，点击下方添加
@@ -868,7 +654,6 @@ const UniverTestPage: React.FC = () => {
 
               <Divider style={{ margin: '8px 0' }}>添加属性</Divider>
 
-              {/* 添加属性表单 */}
               {addingPropKind ? (
                 <PropAddForm
                   kind={addingPropKind}
@@ -896,6 +681,15 @@ const UniverTestPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 隐藏的文件选择器 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
     </div>
   );
 };
@@ -975,7 +769,6 @@ const PropAddForm: React.FC<{
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <Tag color="geekblue">{template?.label || kind}</Tag>
 
-      {/* 字段绑定（所有类型通用，可选） */}
       <div>
         <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>字段（可选）</div>
         <Select
@@ -989,7 +782,6 @@ const PropAddForm: React.FC<{
         />
       </div>
 
-      {/* 类型特定字段 */}
       {formFields.map((f) => (
         <div key={f.key}>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>{f.label}</div>
