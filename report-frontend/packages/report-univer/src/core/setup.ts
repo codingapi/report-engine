@@ -48,6 +48,14 @@ import '@univerjs/sheets-formula-ui/facade';
 // CSS
 import '@univerjs/preset-sheets-core/lib/index.css';
 
+/** Univer 字体列表（仅保留通用字体，中文字体待后端字体服务就绪后动态注入） */
+const FONT_LIST = [
+    { value: 'Arial', label: 'Arial', category: 'sans-serif' as const },
+    { value: 'Times New Roman', label: 'Times New Roman', category: 'serif' as const },
+    { value: 'Tahoma', label: 'Tahoma', category: 'sans-serif' as const },
+    { value: 'Verdana', label: 'Verdana', category: 'sans-serif' as const },
+];
+
 /** 需要隐藏的菜单项 */
 const HIDDEN_MENUS: Record<string, { hidden: boolean }> = {
     // 隐藏常用函数菜单
@@ -103,6 +111,7 @@ export function setupUniver(container: HTMLDivElement): SetupResult {
                 ribbonType: 'simple' as const,
                 formulaBar: false,
                 menu: HIDDEN_MENUS,
+                customFontFamily: { override: true, list: FONT_LIST },
             }],
             UniverDocsUIPlugin,
             UniverFormulaEnginePlugin,
