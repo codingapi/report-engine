@@ -1,81 +1,120 @@
-import React, { useEffect, useRef } from 'react';
-import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core';
-import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/locales/zh-CN';
-import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
-import '@univerjs/preset-sheets-core/lib/index.css';
-import { UniverSheetProps } from './type';
+import React, { useEffect, useImperativeHandle, useRef, forwardRef } from 'react';
+import { setupUniver } from '@/core/setup';
+import type { UniverAPI } from '@/core/setup';
+import { registerCellSelection } from '@/core/cell-selection';
+import { buildContextMenus, updateMenuGroups } from '@/core/context-menu';
+import { createHighlightManager } from '@/core/highlight';
+import type { HighlightManager } from '@/core/highlight';
+import { registerDragDrop } from '@/core/drag-drop';
+import { extractSnapshot } from '@/core/snapshot';
+import type { UniverSheetProps, UniverSheetHandle } from './type';
 
-export const UniverSheet: React.FC<UniverSheetProps> = (props) => {
-    const containerRef = useRef<HTMLDivElement>(null);
+export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
+    (props, ref) => {
+        const containerRef = useRef<HTMLDivElement>(null);
+        const univerAPIRef = useRef<UniverAPI>(null);
+        const highlightManagerRef = useRef<HighlightManager | null>(null);
+        const menusBuiltRef = useRef(false);
 
-    const style = props.style || {
-        height: '100vh',
-    };
+        // 用 ref 保存最新回调，避免闭包过期
+        const onCellSelectRef = useRef(props.onCellSelect);
+        onCellSelectRef.current = props.onCellSelect;
 
-    useEffect(() => {
-        const { univerAPI, univer } = createUniver({
-            locale: LocaleType.ZH_CN,
-            locales: {
-                [LocaleType.ZH_CN]: mergeLocales(
-                    UniverPresetSheetsCoreZhCN,
-                ),
+        const onFieldDropRef = useRef(props.onFieldDrop);
+        onFieldDropRef.current = props.onFieldDrop;
+
+        const style = props.style || { height: '100vh' };
+
+        // 暴露命令式句柄
+        useImperativeHandle(ref, () => ({
+            getSnapshot: () => {
+                const api = univerAPIRef.current;
+                if (!api) return null;
+                const workbook = api.getActiveWorkbook();
+                if (!workbook) return null;
+                return extractSnapshot(workbook);
             },
-            presets: [
-                UniverSheetsCorePreset({
-                    container: containerRef?.current || undefined,
-                    ribbonType: 'simple',
-                    formulaBar: false,
-                    formula: {
-                        functionScreenTips: false,
-                    },
-                    menu: {
-                        // 隐藏冻结行列功能
-                        'sheet.menu.sheet-frozen': { hidden: true },
-                        'sheet.column-header-menu.sheet-frozen': { hidden: true },
-                        'sheet.row-header-menu.sheet-frozen': { hidden: true },
-                        // 隐藏保护（权限）功能
-                        'sheet.contextMenu.permission': { hidden: true },
-                        'sheet.command.add-range-protection-from-toolbar': { hidden: true },
-                        'sheet.command.add-range-protection-from-sheet-bar': { hidden: true },
-                        'sheet.command.delete-worksheet-protection-from-sheet-bar': { hidden: true },
-                        'sheet.command.change-sheet-protection-from-sheet-bar': { hidden: true },
-                        'sheet.command.view-sheet-permission-from-sheet-bar': { hidden: true },
-                        // 隐藏文本转换数字功能
-                        'sheet.toolbar.text-to-number': { hidden: true },
-                        'sheet.contextMenu.text-to-number': { hidden: true },
-                        // 隐藏常用函数功能
-                        'formula-ui.operation.insert-function.common': { hidden: true },
-                        'formula-ui.operation.insert-function.financial': { hidden: true },
-                        'formula-ui.operation.insert-function.logical': { hidden: true },
-                        'formula-ui.operation.insert-function.text': { hidden: true },
-                        'formula-ui.operation.insert-function.date': { hidden: true },
-                        'formula-ui.operation.insert-function.lookup': { hidden: true },
-                        'formula-ui.operation.insert-function.math': { hidden: true },
-                        'formula-ui.operation.insert-function.statistical': { hidden: true },
-                        'formula-ui.operation.insert-function.engineering': { hidden: true },
-                        'formula-ui.operation.insert-function.information': { hidden: true },
-                        'formula-ui.operation.insert-function.database': { hidden: true },
-                        'formula-ui.operation.more-functions': { hidden: true },
-                        // 隐藏数据格式功能
-                        'sheet.operation.open.numfmt.panel': { hidden: true },
-                        'sheet.command.numfmt.set.percent': { hidden: true },
-                        'sheet.command.numfmt.set.currency': { hidden: true },
-                        'sheet.command.numfmt.add.decimal.command': { hidden: true },
-                        'sheet.command.numfmt.subtract.decimal.command': { hidden: true },
-                    },
-                }),
-            ],
-        })
-        univerAPI.createWorkbook({})
+            setCellValue: (sheetId: string, row: number, column: number, value: string) => {
+                const api = univerAPIRef.current;
+                if (!api) return;
+                const workbook = api.getActiveWorkbook();
+                if (!workbook) return;
+                const sheet = workbook.getSheetBySheetId(sheetId);
+                if (!sheet) return;
+                sheet.getRange(row, column).setValue(value);
+            },
+        }));
 
-        props.onCreate?.(univer, univerAPI, containerRef.current!);
+        // 初始化 Univer（仅一次）
+        useEffect(() => {
+            if (!containerRef.current) return;
 
-        return () => {
-            univerAPI.dispose()
-        }
-    }, [])
-    return (
-        <div ref={containerRef} style={style} />
-    )
-};
+            const { univerAPI, dispose } = setupUniver(containerRef.current);
+            univerAPIRef.current = univerAPI;
 
+            // 创建高亮管理器
+            highlightManagerRef.current = createHighlightManager(univerAPI);
+
+            // 注册单元格选中事件（含高亮重应用）
+            registerCellSelection(
+                univerAPI,
+                () => onCellSelectRef.current,
+                () => highlightManagerRef.current,
+            );
+
+            // 构建右键菜单
+            if (props.contextMenuGroups?.length) {
+                buildContextMenus(univerAPI, props.contextMenuGroups);
+                menusBuiltRef.current = true;
+            }
+
+            // 注册拖拽事件
+            const cleanupDragDrop = registerDragDrop(
+                containerRef.current,
+                univerAPI,
+                () => onFieldDropRef.current,
+            );
+
+            return () => {
+                cleanupDragDrop();
+                highlightManagerRef.current?.dispose();
+                highlightManagerRef.current = null;
+                dispose();
+            };
+        }, []);
+
+        // 同步菜单定义
+        useEffect(() => {
+            if (props.contextMenuGroups) {
+                updateMenuGroups(props.contextMenuGroups);
+
+                if (!menusBuiltRef.current && props.contextMenuGroups.length && univerAPIRef.current) {
+                    buildContextMenus(univerAPIRef.current, props.contextMenuGroups);
+                    menusBuiltRef.current = true;
+                }
+            }
+        }, [props.contextMenuGroups]);
+
+        // 同步循环块高亮
+        useEffect(() => {
+            if (!highlightManagerRef.current) return;
+            highlightManagerRef.current.sync(props.loopBlocks || {});
+        }, [props.loopBlocks]);
+
+        // 显示消息提示
+        useEffect(() => {
+            if (!props.message || !univerAPIRef.current) return;
+
+            univerAPIRef.current.showMessage({
+                content: props.message.content,
+                type: props.message.type || 'info',
+                duration: props.message.duration ?? 2000,
+            });
+            props.onMessageConsumed?.();
+        }, [props.message]);
+
+        return <div ref={containerRef} style={style} />;
+    },
+);
+
+UniverSheet.displayName = 'UniverSheet';

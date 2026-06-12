@@ -1,7 +1,7 @@
 {
   "name": "@coding-report/report-univer",
   "version": "0.0.1",
-  "description": "report-engine components",
+  "description": "Univer spreadsheet wrapper for report-engine",
   "keywords": [
     "coding-report",
     "report-engine"
@@ -41,15 +41,16 @@
     "@univerjs/engine-render": "^0.25.0",
     "@univerjs/network": "^0.25.0",
     "@univerjs/presets": "^0.25.0",
+    "@univerjs/preset-sheets-core": "^0.25.0",
     "@univerjs/sheets": "^0.25.0",
+    "@univerjs/sheets-formula": "^0.25.0",
+    "@univerjs/sheets-formula-ui": "^0.25.0",
+    "@univerjs/sheets-numfmt": "^0.25.0",
+    "@univerjs/sheets-numfmt-ui": "^0.25.0",
     "@univerjs/sheets-ui": "^0.25.0",
-    "@univerjs/ui": "^0.25.0",
-    "react-resizable-panels": "^4.11.2",
-    "rxjs": "^7.8.2"
+    "@univerjs/ui": "^0.25.0"
   },
   "peerDependencies": {
-    "@ant-design/icons": ">=5",
-    "antd": ">=5",
     "react": ">=18",
     "react-dom": ">=18"
   }

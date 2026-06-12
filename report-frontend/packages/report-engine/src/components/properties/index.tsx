@@ -1,22 +1,27 @@
 import React, { useMemo, useCallback } from 'react';
-import { Empty, Tag } from 'antd';
+import { Empty, Tabs, Tag } from 'antd';
 import type { DataConfig } from '../datasource/types';
 import {
   type SelectedCellInfo,
   type CellPropertyMap,
   type CellPropertyConfig,
   type CellKey,
+  type LoopBlockConfig,
   EMPTY_CELL_CONFIG,
   makeCellKey,
 } from './types';
 import ConditionSection from './condition-section';
 import CalcMethodSection from './calc-method-section';
+import LoopBlockSection from './loop-block-section';
 
 export interface PropertyPanelProps {
   selectedCell: SelectedCellInfo | null;
   dataConfig?: DataConfig;
   cellProperties: CellPropertyMap;
   onCellPropertyChange: (cellKey: CellKey, config: CellPropertyConfig) => void;
+  loopBlocks: Record<string, LoopBlockConfig>;
+  onLoopBlockChange: (id: string, config: LoopBlockConfig) => void;
+  onLoopBlockRemove: (id: string) => void;
 }
 
 const PropertyPanel: React.FC<PropertyPanelProps> = ({
@@ -24,6 +29,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   dataConfig,
   cellProperties,
   onCellPropertyChange,
+  loopBlocks,
+  onLoopBlockChange,
+  onLoopBlockRemove,
 }) => {
   const cellKey = useMemo(() => {
     if (!selectedCell) return null;
@@ -50,7 +58,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     [cellKey, config, onCellPropertyChange],
   );
 
-  // 空状态
+  // 空状态（未选中单元格或无数据源）
   if (!selectedCell || !dataConfig) {
     return (
       <div className="report-engine__property-panel">
@@ -63,8 +71,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     );
   }
 
-  return (
-    <div className="report-engine__property-panel">
+  /** 单元格属性 tab 内容 */
+  const cellTab = (
+    <>
       {/* 单元格信息栏 */}
       <div className="report-engine__property-cell-info">
         <div className="report-engine__property-cell-ref">
@@ -107,6 +116,31 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         selectedField={firstSelectedField}
         dataConfig={dataConfig}
         onChange={(calcMethod) => handleChange({ calcMethod })}
+      />
+    </>
+  );
+
+  return (
+    <div className="report-engine__property-panel">
+      <Tabs
+        defaultActiveKey="cell"
+        size="small"
+        items={[
+          { key: 'cell', label: '单元格属性', children: cellTab },
+          {
+            key: 'loopBlock',
+            label: '循环块',
+            children: (
+              <LoopBlockSection
+                selectedCell={selectedCell}
+                dataConfig={dataConfig}
+                loopBlocks={loopBlocks}
+                onLoopBlockChange={onLoopBlockChange}
+                onLoopBlockRemove={onLoopBlockRemove}
+              />
+            ),
+          },
+        ]}
       />
     </div>
   );

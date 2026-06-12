@@ -141,12 +141,12 @@ importers:
       react-dom:
         specifier: '>=18'
         version: 18.3.1(react@18.3.1)
+      react-resizable-panels:
+        specifier: ^4.11.2
+        version: 4.11.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   packages/report-univer:
     dependencies:
-      '@ant-design/icons':
-        specifier: '>=5'
-        version: 6.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@univerjs/core':
         specifier: ^0.25.0
         version: 0.25.0(react@18.3.1)(rxjs@7.8.2)
@@ -168,33 +168,39 @@ importers:
       '@univerjs/network':
         specifier: ^0.25.0
         version: 0.25.0(react@18.3.1)(rxjs@7.8.2)
+      '@univerjs/preset-sheets-core':
+        specifier: ^0.25.0
+        version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
       '@univerjs/presets':
         specifier: ^0.25.0
         version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
       '@univerjs/sheets':
         specifier: ^0.25.0
         version: 0.25.0(react@18.3.1)(rxjs@7.8.2)
+      '@univerjs/sheets-formula':
+        specifier: ^0.25.0
+        version: 0.25.0(react@18.3.1)(rxjs@7.8.2)
+      '@univerjs/sheets-formula-ui':
+        specifier: ^0.25.0
+        version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
+      '@univerjs/sheets-numfmt':
+        specifier: ^0.25.0
+        version: 0.25.0(react@18.3.1)(rxjs@7.8.2)
+      '@univerjs/sheets-numfmt-ui':
+        specifier: ^0.25.0
+        version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
       '@univerjs/sheets-ui':
         specifier: ^0.25.0
         version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
       '@univerjs/ui':
         specifier: ^0.25.0
         version: 0.25.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rxjs@7.8.2)
-      antd:
-        specifier: '>=5'
-        version: 6.4.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: '>=18'
         version: 18.3.1
       react-dom:
         specifier: '>=18'
         version: 18.3.1(react@18.3.1)
-      react-resizable-panels:
-        specifier: ^4.11.2
-        version: 4.11.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      rxjs:
-        specifier: ^7.8.2
-        version: 7.8.2
 
 packages:
 

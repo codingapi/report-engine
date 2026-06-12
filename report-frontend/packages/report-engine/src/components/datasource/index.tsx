@@ -3,7 +3,6 @@ import { Tree } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
   TableOutlined,
-  FieldStringOutlined,
   KeyOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
@@ -38,7 +37,18 @@ const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ dataConfig }) => {
     children: table.fields.map((field) => ({
       key: `field-${table.id}-${field.name}`,
       title: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        <span
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+              table: table.name,
+              field: field.name,
+              alias: field.alias || field.name,
+            }));
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'grab' }}
+        >
           <DataTypeIcon dataType={field.dataType} />
           <span>{field.alias || field.name}</span>
           {field.isPrimary && <KeyOutlined style={{ fontSize: 12, color: '#faad14' }} />}
