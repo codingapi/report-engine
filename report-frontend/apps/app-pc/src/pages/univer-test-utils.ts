@@ -3,7 +3,10 @@
  * 输出后端友好的 Excel 数据结构，可直接映射到 Apache POI API
  */
 
-import type { FWorkbook } from '@univerjs/core/facade';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FWorkbook = any;
+import type { CellProp, CellPropStore, LoopBlock } from './univer-test-props';
+import { makeCellKey, makeMergeKey } from './univer-test-props';
 
 // ─── 输出类型定义 ───────────────────────────────────────────
 
@@ -30,6 +33,8 @@ interface ExcelSheet {
   rows: ExcelRow[];
   /** 自定义列宽（仅包含非默认列） */
   columns: ExcelColumn[];
+  /** 循环块列表 */
+  loopBlocks?: ExcelLoopBlock[];
 }
 
 interface ExcelMerge {
@@ -41,6 +46,8 @@ interface ExcelMerge {
   rowSpan: number;
   /** 列数 */
   colSpan: number;
+  /** 合并区域属性 */
+  props?: CellProp[];
 }
 
 interface ExcelCell {
@@ -58,6 +65,27 @@ interface ExcelCell {
   richText?: ExcelRichText;
   /** 单元格样式 */
   style?: ExcelStyle;
+  /** 单元格属性绑定 */
+  props?: CellProp[];
+}
+
+interface ExcelLoopBlock {
+  /** 循环块 ID */
+  id: string;
+  /** 标签 */
+  label: string;
+  /** 循环变量 "tableName.fieldName" */
+  loopVariable: string;
+  /** 起始行（0-based） */
+  startRow: number;
+  /** 起始列（0-based） */
+  startCol: number;
+  /** 结束行（0-based） */
+  endRow: number;
+  /** 结束列（0-based） */
+  endCol: number;
+  /** 循环块属性 */
+  props?: CellProp[];
 }
 
 interface ExcelRichText {
@@ -166,15 +194,6 @@ function rowColToA1(row: number, col: number): string {
   return `${colStr}${row + 1}`;
 }
 
-function a1ToRowCol(a1: string): [number, number] {
-  const match = a1.match(/^([A-Z]+)(\d+)$/);
-  if (!match) return [0, 0];
-  let col = 0;
-  for (const ch of match[1]) {
-    col = col * 26 + (ch.charCodeAt(0) - 64);
-  }
-  return [parseInt(match[2]) - 1, col - 1];
-}
 
 // ─── 解析函数 ───────────────────────────────────────────────
 
@@ -307,8 +326,15 @@ function parseRichText(docData: Record<string, unknown>): ExcelRichText | undefi
 
 /**
  * 提取工作簿快照，输出后端友好的 Excel 数据结构
+ * @param fWorkbook Univer 工作簿实例
+ * @param propStore 属性绑定存储（可选）
+ * @param loopBlocks 循环块列表（可选）
  */
-export function extractWorkbookSnapshot(fWorkbook: FWorkbook): void {
+export function extractWorkbookSnapshot(
+  fWorkbook: FWorkbook,
+  propStore?: CellPropStore,
+  loopBlocks?: LoopBlock[],
+): void {
   console.group('📊 [Excel 快照]');
 
   const snapshot = fWorkbook.save();
@@ -341,18 +367,28 @@ export function extractWorkbookSnapshot(fWorkbook: FWorkbook): void {
     const mergeData = sheetData.mergeData as Array<Record<string, number>> | undefined;
     if (mergeData) {
       for (const m of mergeData) {
-        sheet.merges.push({
+        const merge: ExcelMerge = {
           startRow: m.startRow,
           startCol: m.startColumn,
           rowSpan: m.endRow - m.startRow + 1,
           colSpan: m.endColumn - m.startColumn + 1,
-        });
+        };
+        // 查找合并区域属性
+        if (propStore) {
+          const mk = makeMergeKey(sheetId, m.startRow, m.startColumn, m.endRow, m.endColumn);
+          const mp = propStore.mergeProps[mk];
+          if (mp && mp.length > 0) merge.props = mp;
+        }
+        sheet.merges.push(merge);
       }
     }
 
     // slave 集合（跳过合并区域内的非主单元格）
     const slavePositions = new Set<string>();
+    // 合并区域主单元格 → 合并区域映射（用于边框收集）
+    const mergeMasterMap = new Map<string, ExcelMerge>();
     for (const m of sheet.merges) {
+      mergeMasterMap.set(`${m.startRow},${m.startCol}`, m);
       for (let r = m.startRow; r < m.startRow + m.rowSpan; r++) {
         for (let c = m.startCol; c < m.startCol + m.colSpan; c++) {
           if (r !== m.startRow || c !== m.startCol) {
@@ -400,8 +436,16 @@ export function extractWorkbookSnapshot(fWorkbook: FWorkbook): void {
 
           const style = resolvedStyle ? parseStyle(resolvedStyle) : undefined;
 
-          // 跳过完全空的单元格
-          if (value == null && !formula && !richText && !style) continue;
+          // 查找单元格属性
+          let cellProps: CellProp[] | undefined;
+          if (propStore) {
+            const ck = makeCellKey(sheetId, row, col);
+            const cp = propStore.cellProps[ck];
+            if (cp && cp.length > 0) cellProps = cp;
+          }
+
+          // 跳过完全空的单元格（无值、无样式、无属性）
+          if (value == null && !formula && !richText && !style && !cellProps) continue;
 
           const cell: ExcelCell = {
             row,
@@ -412,6 +456,66 @@ export function extractWorkbookSnapshot(fWorkbook: FWorkbook): void {
           if (formula) cell.formula = formula;
           if (richText) cell.richText = richText;
           if (style) cell.style = style;
+          if (cellProps) cell.props = cellProps;
+
+          // 合并单元格边框收集：从从属单元格收集右边框和下边框
+          const mergeInfo = mergeMasterMap.get(`${row},${col}`);
+          if (mergeInfo && cellData) {
+            const mergeBorders: ExcelBorders = {};
+            let hasMergeBorders = false;
+
+            // 保留主单元格已有的边框
+            if (cell.style?.borders) {
+              Object.assign(mergeBorders, cell.style.borders);
+              hasMergeBorders = true;
+            }
+
+            // 收集右边框：遍历合并区域最右列的每个单元格
+            const rightCol = mergeInfo.startCol + mergeInfo.colSpan - 1;
+            if (!mergeBorders.right) {
+              for (let r = mergeInfo.startRow; r < mergeInfo.startRow + mergeInfo.rowSpan; r++) {
+                const rightRaw = cellData[String(r)]?.[String(rightCol)];
+                if (!rightRaw) continue;
+                let rightStyle: Record<string, unknown> | undefined;
+                const rs = rightRaw.s;
+                if (rs) {
+                  if (typeof rs === 'string') rightStyle = globalStyles?.[rs];
+                  else if (typeof rs === 'object') rightStyle = rs as Record<string, unknown>;
+                }
+                if (rightStyle) {
+                  const rb = parseBorder((rightStyle.bd as Record<string, unknown>)?.r);
+                  if (rb) { mergeBorders.right = rb; hasMergeBorders = true; break; }
+                }
+              }
+            }
+
+            // 收集下边框：遍历合并区域最底行的每个单元格
+            const bottomRow = mergeInfo.startRow + mergeInfo.rowSpan - 1;
+            if (!mergeBorders.bottom) {
+              const bottomRowData = cellData[String(bottomRow)];
+              if (bottomRowData) {
+                for (let c = mergeInfo.startCol; c < mergeInfo.startCol + mergeInfo.colSpan; c++) {
+                  const bottomRaw = bottomRowData[String(c)];
+                  if (!bottomRaw) continue;
+                  let bottomStyle: Record<string, unknown> | undefined;
+                  const bs = bottomRaw.s;
+                  if (bs) {
+                    if (typeof bs === 'string') bottomStyle = globalStyles?.[bs];
+                    else if (typeof bs === 'object') bottomStyle = bs as Record<string, unknown>;
+                  }
+                  if (bottomStyle) {
+                    const bb = parseBorder((bottomStyle.bd as Record<string, unknown>)?.b);
+                    if (bb) { mergeBorders.bottom = bb; hasMergeBorders = true; break; }
+                  }
+                }
+              }
+            }
+
+            if (hasMergeBorders) {
+              if (!cell.style) cell.style = {};
+              cell.style.borders = mergeBorders;
+            }
+          }
 
           sheet.cells.push(cell);
         }
@@ -447,10 +551,252 @@ export function extractWorkbookSnapshot(fWorkbook: FWorkbook): void {
       }
     }
 
+    // 循环块
+    if (loopBlocks) {
+      const sheetLoopBlocks = loopBlocks.filter((b) => b.sheetId === sheetId);
+      if (sheetLoopBlocks.length > 0) {
+        sheet.loopBlocks = sheetLoopBlocks.map((b) => {
+          const lb: ExcelLoopBlock = {
+            id: b.id,
+            label: b.label,
+            loopVariable: b.loopVariable,
+            startRow: b.startRow,
+            startCol: b.startColumn,
+            endRow: b.endRow,
+            endCol: b.endColumn,
+          };
+          if (propStore) {
+            const lp = propStore.loopBlockProps[b.id];
+            if (lp && lp.length > 0) lb.props = lp;
+          }
+          return lb;
+        });
+      }
+    }
+
     workbook.sheets.push(sheet);
   }
 
   // 完整 JSON 输出
   console.log(JSON.stringify(workbook, null, 2));
   console.groupEnd();
+}
+
+// ─── 边框线型反向映射（可读名称 → Univer 枚举值） ──────────
+
+const BORDER_STYLE_REVERSE: Record<string, number> = {
+  thin: 1, hair: 2, dotted: 3, dashed: 4,
+  dashDot: 5, dashDotDot: 6, double: 7, medium: 8,
+  mediumDashed: 9, mediumDashDot: 10, mediumDashDotDot: 11,
+  slantDashDot: 12, thick: 13,
+};
+
+// ─── 默认快照数据（演示所有能力） ──────────────────────────
+
+export const MOCK_SNAPSHOT = {
+  sheets: [
+    // Sheet 1: 主报表
+    {
+      id: 'sheet-1',
+      name: '用户报表',
+      rowCount: 15,
+      columnCount: 6,
+      defaultRowHeight: 24,
+      defaultColumnWidth: 88,
+      rows: [{ index: 0, height: 36, hidden: false }],
+      columns: [{ index: 0, width: 120, hidden: false }],
+      merges: [
+        { startRow: 0, startCol: 0, rowSpan: 1, colSpan: 3, props: [{ kind: 'field', field: 'sys_user.username', data: { display: 'label' } }] },
+      ],
+      cells: [
+        { row: 0, col: 0, ref: 'A1', value: '用户报表', style: { font: { size: 16, bold: true }, align: 'center' as const, valign: 'middle' as const } },
+        { row: 2, col: 0, ref: 'A3', value: '姓名', style: { font: { bold: true }, fill: '#f0f5ff' } },
+        { row: 2, col: 1, ref: 'B3', value: '邮箱', style: { font: { bold: true }, fill: '#f0f5ff' } },
+        { row: 3, col: 0, ref: 'A4', value: '张三', props: [{ kind: 'field', field: 'sys_user.username', data: { display: 'value' } }] },
+        { row: 3, col: 1, ref: 'B4', value: 'zhangsan@test.com', props: [{ kind: 'field', field: 'sys_user.email', data: { display: 'value' } }] },
+        { row: 4, col: 0, ref: 'A5', value: 100, style: { font: { color: '#52c41a' }, align: 'right' as const } },
+      ],
+      loopBlocks: [
+        { id: 'loop-1', label: '用户列表', loopVariable: 'sys_user.id', startRow: 2, startCol: 0, endRow: 4, endCol: 1,
+          props: [{ kind: 'dataConfig', data: { pageSize: '10' } }] },
+      ],
+    },
+    // Sheet 2: 汇总表
+    {
+      id: 'sheet-2',
+      name: '汇总',
+      rowCount: 10,
+      columnCount: 4,
+      defaultRowHeight: 24,
+      defaultColumnWidth: 88,
+      cells: [
+        { row: 0, col: 0, ref: 'A1', value: '汇总统计', style: { font: { size: 14, bold: true } } },
+        { row: 2, col: 0, ref: 'A3', value: '总金额', style: { font: { bold: true } } },
+        { row: 2, col: 1, ref: 'B3', value: 5000, props: [{ kind: 'aggregation', data: { method: 'sum' } }] },
+      ],
+      loopBlocks: [],
+    },
+  ],
+};
+
+// ─── 渲染快照 ────────────────────────────────────────────
+
+/**
+ * 将快照数据渲染到 Univer 工作表中
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function renderWorkbookSnapshot(
+  api: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  snapshot: any,
+  onRendered?: (props: {
+    cellProps: Record<string, CellProp[]>;
+    mergeProps: Record<string, CellProp[]>;
+    loopBlockProps: Record<string, CellProp[]>;
+    loopBlocks: LoopBlock[];
+  }) => void,
+): void {
+  const workbook = api?.getActiveWorkbook?.();
+  if (!workbook) {
+    console.warn('⚠️ 未找到活动工作簿');
+    return;
+  }
+
+  const sheetsData = snapshot.sheets;
+  if (!sheetsData || sheetsData.length === 0) {
+    console.warn('⚠️ 快照中无工作表数据');
+    return;
+  }
+
+  // 收集属性（跨所有 sheet）
+  const cellProps: Record<string, CellProp[]> = {};
+  const mergeProps: Record<string, CellProp[]> = {};
+  const loopBlockProps: Record<string, CellProp[]> = {};
+  const loopBlocks: LoopBlock[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderSheet = (sheet: any, sheetData: any) => {
+    // 设置工作表名称
+    if (sheetData.name) sheet.setName(sheetData.name);
+
+    // 设置尺寸
+    if (sheetData.columnCount) sheet.setColumnCount(sheetData.columnCount);
+    if (sheetData.rowCount) sheet.setRowCount(sheetData.rowCount);
+
+    // 设置行高
+    const rows: Array<{ index: number; height: number }> = sheetData.rows || [];
+    for (const r of rows) {
+      sheet.setRowHeight(r.index, r.height);
+    }
+
+    // 设置列宽
+    const columns: Array<{ index: number; width: number }> = sheetData.columns || [];
+    for (const c of columns) {
+      sheet.setColumnWidth(c.index, c.width);
+    }
+
+    const sheetId = sheet.getSheetId?.() ?? 'unknown';
+
+    // 渲染单元格
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cells: Array<any> = sheetData.cells || [];
+    for (const cell of cells) {
+      const range = sheet.getRange(cell.row, cell.col);
+      if (!range) continue;
+
+      if (cell.value != null) {
+        range.setValue(cell.value);
+      }
+
+      const s = cell.style;
+      if (s) {
+        if (s.font?.color) range.setFontColor(s.font.color);
+        if (s.font?.size) range.setFontSize(s.font.size);
+        if (s.font?.bold) range.setFontWeight('bold');
+        if (s.fill) range.setBackground(s.fill);
+        if (s.align) {
+          const hAlignMap: Record<string, string> = { right: 'normal', justify: 'left', distributed: 'left' };
+          range.setHorizontalAlignment(hAlignMap[s.align] || s.align);
+        }
+        if (s.valign) range.setVerticalAlignment(s.valign);
+
+        if (s.borders) {
+          const Enum = api.Enum;
+          const sides = ['top', 'bottom', 'left', 'right'] as const;
+          for (const side of sides) {
+            const border = s.borders[side];
+            if (border) {
+              const styleVal = BORDER_STYLE_REVERSE[border.style] ?? 1;
+              range.setBorder(Enum.BorderType[side.toUpperCase()], styleVal, border.color || '#000000');
+            }
+          }
+        }
+      }
+
+      if (cell.props && cell.props.length > 0) {
+        cellProps[`${sheetId}:${cell.row}:${cell.col}`] = cell.props;
+      }
+    }
+
+    // 渲染合并区域
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const merges: Array<any> = sheetData.merges || [];
+    for (const m of merges) {
+      const range = sheet.getRange(m.startRow, m.startCol, m.rowSpan, m.colSpan);
+      if (range) range.merge();
+      if (m.props && m.props.length > 0) {
+        const mk = `merge:${sheetId}:${m.startRow}:${m.startCol}:${m.startRow + m.rowSpan - 1}:${m.startCol + m.colSpan - 1}`;
+        mergeProps[mk] = m.props;
+      }
+    }
+
+    // 收集循环块
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawLoopBlocks: Array<any> = sheetData.loopBlocks || [];
+    for (const lb of rawLoopBlocks) {
+      loopBlocks.push({
+        id: lb.id,
+        sheetId,
+        startRow: lb.startRow,
+        startColumn: lb.startCol,
+        endRow: lb.endRow,
+        endColumn: lb.endCol,
+        label: lb.label,
+        loopVariable: lb.loopVariable,
+      });
+      if (lb.props && lb.props.length > 0) {
+        loopBlockProps[lb.id] = lb.props;
+      }
+    }
+  };
+
+  // 遍历所有 sheet 数据
+  for (let i = 0; i < sheetsData.length; i++) {
+    const sheetData = sheetsData[i];
+    if (i === 0) {
+      // 第一个 sheet 使用已有的活动工作表
+      const sheet = workbook.getActiveSheet();
+      if (sheet) renderSheet(sheet, sheetData);
+    } else {
+      // 后续 sheet 创建新工作表
+      const newSheet = workbook.insertSheet(sheetData.name || `Sheet${i + 1}`);
+      if (newSheet) renderSheet(newSheet, sheetData);
+    }
+  }
+
+  // 切回第一个 sheet
+  const firstSheet = workbook.getSheets?.()?.[0];
+  if (firstSheet) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (firstSheet as any).activate?.();
+  }
+
+  console.log(`✅ [渲染快照] 完成: ${sheetsData.length} 个工作表`, {
+    loopBlocks: loopBlocks.length,
+    cellProps: Object.keys(cellProps).length,
+    mergeProps: Object.keys(mergeProps).length,
+    loopBlockProps: Object.keys(loopBlockProps).length,
+  });
+
+  onRendered?.({ cellProps, mergeProps, loopBlockProps, loopBlocks });
 }

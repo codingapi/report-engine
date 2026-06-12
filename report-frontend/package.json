@@ -13,6 +13,7 @@
     "push:report-univer": "pnpm -F @coding-report/report-univer push",
     "push": "pnpm run push:report-univer && pnpm run push:report-engine",
     "dev:app-pc": "pnpm -F @report-example/app-pc dev",
+    "dev": "pnpm run dev:app-pc",
     "clean": "pnpm cleaninstall-node"
   },
   "keywords": [],

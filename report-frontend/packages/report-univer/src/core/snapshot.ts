@@ -211,7 +211,10 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
 
         // slave 集合
         const slavePositions = new Set<string>();
+        // 合并区域主单元格映射（用于边框收集）
+        const mergeMasterMap = new Map<string, ExcelMerge>();
         for (const m of sheet.merges) {
+            mergeMasterMap.set(`${m.startRow},${m.startCol}`, m);
             for (let r = m.startRow; r < m.startRow + m.rowSpan; r++) {
                 for (let c = m.startCol; c < m.startCol + m.colSpan; c++) {
                     if (r !== m.startRow || c !== m.startCol) {
@@ -270,6 +273,64 @@ export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
                     if (formula) cell.formula = formula;
                     if (richText) cell.richText = richText;
                     if (style) cell.style = style;
+
+                    // 合并单元格边框收集：从从属单元格收集右边框和下边框
+                    const mergeInfo = mergeMasterMap.get(`${row},${col}`);
+                    if (mergeInfo && cellData) {
+                        const mergeBorders: ExcelBorders = {};
+                        let hasMergeBorders = false;
+
+                        if (cell.style?.borders) {
+                            Object.assign(mergeBorders, cell.style.borders);
+                            hasMergeBorders = true;
+                        }
+
+                        // 右边框：合并区域最右列
+                        const rightCol = mergeInfo.startCol + mergeInfo.colSpan - 1;
+                        if (!mergeBorders.right) {
+                            for (let r = mergeInfo.startRow; r < mergeInfo.startRow + mergeInfo.rowSpan; r++) {
+                                const rightRaw = cellData[String(r)]?.[String(rightCol)];
+                                if (!rightRaw) continue;
+                                let rightStyle: Record<string, unknown> | undefined;
+                                const rs = rightRaw.s;
+                                if (rs) {
+                                    if (typeof rs === 'string') rightStyle = globalStyles?.[rs];
+                                    else if (typeof rs === 'object') rightStyle = rs as Record<string, unknown>;
+                                }
+                                if (rightStyle) {
+                                    const rb = parseBorder((rightStyle.bd as Record<string, unknown>)?.r);
+                                    if (rb) { mergeBorders.right = rb; hasMergeBorders = true; break; }
+                                }
+                            }
+                        }
+
+                        // 下边框：合并区域最底行
+                        const bottomRow = mergeInfo.startRow + mergeInfo.rowSpan - 1;
+                        if (!mergeBorders.bottom) {
+                            const bottomRowData = cellData[String(bottomRow)];
+                            if (bottomRowData) {
+                                for (let c = mergeInfo.startCol; c < mergeInfo.startCol + mergeInfo.colSpan; c++) {
+                                    const bottomRaw = bottomRowData[String(c)];
+                                    if (!bottomRaw) continue;
+                                    let bottomStyle: Record<string, unknown> | undefined;
+                                    const bs = bottomRaw.s;
+                                    if (bs) {
+                                        if (typeof bs === 'string') bottomStyle = globalStyles?.[bs];
+                                        else if (typeof bs === 'object') bottomStyle = bs as Record<string, unknown>;
+                                    }
+                                    if (bottomStyle) {
+                                        const bb = parseBorder((bottomStyle.bd as Record<string, unknown>)?.b);
+                                        if (bb) { mergeBorders.bottom = bb; hasMergeBorders = true; break; }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (hasMergeBorders) {
+                            if (!cell.style) cell.style = {};
+                            cell.style.borders = mergeBorders;
+                        }
+                    }
 
                     sheet.cells.push(cell);
                 }
