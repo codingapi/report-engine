@@ -1,6 +1,9 @@
 package com.codingapi.report.starter;
 
 import com.codingapi.report.excel.FontRegistry;
+import com.codingapi.report.starter.controller.ExcelController;
+import com.codingapi.report.starter.controller.FontController;
+import com.codingapi.report.starter.properties.ReportFontProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -40,7 +43,7 @@ public class ReportEngineAutoConfiguration {
     }
 
     /**
-     * Web 环境下的自动配置：注册字体列表 API。
+     * Web 环境下的自动配置：注册 REST API Controller。
      */
     @Configuration
     @ConditionalOnClass(RestController.class)
@@ -49,6 +52,11 @@ public class ReportEngineAutoConfiguration {
         @Bean
         public FontController fontController(FontRegistry fontRegistry) {
             return new FontController(fontRegistry);
+        }
+
+        @Bean
+        public ExcelController excelController() {
+            return new ExcelController();
         }
     }
 }

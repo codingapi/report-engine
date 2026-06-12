@@ -42,6 +42,6 @@ export interface FontItem {
  * 返回后端已注册的自定义字体（含文件名）
  */
 export async function fetchFonts(): Promise<FontItem[]> {
-  const response = await http.get('/fonts/list');
-  return response.data as FontItem[];
+  const response = await http.get<{ list: FontItem[] }>('/fonts/list');
+  return response.data.list;
 }

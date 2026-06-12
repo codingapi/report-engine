@@ -1,6 +1,7 @@
-package com.codingapi.report.starter;
+package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.excel.FontRegistry;
+import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.file.Path;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -43,7 +43,7 @@ public class FontController {
      * </p>
      */
     @GetMapping("/list")
-    public List<FontItem> listFonts() {
+    public MultiResponse<FontItem> listFonts() {
         // 收集内置字体的 family 名称（排除与内置同名的自定义字体，避免 @font-face 覆盖系统字体）
         Set<String> builtinFamilies = fontRegistry.getBuiltinFontCatalog().stream()
                 .map(f -> f.getFamily().toLowerCase())
@@ -51,11 +51,11 @@ public class FontController {
 
         // 返回自定义字体，按族名去重，排除内置字体
         Set<String> seen = new HashSet<>();
-        return fontRegistry.getCustomFontCatalog().stream()
+        return MultiResponse.of(fontRegistry.getCustomFontCatalog().stream()
                 .filter(f -> !builtinFamilies.contains(f.getFamily().toLowerCase()))
                 .filter(f -> seen.add(f.getFamily()))
                 .map(f -> new FontItem(f.getFamily(), f.getFilename()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
     }
 
     /**

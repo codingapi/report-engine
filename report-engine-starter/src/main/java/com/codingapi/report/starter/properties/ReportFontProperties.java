@@ -1,4 +1,4 @@
-package com.codingapi.report.starter;
+package com.codingapi.report.starter.properties;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
