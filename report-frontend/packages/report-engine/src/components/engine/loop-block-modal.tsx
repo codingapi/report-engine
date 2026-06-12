@@ -1,13 +1,11 @@
-import React, { useMemo } from 'react';
-import { Modal, Form, Select, Input, Button, Popconfirm, Space } from 'antd';
+import React from 'react';
+import { Modal, Form, Input, Button, Popconfirm, Space } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import type { DataConfig } from '../datasource/types';
 import type { LoopBlockConfig } from '../properties/types';
 
 interface LoopBlockModalProps {
   open: boolean;
   config: LoopBlockConfig | null;
-  dataConfig?: DataConfig;
   onSave: (config: LoopBlockConfig) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
@@ -16,31 +14,17 @@ interface LoopBlockModalProps {
 const LoopBlockModal: React.FC<LoopBlockModalProps> = ({
   open,
   config,
-  dataConfig,
   onSave,
   onRemove,
   onClose,
 }) => {
   const [form] = Form.useForm();
 
-  /** 字段选项：按表分组 */
-  const fieldOptions = useMemo(() => {
-    if (!dataConfig) return [];
-    return dataConfig.tables.map((table) => ({
-      label: table.alias || table.name,
-      options: table.fields.map((field) => ({
-        label: field.alias || field.name,
-        value: `${table.name}.${field.name}`,
-      })),
-    }));
-  }, [dataConfig]);
-
   /** 弹窗打开时同步表单值 */
   const handleAfterOpen = (isOpen: boolean) => {
     if (isOpen && config) {
       form.setFieldsValue({
         label: config.label || '',
-        loopVariable: config.loopVariable || '',
       });
     }
   };
@@ -52,7 +36,6 @@ const LoopBlockModal: React.FC<LoopBlockModalProps> = ({
       onSave({
         ...config,
         label: values.label,
-        loopVariable: values.loopVariable,
       });
     } catch {
       // 表单验证失败
@@ -98,18 +81,6 @@ const LoopBlockModal: React.FC<LoopBlockModalProps> = ({
           name="label"
         >
           <Input placeholder="如：部门循环、月份循环" />
-        </Form.Item>
-        <Form.Item
-          label="循环变量字段"
-          name="loopVariable"
-          rules={[{ required: true, message: '请选择循环变量字段' }]}
-        >
-          <Select
-            placeholder="选择循环迭代的字段"
-            options={fieldOptions}
-            showSearch
-            optionFilterProp="label"
-          />
         </Form.Item>
       </Form>
     </Modal>

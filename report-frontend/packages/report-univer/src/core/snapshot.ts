@@ -416,7 +416,6 @@ export function extractSnapshot<TCellProp = unknown, TLoopProp = unknown>(
                     const lb: ExcelLoopBlock<TLoopProp> = {
                         id: b.id,
                         label: b.label,
-                        loopVariable: b.loopVariable,
                         startRow: b.startRow,
                         startCol: b.startColumn,
                         endRow: b.endRow,

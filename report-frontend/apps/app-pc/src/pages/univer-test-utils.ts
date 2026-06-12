@@ -33,8 +33,8 @@ export const MOCK_SNAPSHOT = {
         { row: 4, col: 0, ref: 'A5', value: 100, style: { font: { color: '#52c41a' }, align: 'right' as const } },
       ],
       loopBlocks: [
-        { id: 'loop-1', label: '用户列表', loopVariable: 'sys_user.id', startRow: 2, startCol: 0, endRow: 4, endCol: 1,
-          props: [{ kind: 'dataConfig', data: { pageSize: '10' } }] as CellProp[] },
+        { id: 'loop-1', label: '用户列表', startRow: 2, startCol: 0, endRow: 4, endCol: 1,
+          props: [{ kind: 'dataConfig', data: { pageSize: '10', loopVariable: 'sys_user.id' } }] as CellProp[] },
       ],
     },
     // Sheet 2: 汇总表

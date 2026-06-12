@@ -118,8 +118,6 @@ export interface LoopBlockConfig {
     endColumn: number;
     /** 循环块标签 */
     label?: string;
-    /** 循环变量字段 "tableName.fieldName" */
-    loopVariable: string;
 }
 
 // ─── 循环块动态 UI ──────────────────────────────────────────
@@ -310,7 +308,6 @@ export interface ExcelColumn {
 export interface ExcelLoopBlock<TLoopProp = CellProp> {
     id: string;
     label?: string;
-    loopVariable: string;
     startRow: number;
     startCol: number;
     endRow: number;

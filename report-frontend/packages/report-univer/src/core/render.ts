@@ -136,7 +136,6 @@ export function renderSnapshot<TCellProp = unknown, TLoopProp = unknown>(
                 endRow: lb.endRow,
                 endColumn: lb.endCol,
                 label: lb.label,
-                loopVariable: lb.loopVariable,
             });
             if (lb.props && lb.props.length > 0) {
                 loopBlockProps[lb.id] = lb.props;

@@ -113,7 +113,6 @@ const UniverTestPage: React.FC = () => {
               endRow: range.endRow,
               endColumn: range.endColumn,
               label: `循环块 ${Object.keys(loopBlocks).length + 1}`,
-              loopVariable: '',
             };
             setLoopBlocks((prev) => ({ ...prev, [block.id]: block }));
           },
@@ -269,7 +268,6 @@ const UniverTestPage: React.FC = () => {
       endRow: row + 2,
       endColumn: column + 1,
       label: `循环块 ${Object.keys(loopBlocks).length + 1}`,
-      loopVariable: '',
     };
 
     setLoopBlocks((prev) => ({ ...prev, [block.id]: block }));
@@ -278,14 +276,6 @@ const UniverTestPage: React.FC = () => {
   const handleClearLoopBlocks = useCallback(() => {
     setLoopBlocks({});
     setPropStore((prev) => ({ ...prev, loopBlockProps: {} }));
-  }, []);
-
-  const handleLoopBlockVariableChange = useCallback((blockId: string, variable: string) => {
-    setLoopBlocks((prev) => {
-      const block = prev[blockId];
-      if (!block) return prev;
-      return { ...prev, [blockId]: { ...block, loopVariable: variable } };
-    });
   }, []);
 
   // ─── 快照 ──────────────────────────────────
@@ -475,21 +465,6 @@ const UniverTestPage: React.FC = () => {
                   <div style={{ color: '#666' }}>
                     范围: ({currentContext.loopBlock.startRow},{currentContext.loopBlock.startColumn}) → ({currentContext.loopBlock.endRow},{currentContext.loopBlock.endColumn})
                   </div>
-                </div>
-              )}
-
-              {currentContext.type === 'loopBlock' && currentContext.loopBlock && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>循环变量</div>
-                  <Select
-                    size="small"
-                    style={{ width: '100%' }}
-                    placeholder="选择循环变量字段"
-                    allowClear
-                    value={currentContext.loopBlock.loopVariable || undefined}
-                    options={fieldOptions}
-                    onChange={(val) => handleLoopBlockVariableChange(currentContext.loopBlock!.id, val || '')}
-                  />
                 </div>
               )}
 

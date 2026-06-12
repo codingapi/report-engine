@@ -43,11 +43,6 @@ export const DefaultLoopBlockPanel: React.FC<LoopBlockComponentProps> = ({
             <div style={{ color: '#666' }}>
                 范围: ({block.startRow},{block.startColumn}) → ({block.endRow},{block.endColumn})
             </div>
-            {block.loopVariable && (
-                <div style={{ color: '#666', marginTop: 2 }}>
-                    循环变量: {block.loopVariable}
-                </div>
-            )}
         </div>
     );
 };
