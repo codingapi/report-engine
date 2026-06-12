@@ -15,6 +15,9 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
     /** 容器样式 */
     style?: React.CSSProperties;
 
+    /** Univer 初始化完成后的回调（可安全调用 ref 方法） */
+    onReady?: () => void;
+
     // ─── 单元格 ───
 
     /** 单元格选中回调（含操作句柄和属性） */
@@ -63,6 +66,13 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
     loopBlockProps?: Record<string, TLoopProp[]>;
 }
 
+/** Univer 字体配置（对应 IFontConfig） */
+export interface FontConfig {
+    value: string;
+    label: string;
+    category?: 'sans-serif' | 'serif' | 'monospace' | 'display' | 'handwriting';
+}
+
 /** 通过 ref 暴露的命令式句柄 */
 export interface UniverSheetHandle<TCellProp = CellProp, TLoopProp = CellProp> {
     /** 提取当前工作簿的 Excel 格式快照（含属性） */
@@ -75,4 +85,6 @@ export interface UniverSheetHandle<TCellProp = CellProp, TLoopProp = CellProp> {
     setSheetName: (sheetId: string, name: string) => void;
     /** 设置工作表行列数 */
     setSheetSize: (sheetId: string, rowCount: number, columnCount: number) => void;
+    /** 动态注册字体到 Univer 字体列表 */
+    addFonts: (fonts: FontConfig[]) => void;
 }

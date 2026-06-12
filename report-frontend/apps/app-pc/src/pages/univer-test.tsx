@@ -40,7 +40,7 @@ import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
 // API
-import { exportExcel, importExcel } from '@/api/example';
+import { exportExcel, importExcel, fetchFonts } from '@/api/example';
 import { mockDataConfig } from '../data/mock-data';
 
 // ─── 字段选项构建 ──────────────────────────────────────
@@ -169,6 +169,20 @@ const UniverTestPage: React.FC = () => {
       ],
     },
   ]), [loopBlocks]);
+
+  // ─── Univer 就绪后加载字体 ──────────────────────────────
+
+  const handleReady = useCallback(async () => {
+    try {
+      const fonts = await fetchFonts();
+      if (fonts.length > 0) {
+        sheetRef.current?.addFonts(fonts);
+      }
+    } catch {
+      // 字体加载失败不影响主功能
+      console.warn('加载后端字体列表失败，将仅使用内置字体');
+    }
+  }, []);
 
   // ─── 单元格选中回调 ──────────────────────────────────
 
@@ -514,6 +528,7 @@ const UniverTestPage: React.FC = () => {
         <UniverSheet
           ref={sheetRef}
           style={{ flex: 1, height: '100%' }}
+          onReady={handleReady}
           onCellSelect={handleCellSelect}
           onFieldDrop={handleFieldDrop}
           contextMenuGroups={contextMenuGroups}

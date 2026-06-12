@@ -85,6 +85,12 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 sheet.setRowCount(rowCount);
                 sheet.setColumnCount(columnCount);
             },
+
+            addFonts: (fonts) => {
+                const api = univerAPIRef.current;
+                if (!api || fonts.length === 0) return;
+                api.addFonts(fonts);
+            },
         }));
 
         // 初始化 Univer（仅一次）
@@ -117,6 +123,9 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 univerAPI,
                 () => onFieldDropRef.current,
             );
+
+            // 通知父组件 Univer 已就绪
+            props.onReady?.();
 
             return () => {
                 cleanupDragDrop();

@@ -1,9 +1,11 @@
 package com.codingapi.report.starter;
 
 import com.codingapi.report.excel.FontRegistry;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -35,5 +37,18 @@ public class ReportEngineAutoConfiguration {
         registry.scanDirectory();
         registry.registerToGraphicsEnvironment();
         return registry;
+    }
+
+    /**
+     * Web 环境下的自动配置：注册字体列表 API。
+     */
+    @Configuration
+    @ConditionalOnClass(RestController.class)
+    static class WebConfiguration {
+
+        @Bean
+        public FontController fontController(FontRegistry fontRegistry) {
+            return new FontController(fontRegistry);
+        }
     }
 }
