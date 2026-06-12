@@ -32,6 +32,7 @@
 		<commons-io.version>2.17.0</commons-io.version>
 		<commons-lang3.version>3.20.0</commons-lang3.version>
 		<commons-crypto.version>1.2.0</commons-crypto.version>
+		<poi.version>5.5.1</poi.version>
 		<codingapi.framework.version>3.4.54</codingapi.framework.version>
 	</properties>
 
@@ -64,33 +65,21 @@
 		<dependencies>
 
 			<dependency>
-				<groupId>com.codingapi.flow</groupId>
-				<artifactId>flow-engine-framework</artifactId>
+				<groupId>com.codingapi.report</groupId>
+				<artifactId>report-engine-excel</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 
 			<dependency>
-				<groupId>com.codingapi.flow</groupId>
-				<artifactId>flow-engine-starter</artifactId>
+				<groupId>com.codingapi.report</groupId>
+				<artifactId>report-engine-framework</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 
 			<dependency>
-				<groupId>com.codingapi.flow</groupId>
-				<artifactId>flow-engine-starter-infra</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-
-			<dependency>
-				<groupId>com.codingapi.flow</groupId>
-				<artifactId>flow-engine-starter-api</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-
-			<dependency>
-				<groupId>com.codingapi.flow</groupId>
-				<artifactId>flow-engine-starter-query</artifactId>
-				<version>${project.version}</version>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi-ooxml</artifactId>
+				<version>${poi.version}</version>
 			</dependency>
 
 			<dependency>
@@ -239,8 +228,9 @@
 				<activeByDefault>true</activeByDefault>
 			</activation>
 			<modules>
-				<module>report-engine-framework</module>
 				<module>report-engine-example</module>
+				<module>report-engine-framework</module>
+				<module>report-engine-excel</module>
 			</modules>
 		</profile>
 		<!-- mvn clean test -P travis-->
@@ -249,6 +239,7 @@
 
 			<modules>
 				<module>report-engine-framework</module>
+				<module>report-engine-excel</module>
 			</modules>
 
 			<build>
@@ -297,6 +288,7 @@
 
 			<modules>
 				<module>report-engine-framework</module>
+				<module>report-engine-excel</module>
 			</modules>
 
 

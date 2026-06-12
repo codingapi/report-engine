@@ -13,3 +13,18 @@ export async function exportExcel(workbook: ExcelWorkbook): Promise<Blob> {
   });
   return response.data as Blob;
 }
+
+/**
+ * 导入 Excel 文件
+ *
+ * POST /api/excel/import
+ * 上传 .xlsx 文件，后端解析为 Workbook JSON 返回
+ */
+export async function importExcel(file: File): Promise<ExcelWorkbook> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await http.post('/excel/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data as ExcelWorkbook;
+}

@@ -1,26 +1,43 @@
-package com.example.report.excel;
+package com.codingapi.report.excel;
 
-import com.example.report.excel.dto.*;
+import com.codingapi.report.excel.pojo.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-@Service
-public class ExcelBuilderService {
+/**
+ * Excel 导出器，将 {@link Workbook} JSON 模型转换为 Apache POI 的 .xlsx 字节流。
+ * <p>
+ * 支持完整的样式映射：字体、对齐、边框（13 种线型）、填充、旋转、换行、数字格式、
+ * 富文本分段样式、合并区域、自定义行高列宽、隐藏行列等。
+ * </p>
+ * <p>
+ * 此类为纯 Java 实现，不依赖任何 Web 框架，可在任意 Java 环境中使用。
+ * </p>
+ *
+ * @see Workbook
+ * @see ExcelImporter
+ */
+public class ExcelExporter {
 
+    /** 前端边框线型字符串 → POI BorderStyle 枚举的映射表 */
     private static final Map<String, BorderStyle> BORDER_STYLE_MAP = Map.ofEntries(
             Map.entry("thin", BorderStyle.THIN),
             Map.entry("hair", BorderStyle.HAIR),
@@ -39,33 +56,47 @@ public class ExcelBuilderService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public byte[] buildExcel(ExcelWorkbookDTO workbook) {
+    /**
+     * 将 Workbook 模型导出为 .xlsx 字节数组。
+     *
+     * @param workbook 工作簿模型
+     * @return .xlsx 文件的字节内容
+     */
+    public byte[] export(Workbook workbook) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        export(workbook, out);
+        return out.toByteArray();
+    }
+
+    /**
+     * 将 Workbook 模型导出到指定的输出流。
+     *
+     * @param workbook   工作簿模型
+     * @param outputStream 目标输出流（调用方负责关闭）
+     */
+    public void export(Workbook workbook, OutputStream outputStream) {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             if (workbook.getSheets() != null) {
-                for (ExcelSheetDTO sheetDTO : workbook.getSheets()) {
+                for (Sheet sheetDTO : workbook.getSheets()) {
                     buildSheet(wb, sheetDTO);
                 }
             }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            wb.write(out);
-            return out.toByteArray();
+            wb.write(outputStream);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to build Excel", e);
+            throw new RuntimeException("Failed to export Excel", e);
         }
     }
 
-    private void buildSheet(XSSFWorkbook wb, ExcelSheetDTO dto) {
+    private void buildSheet(XSSFWorkbook wb, Sheet dto) {
         String sheetName = (dto.getName() != null && !dto.getName().isEmpty()) ? dto.getName() : "Sheet";
-        Sheet sheet = wb.createSheet(sheetName);
+        org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet(sheetName);
 
-        // 默认行高列宽
         sheet.setDefaultRowHeightInPoints(pixelsToPoints(dto.getDefaultRowHeight()));
         sheet.setDefaultColumnWidth((int) (dto.getDefaultColumnWidth() / 7.0));
 
-        // 自定义行高
         if (dto.getRows() != null) {
-            for (ExcelRowDTO r : dto.getRows()) {
-                Row row = getOrCreateRow(sheet, r.getIndex());
+            for (Row r : dto.getRows()) {
+                org.apache.poi.ss.usermodel.Row row = getOrCreateRow(sheet, r.getIndex());
                 row.setHeightInPoints(pixelsToPoints(r.getHeight()));
                 if (r.isHidden()) {
                     row.setZeroHeight(true);
@@ -73,9 +104,8 @@ public class ExcelBuilderService {
             }
         }
 
-        // 自定义列宽
         if (dto.getColumns() != null) {
-            for (ExcelColumnDTO c : dto.getColumns()) {
+            for (com.codingapi.report.excel.pojo.Column c : dto.getColumns()) {
                 sheet.setColumnWidth(c.getIndex(), pixelsToWidthUnits(c.getWidth()));
                 if (c.isHidden()) {
                     sheet.setColumnHidden(c.getIndex(), true);
@@ -83,19 +113,16 @@ public class ExcelBuilderService {
             }
         }
 
-        // 样式缓存（每个 sheet 独立缓存）
         Map<String, CellStyle> styleCache = new HashMap<>();
 
-        // 写入单元格
         if (dto.getCells() != null) {
-            for (ExcelCellDTO cellDTO : dto.getCells()) {
+            for (Cell cellDTO : dto.getCells()) {
                 buildCell(wb, sheet, cellDTO, styleCache);
             }
         }
 
-        // 合并区域
         if (dto.getMerges() != null) {
-            for (ExcelMergeDTO m : dto.getMerges()) {
+            for (Merge m : dto.getMerges()) {
                 sheet.addMergedRegion(new CellRangeAddress(
                         m.getStartRow(),
                         m.getStartRow() + m.getRowSpan() - 1,
@@ -106,11 +133,10 @@ public class ExcelBuilderService {
         }
     }
 
-    private void buildCell(XSSFWorkbook wb, Sheet sheet, ExcelCellDTO dto, Map<String, CellStyle> styleCache) {
-        Row row = getOrCreateRow(sheet, dto.getRow());
-        Cell cell = row.createCell(dto.getCol());
+    private void buildCell(XSSFWorkbook wb, org.apache.poi.ss.usermodel.Sheet sheet, Cell dto, Map<String, CellStyle> styleCache) {
+        org.apache.poi.ss.usermodel.Row row = getOrCreateRow(sheet, dto.getRow());
+        org.apache.poi.ss.usermodel.Cell cell = row.createCell(dto.getCol());
 
-        // 设置值
         if (dto.getValue() != null && !dto.getValue().isNull()) {
             if (dto.getValue().isNumber()) {
                 cell.setCellValue(dto.getValue().doubleValue());
@@ -121,59 +147,50 @@ public class ExcelBuilderService {
             }
         }
 
-        // 设置公式
         if (dto.getFormula() != null && !dto.getFormula().isEmpty()) {
             cell.setCellFormula(dto.getFormula());
         }
 
-        // 设置富文本（覆盖普通值）
         if (dto.getRichText() != null) {
             XSSFRichTextString rts = buildRichText(wb, dto.getRichText());
             cell.setCellValue(rts);
         }
 
-        // 设置样式
         if (dto.getStyle() != null) {
             CellStyle style = buildCellStyle(wb, dto.getStyle(), styleCache);
             cell.setCellStyle(style);
         }
     }
 
-    private CellStyle buildCellStyle(XSSFWorkbook wb, ExcelStyleDTO dto, Map<String, CellStyle> cache) {
+    private CellStyle buildCellStyle(XSSFWorkbook wb, Style dto, Map<String, CellStyle> cache) {
         String key = computeStyleKey(dto);
         return cache.computeIfAbsent(key, k -> createCellStyle(wb, dto));
     }
 
-    private CellStyle createCellStyle(XSSFWorkbook wb, ExcelStyleDTO dto) {
+    private CellStyle createCellStyle(XSSFWorkbook wb, Style dto) {
         CellStyle style = wb.createCellStyle();
 
-        // 字体
         if (dto.getFont() != null) {
-            Font font = createFont(wb, dto.getFont());
+            org.apache.poi.ss.usermodel.Font font = createFont(wb, dto.getFont());
             style.setFont(font);
         }
 
-        // 水平对齐
         if (dto.getAlign() != null) {
             style.setAlignment(mapHorizontalAlignment(dto.getAlign()));
         }
 
-        // 垂直对齐
         if (dto.getValign() != null) {
             style.setVerticalAlignment(mapVerticalAlignment(dto.getValign()));
         }
 
-        // 自动换行
         if (Boolean.TRUE.equals(dto.getWrap())) {
             style.setWrapText(true);
         }
 
-        // 旋转
         if (dto.getRotation() != null) {
             style.setRotation(dto.getRotation().shortValue());
         }
 
-        // 背景填充
         if (dto.getFill() != null && !dto.getFill().isEmpty()) {
             XSSFColor color = parseColor(dto.getFill());
             if (color != null) {
@@ -182,18 +199,15 @@ public class ExcelBuilderService {
             }
         }
 
-        // 边框
         if (dto.getBorders() != null) {
             applyBorders(style, dto.getBorders());
         }
 
-        // 数字格式
         if (dto.getNumberFormat() != null && !dto.getNumberFormat().isEmpty()) {
             DataFormat dataFormat = wb.createDataFormat();
             style.setDataFormat(dataFormat.getFormat(dto.getNumberFormat()));
         }
 
-        // 内边距（仅 left 可近似映射为 indent）
         if (dto.getPadding() != null && dto.getPadding().getLeft() != null) {
             int indent = (int) (dto.getPadding().getLeft() / 7.0);
             if (indent > 0) {
@@ -204,8 +218,8 @@ public class ExcelBuilderService {
         return style;
     }
 
-    private Font createFont(XSSFWorkbook wb, ExcelFontDTO dto) {
-        Font font = wb.createFont();
+    private org.apache.poi.ss.usermodel.Font createFont(XSSFWorkbook wb, Font dto) {
+        org.apache.poi.ss.usermodel.Font font = wb.createFont();
         if (dto.getFamily() != null) {
             font.setFontName(dto.getFamily());
         }
@@ -219,7 +233,7 @@ public class ExcelBuilderService {
             font.setItalic(true);
         }
         if (Boolean.TRUE.equals(dto.getUnderline())) {
-            font.setUnderline(Font.U_SINGLE);
+            font.setUnderline(org.apache.poi.ss.usermodel.Font.U_SINGLE);
         }
         if (Boolean.TRUE.equals(dto.getStrikethrough())) {
             font.setStrikeout(true);
@@ -233,15 +247,15 @@ public class ExcelBuilderService {
         return font;
     }
 
-    private XSSFRichTextString buildRichText(XSSFWorkbook wb, ExcelRichTextDTO rt) {
+    private XSSFRichTextString buildRichText(XSSFWorkbook wb, RichText rt) {
         XSSFRichTextString rts = new XSSFRichTextString(rt.getText());
         if (rt.getSegments() != null) {
             int offset = 0;
-            for (ExcelRichTextSegmentDTO seg : rt.getSegments()) {
+            for (RichTextSegment seg : rt.getSegments()) {
                 int start = offset;
                 int end = offset + seg.getText().length();
                 if (seg.getStyle() != null && end > start) {
-                    Font font = createFont(wb, seg.getStyle());
+                    org.apache.poi.ss.usermodel.Font font = createFont(wb, seg.getStyle());
                     rts.applyFont(start, end, font);
                 }
                 offset = end;
@@ -250,48 +264,28 @@ public class ExcelBuilderService {
         return rts;
     }
 
-    private void applyBorders(CellStyle style, ExcelBordersDTO borders) {
-        if (borders.getTop() != null) {
-            applyBorder(style, borders.getTop(), "top");
-        }
-        if (borders.getRight() != null) {
-            applyBorder(style, borders.getRight(), "right");
-        }
-        if (borders.getBottom() != null) {
-            applyBorder(style, borders.getBottom(), "bottom");
-        }
-        if (borders.getLeft() != null) {
-            applyBorder(style, borders.getLeft(), "left");
-        }
+    private void applyBorders(CellStyle style, Borders borders) {
+        if (borders.getTop() != null) applyBorder(style, borders.getTop(), "top");
+        if (borders.getRight() != null) applyBorder(style, borders.getRight(), "right");
+        if (borders.getBottom() != null) applyBorder(style, borders.getBottom(), "bottom");
+        if (borders.getLeft() != null) applyBorder(style, borders.getLeft(), "left");
     }
 
-    private void applyBorder(CellStyle style, ExcelBorderDTO border, String side) {
+    private void applyBorder(CellStyle style, Border border, String side) {
         BorderStyle bs = BORDER_STYLE_MAP.getOrDefault(border.getStyle(), BorderStyle.THIN);
         XSSFColor color = parseColor(border.getColor());
         XSSFCellStyle xssfStyle = (XSSFCellStyle) style;
         switch (side) {
-            case "top" -> {
-                xssfStyle.setBorderTop(bs);
-                if (color != null) xssfStyle.setTopBorderColor(color);
-            }
-            case "right" -> {
-                xssfStyle.setBorderRight(bs);
-                if (color != null) xssfStyle.setRightBorderColor(color);
-            }
-            case "bottom" -> {
-                xssfStyle.setBorderBottom(bs);
-                if (color != null) xssfStyle.setBottomBorderColor(color);
-            }
-            case "left" -> {
-                xssfStyle.setBorderLeft(bs);
-                if (color != null) xssfStyle.setLeftBorderColor(color);
-            }
+            case "top" -> { xssfStyle.setBorderTop(bs); if (color != null) xssfStyle.setTopBorderColor(color); }
+            case "right" -> { xssfStyle.setBorderRight(bs); if (color != null) xssfStyle.setRightBorderColor(color); }
+            case "bottom" -> { xssfStyle.setBorderBottom(bs); if (color != null) xssfStyle.setBottomBorderColor(color); }
+            case "left" -> { xssfStyle.setBorderLeft(bs); if (color != null) xssfStyle.setLeftBorderColor(color); }
         }
     }
 
     // ─── 工具方法 ─────────────────────────────────────────────
 
-    private static XSSFColor parseColor(String hex) {
+    static XSSFColor parseColor(String hex) {
         if (hex == null || hex.isEmpty()) return null;
         String clean = hex.startsWith("#") ? hex.substring(1) : hex;
         if (clean.length() != 6) return null;
@@ -302,12 +296,22 @@ public class ExcelBuilderService {
         return new XSSFColor(rgb, null);
     }
 
-    private static float pixelsToPoints(double pixels) {
+    static float pixelsToPoints(double pixels) {
         return (float) (pixels * 72.0 / 96.0);
     }
 
-    private static int pixelsToWidthUnits(double pixels) {
+    static int pixelsToWidthUnits(double pixels) {
         return (int) (pixels * 256.0 / 7.0);
+    }
+
+    /** 将 POI points 反向转换为像素值 */
+    static double pointsToPixels(float points) {
+        return points * 96.0 / 72.0;
+    }
+
+    /** 将 POI 列宽单位反向转换为像素值 */
+    static double widthUnitsToPixels(int units) {
+        return units * 7.0 / 256.0;
     }
 
     private static HorizontalAlignment mapHorizontalAlignment(String align) {
@@ -330,12 +334,12 @@ public class ExcelBuilderService {
         };
     }
 
-    private static Row getOrCreateRow(Sheet sheet, int rowIndex) {
-        Row row = sheet.getRow(rowIndex);
+    private static org.apache.poi.ss.usermodel.Row getOrCreateRow(org.apache.poi.ss.usermodel.Sheet sheet, int rowIndex) {
+        org.apache.poi.ss.usermodel.Row row = sheet.getRow(rowIndex);
         return row != null ? row : sheet.createRow(rowIndex);
     }
 
-    private String computeStyleKey(ExcelStyleDTO dto) {
+    private String computeStyleKey(Style dto) {
         try {
             return objectMapper.writeValueAsString(dto);
         } catch (JsonProcessingException e) {

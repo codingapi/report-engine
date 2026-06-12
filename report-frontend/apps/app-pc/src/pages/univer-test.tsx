@@ -11,7 +11,7 @@
 
 import React, { useRef, useState, useMemo, useCallback } from 'react';
 import { Button, Tag, Space, Select, Input, Empty, Divider, message as antdMessage } from 'antd';
-import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, HighlightOutlined, DeleteOutlined, PlusOutlined, PlayCircleOutlined, DownloadOutlined, UploadOutlined, ExperimentOutlined } from '@ant-design/icons';
 
 // report-univer 组件和类型
 import {
@@ -40,7 +40,7 @@ import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
 // API
-import { exportExcel } from '@/api/example';
+import { exportExcel, importExcel } from '@/api/example';
 import { mockDataConfig } from '../data/mock-data';
 
 // ─── 字段选项构建 ──────────────────────────────────────
@@ -61,6 +61,7 @@ const genBlockId = () => `loop-${++blockIdCounter}-${Date.now().toString(36)}`;
 
 const UniverTestPage: React.FC = () => {
   const sheetRef = useRef<UniverSheetHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 当前选中的单元格信息
   const [selectedInfo, setSelectedInfo] = useState<SelectedCellInfo | null>(null);
@@ -92,6 +93,9 @@ const UniverTestPage: React.FC = () => {
 
   // 导出 Excel 加载状态
   const [exporting, setExporting] = useState(false);
+
+  // 导入 Excel 加载状态
+  const [importing, setImporting] = useState(false);
 
   // ─── 右键菜单（循环块） ──────────────────────────
 
@@ -361,6 +365,45 @@ const UniverTestPage: React.FC = () => {
     }
   }, []);
 
+  // ─── 导入 Excel ──────────────────────────────
+
+  const handleImportExcel = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 重置 input，以便同一文件可再次选择
+    e.target.value = '';
+
+    setImporting(true);
+    try {
+      const workbook = await importExcel(file);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = sheetRef.current?.loadSnapshot(workbook as any);
+      if (result) {
+        setPropStore((prev) => ({
+          cellProps: { ...prev.cellProps, ...result.cellProps },
+          mergeProps: { ...prev.mergeProps, ...result.mergeProps },
+          loopBlockProps: { ...prev.loopBlockProps, ...result.loopBlockProps },
+        }));
+        const newBlocks: Record<string, LoopBlockConfig> = {};
+        for (const lb of result.loopBlocks) {
+          newBlocks[lb.id] = lb;
+        }
+        setLoopBlocks((prev) => ({ ...prev, ...newBlocks }));
+      }
+      antdMessage.success('Excel 导入成功');
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : '未知错误';
+      antdMessage.error(`导入失败: ${errMsg}`);
+    } finally {
+      setImporting(false);
+    }
+  }, []);
+
   // ─── 样式操作（通过 CellHandle） ──────────────────
 
   const handle = cellHandleRef.current;
@@ -396,6 +439,13 @@ const UniverTestPage: React.FC = () => {
             onClick={handleExportExcel}
           >
             导出 Excel
+          </Button>
+          <Button
+            icon={<UploadOutlined />}
+            loading={importing}
+            onClick={handleImportExcel}
+          >
+            导入 Excel
           </Button>
           <Button icon={<HighlightOutlined />} onClick={handleCreateLoopBlock}>
             创建循环块
@@ -631,6 +681,15 @@ const UniverTestPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 隐藏的文件选择器 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
     </div>
   );
 };
