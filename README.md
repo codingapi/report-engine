@@ -103,6 +103,22 @@ report.fonts.dir=/path/to/custom/fonts
 
 字体文件命名约定：数字前缀控制排序（如 `01_微软雅黑.ttf`、`02_宋体.ttf`），无编号按文件名自然序。
 
+## 字体版权声明
+
+本项目内置的字体文件（Arial、Times New Roman、Tahoma、Verdana 等）仅用于开发调试目的，其版权归原作者/公司所有（Monotype、Microsoft 等）。
+
+如果您是字体版权方，认为本项目中的字体使用侵犯了您的权益，请联系我们进行移除：
+
+- 邮箱：wangliang@codingapi.com
+- 或通过 GitHub Issues 提交移除请求
+
+收到合理请求后，我们将在第一时间删除相关字体文件。
+
+**建议生产环境使用方式**：
+- 使用操作系统已授权的字体（系统自带）
+- 使用开源字体替代（如 Google Liberation 字体家族，Apache 2.0 开源）
+- 自行采购商用字体授权后放入自定义字体目录
+
 ## License
 
 Apache 2.0
