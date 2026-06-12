@@ -1,7 +1,6 @@
 package com.codingapi.report.starter;
 
 import com.codingapi.report.excel.FontRegistry;
-import com.codingapi.report.excel.pojo.FontInfo;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +35,8 @@ public class FontController {
      */
     @GetMapping("/list")
     public List<FontItem> listFonts() {
-        return fontRegistry.getFontCatalog().stream()
+        // 仅返回自定义字体（内置字体 Univer 已自带，重复添加会抛异常）
+        return fontRegistry.getCustomFontCatalog().stream()
                 .filter(f -> "regular".equals(f.getStyle()))
                 .map(f -> new FontItem(f.getFamily(), f.getFilename()))
                 .collect(Collectors.toList());

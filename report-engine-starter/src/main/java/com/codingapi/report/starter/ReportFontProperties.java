@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * report.fonts.dir=/path/to/custom/fonts
  * </pre>
  */
-@ConfigurationProperties(prefix = "report.fonts")
+@ConfigurationProperties(prefix = "codingapi.report.fonts")
 @Data
 public class ReportFontProperties {
 
