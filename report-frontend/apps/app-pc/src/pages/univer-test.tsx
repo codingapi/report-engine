@@ -174,12 +174,29 @@ const UniverTestPage: React.FC = () => {
 
   const handleReady = useCallback(async () => {
     try {
-      const fonts = await fetchFonts();
-      if (fonts.length > 0) {
-        sheetRef.current?.addFonts(fonts);
+      const items = await fetchFonts();
+      if (items.length === 0) return;
+
+      // 注入 @font-face 规则，让浏览器加载字体文件
+      const styleId = 'report-engine-fonts';
+      let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
       }
+      styleEl.textContent = items.map((item) => `
+@font-face {
+  font-family: '${item.family}';
+  src: url('/api/fonts/file/${encodeURIComponent(item.filename)}');
+  font-display: swap;
+}`).join('\n');
+
+      // 注册到 Univer 字体下拉菜单
+      sheetRef.current?.addFonts(
+        items.map((item) => ({ value: item.family, label: item.family })),
+      );
     } catch {
-      // 字体加载失败不影响主功能
       console.warn('加载后端字体列表失败，将仅使用内置字体');
     }
   }, []);

@@ -2,11 +2,18 @@ package com.codingapi.report.starter;
 
 import com.codingapi.report.excel.FontRegistry;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +55,31 @@ public class FontController {
      * @param family   字体族名（用于 CSS font-family 和 Univer value）
      * @param filename 字体文件名（供前端按需加载字体文件时使用）
      */
+    /**
+     * 下载字体文件，供前端通过 @font-face 加载。
+     */
+    @GetMapping("/file/{filename}")
+    public ResponseEntity<Resource> downloadFont(@PathVariable String filename) {
+        Path fontFile = fontRegistry.getFontFile(filename);
+        if (fontFile == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+        String contentType = MIME_TYPES.getOrDefault(ext, "application/octet-stream");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header("Cache-Control", "public, max-age=31536000")
+                .body(new FileSystemResource(fontFile));
+    }
+
+    private static final Map<String, String> MIME_TYPES = Map.of(
+            "ttf", "font/ttf",
+            "otf", "font/otf",
+            "ttc", "font/collection"
+    );
+
     public record FontItem(String family, String filename) {
     }
 }

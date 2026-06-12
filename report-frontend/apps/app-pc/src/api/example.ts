@@ -1,5 +1,5 @@
 import http from './index';
-import type { ExcelWorkbook, FontConfig } from '@coding-report/report-univer';
+import type { ExcelWorkbook } from '@coding-report/report-univer';
 
 /**
  * 导出 Excel 文件
@@ -29,8 +29,8 @@ export async function importExcel(file: File): Promise<ExcelWorkbook> {
   return response.data as ExcelWorkbook;
 }
 
-/** 后端字体列表项 */
-interface FontItem {
+/** 后端字体列表项（含文件名，用于 @font-face 加载） */
+export interface FontItem {
   family: string;
   filename: string;
 }
@@ -39,13 +39,9 @@ interface FontItem {
  * 获取可用字体列表
  *
  * GET /api/fonts/list
- * 返回后端已注册的字体，用于注册到 Univer 字体下拉菜单
+ * 返回后端已注册的自定义字体（含文件名）
  */
-export async function fetchFonts(): Promise<FontConfig[]> {
+export async function fetchFonts(): Promise<FontItem[]> {
   const response = await http.get('/fonts/list');
-  const items = response.data as FontItem[];
-  return items.map((item) => ({
-    value: item.family,
-    label: item.family,
-  }));
+  return response.data as FontItem[];
 }
