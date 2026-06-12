@@ -85,55 +85,6 @@ export interface FieldDropInfo {
     data: string;
 }
 
-// ─── 边框样式 ────────────────────────────────────────────────
-
-/** 边框线型（与 Univer BorderStyleTypes 对应） */
-export enum BorderStyleType {
-    NONE = 0,
-    THIN = 1,
-    HAIR = 2,
-    DOTTED = 3,
-    DASHED = 4,
-    DASH_DOT = 5,
-    DASH_DOT_DOT = 6,
-    DOUBLE = 7,
-    MEDIUM = 8,
-    MEDIUM_DASHED = 9,
-    MEDIUM_DASH_DOT = 10,
-    MEDIUM_DASH_DOT_DOT = 11,
-    SLANT_DASH_DOT = 12,
-    THICK = 13,
-}
-
-/** 单条边框信息 */
-export interface BorderSide {
-    style: BorderStyleType;
-    /** RGB 颜色值（如 "#000000"） */
-    color: string;
-}
-
-/** 单元格四边边框 */
-export interface CellBorderData {
-    top?: BorderSide;
-    right?: BorderSide;
-    bottom?: BorderSide;
-    left?: BorderSide;
-}
-
-// ─── 行列尺寸 ────────────────────────────────────────────────
-
-/** 行尺寸信息 */
-export interface RowDimension {
-    height: number;
-    hidden: boolean;
-}
-
-/** 列尺寸信息 */
-export interface ColumnDimension {
-    width: number;
-    hidden: boolean;
-}
-
 // ─── 消息提示 ────────────────────────────────────────────────
 
 /** 消息类型 */
@@ -151,68 +102,136 @@ export interface MessageConfig {
     duration?: number;
 }
 
-// ─── 工作表快照 ──────────────────────────────────────────────
+// ─── Excel 快照数据结构 ──────────────────────────────────────
+// 后端友好的 Excel 数据格式，可直接映射到 Apache POI API
 
-/** 快照中的单元格数据 */
-export interface SnapshotCell {
-    /** A1 表示法 */
-    cell: string;
-    /** 单元格值 */
-    value: unknown;
-    /** 富文本数据（仅当单元格有分段样式时存在） */
-    richText?: {
-        text: string;
-        textRuns: Array<{
-            text: string;
-            range: string;
-            style: Record<string, unknown> | null;
-        }>;
-    };
-    /** 公式字符串（如 "=SUM(A1:A10)"） */
-    formula?: string;
-    /** 解析后的样式数据 */
-    style?: Record<string, unknown>;
-    /** 边框样式数据 */
-    borders?: CellBorderData;
-    /** 合并区域信息（仅 master 单元格） */
-    merge?: {
-        mergeRange: string;
-        startRow: number;
-        startColumn: number;
-        endRow: number;
-        endColumn: number;
-    };
+/** 边框线型（可读字符串） */
+export type ExcelBorderStyle =
+    | 'thin' | 'hair' | 'dotted' | 'dashed'
+    | 'dashDot' | 'dashDotDot' | 'double' | 'medium'
+    | 'mediumDashed' | 'mediumDashDot' | 'mediumDashDotDot'
+    | 'slantDashDot' | 'thick';
+
+/** 单条边框 */
+export interface ExcelBorder {
+    style: ExcelBorderStyle;
+    /** 颜色（#RRGGBB） */
+    color: string;
 }
 
-/** 快照中的工作表数据 */
-export interface SnapshotSheet {
-    sheetId: string;
-    name: string;
-    cells: SnapshotCell[];
-    mergeData: Array<{
-        startRow: number;
-        startColumn: number;
-        endRow: number;
-        endColumn: number;
+/** 四边边框 */
+export interface ExcelBorders {
+    top?: ExcelBorder;
+    right?: ExcelBorder;
+    bottom?: ExcelBorder;
+    left?: ExcelBorder;
+}
+
+/** 字体样式 */
+export interface ExcelFont {
+    family?: string;
+    size?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    /** 字体颜色（#RRGGBB） */
+    color?: string;
+}
+
+/** 单元格样式 */
+export interface ExcelStyle {
+    font?: ExcelFont;
+    /** 水平对齐 */
+    align?: 'left' | 'center' | 'right' | 'justify' | 'distributed';
+    /** 垂直对齐 */
+    valign?: 'top' | 'middle' | 'bottom';
+    /** 自动换行 */
+    wrap?: boolean;
+    /** 文字旋转角度（0-180） */
+    rotation?: number;
+    /** 背景填充色（#RRGGBB） */
+    fill?: string;
+    /** 四边边框 */
+    borders?: ExcelBorders;
+    /** 数字格式（如 "0.00", "#,##0", "yyyy-MM-dd"） */
+    numberFormat?: string;
+    /** 内边距 */
+    padding?: { top?: number; right?: number; bottom?: number; left?: number };
+}
+
+/** 富文本 */
+export interface ExcelRichText {
+    /** 完整纯文本 */
+    text: string;
+    /** 分段样式 */
+    segments: Array<{
+        text: string;
+        style?: ExcelFont;
     }>;
-    /** 默认行高 */
-    defaultRowHeight: number;
-    /** 默认列宽 */
-    defaultColumnWidth: number;
-    /** 总行数 */
+}
+
+/** 合并区域 */
+export interface ExcelMerge {
+    /** 起始行（0-based） */
+    startRow: number;
+    /** 起始列（0-based） */
+    startCol: number;
+    /** 行数 */
+    rowSpan: number;
+    /** 列数 */
+    colSpan: number;
+}
+
+/** 单元格数据 */
+export interface ExcelCell {
+    /** 行索引（0-based） */
+    row: number;
+    /** 列索引（0-based） */
+    col: number;
+    /** A1 表示法 */
+    ref: string;
+    /** 单元格值 */
+    value: string | number | boolean | null;
+    /** 公式（不含 = 前缀） */
+    formula?: string;
+    /** 富文本 */
+    richText?: ExcelRichText;
+    /** 单元格样式 */
+    style?: ExcelStyle;
+}
+
+/** 自定义行高 */
+export interface ExcelRow {
+    index: number;
+    height: number;
+    hidden: boolean;
+}
+
+/** 自定义列宽 */
+export interface ExcelColumn {
+    index: number;
+    width: number;
+    hidden: boolean;
+}
+
+/** 工作表数据 */
+export interface ExcelSheet {
+    id: string;
+    name: string;
     rowCount: number;
-    /** 总列数 */
     columnCount: number;
-    /** 自定义行尺寸（仅包含非默认行） */
-    rows: Record<string, RowDimension>;
-    /** 自定义列尺寸（仅包含非默认列） */
-    columns: Record<string, ColumnDimension>;
+    /** 默认行高（像素） */
+    defaultRowHeight: number;
+    /** 默认列宽（像素） */
+    defaultColumnWidth: number;
+    merges: ExcelMerge[];
+    cells: ExcelCell[];
+    rows: ExcelRow[];
+    columns: ExcelColumn[];
 }
 
 /** 完整工作簿快照 */
-export interface WorkbookSnapshot {
-    styles: Record<string, Record<string, unknown>>;
-    sheets: SnapshotSheet[];
-    /** 工作表显示顺序 */
-    sheetOrder: string[];
+export interface ExcelWorkbook {
+    sheets: ExcelSheet[];
 }

@@ -4,7 +4,7 @@ import type {
     LoopBlockConfig,
     MenuGroupDef,
     MessageConfig,
-    WorkbookSnapshot,
+    ExcelWorkbook,
 } from '../../types';
 
 export interface UniverSheetProps {
@@ -31,8 +31,8 @@ export interface UniverSheetProps {
 
 /** 通过 ref 暴露的命令式句柄 */
 export interface UniverSheetHandle {
-    /** 提取当前工作簿的结构化快照 */
-    getSnapshot: () => WorkbookSnapshot | null;
+    /** 提取当前工作簿的 Excel 格式快照 */
+    getSnapshot: () => ExcelWorkbook | null;
     /** 设置指定单元格的值 */
     setCellValue: (sheetId: string, row: number, column: number, value: string) => void;
 }

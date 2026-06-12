@@ -3,17 +3,17 @@ import { setupUniver } from '../../core/setup';
 import type { UniverAPI } from '../../core/setup';
 import { registerCellSelection } from '../../core/cell-selection';
 import { buildContextMenus, updateMenuGroups } from '../../core/context-menu';
-import { syncHighlights, disposeAllHighlights } from '../../core/highlight';
+import { createHighlightManager } from '../../core/highlight';
+import type { HighlightManager } from '../../core/highlight';
 import { registerDragDrop } from '../../core/drag-drop';
 import { extractSnapshot } from '../../core/snapshot';
 import type { UniverSheetProps, UniverSheetHandle } from './type';
-import type { LoopBlockConfig, FieldDropInfo } from '../../types';
 
 export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
     (props, ref) => {
         const containerRef = useRef<HTMLDivElement>(null);
         const univerAPIRef = useRef<UniverAPI>(null);
-        const highlightDisposablesRef = useRef<Map<string, unknown>>(new Map());
+        const highlightManagerRef = useRef<HighlightManager | null>(null);
         const menusBuiltRef = useRef(false);
 
         // 用 ref 保存最新回调，避免闭包过期
@@ -52,8 +52,15 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             const { univerAPI, dispose } = setupUniver(containerRef.current);
             univerAPIRef.current = univerAPI;
 
-            // 注册单元格选中事件
-            registerCellSelection(univerAPI, () => onCellSelectRef.current);
+            // 创建高亮管理器
+            highlightManagerRef.current = createHighlightManager(univerAPI);
+
+            // 注册单元格选中事件（含高亮重应用）
+            registerCellSelection(
+                univerAPI,
+                () => onCellSelectRef.current,
+                () => highlightManagerRef.current,
+            );
 
             // 构建右键菜单
             if (props.contextMenuGroups?.length) {
@@ -70,7 +77,8 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
 
             return () => {
                 cleanupDragDrop();
-                disposeAllHighlights(highlightDisposablesRef.current);
+                highlightManagerRef.current?.dispose();
+                highlightManagerRef.current = null;
                 dispose();
             };
         }, []);
@@ -89,15 +97,8 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
 
         // 同步循环块高亮
         useEffect(() => {
-            const api = univerAPIRef.current;
-            if (!api) return;
-
-            const nextBlocks = props.loopBlocks || {};
-            highlightDisposablesRef.current = syncHighlights(
-                api,
-                highlightDisposablesRef.current,
-                nextBlocks,
-            );
+            if (!highlightManagerRef.current) return;
+            highlightManagerRef.current.sync(props.loopBlocks || {});
         }, [props.loopBlocks]);
 
         // 显示消息提示

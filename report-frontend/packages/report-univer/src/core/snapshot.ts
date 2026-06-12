@@ -1,12 +1,40 @@
+/**
+ * 工作簿快照提取
+ * 输出后端友好的 Excel 数据结构，可直接映射到 Apache POI API
+ */
+
 import type {
-    WorkbookSnapshot, SnapshotSheet, SnapshotCell,
-    CellBorderData, BorderSide, RowDimension, ColumnDimension,
+    ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelFont,
+    ExcelBorders, ExcelBorder, ExcelBorderStyle,
+    ExcelRichText, ExcelMerge, ExcelRow, ExcelColumn,
 } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FWorkbook = any;
 
-/** 行列索引 → A1 表示法 */
+// ─── 枚举映射 ────────────────────────────────────────────────
+
+const H_ALIGN: Record<number, ExcelStyle['align']> = {
+    1: 'left', 2: 'center', 3: 'right', 4: 'justify', 6: 'distributed',
+};
+
+const V_ALIGN: Record<number, ExcelStyle['valign']> = {
+    1: 'top', 2: 'middle', 3: 'bottom',
+};
+
+const WRAP: Record<number, boolean> = {
+    0: false, 1: false, 2: false, 3: true,
+};
+
+const BORDER_STYLE: Record<number, ExcelBorderStyle> = {
+    1: 'thin', 2: 'hair', 3: 'dotted', 4: 'dashed',
+    5: 'dashDot', 6: 'dashDotDot', 7: 'double', 8: 'medium',
+    9: 'mediumDashed', 10: 'mediumDashDot', 11: 'mediumDashDotDot',
+    12: 'slantDashDot', 13: 'thick',
+};
+
+// ─── 工具函数 ────────────────────────────────────────────────
+
 function rowColToA1(row: number, col: number): string {
     let colStr = '';
     let c = col;
@@ -17,294 +45,268 @@ function rowColToA1(row: number, col: number): string {
     return `${colStr}${row + 1}`;
 }
 
-/** A1 表示法 → [row, col] */
-function a1ToRowCol(a1: string): [number, number] {
-    const match = a1.match(/^([A-Z]+)(\d+)$/);
-    if (!match) return [0, 0];
-    let col = 0;
-    for (const ch of match[1]) {
-        col = col * 26 + (ch.charCodeAt(0) - 64);
+// ─── 解析函数 ────────────────────────────────────────────────
+
+function parseColor(cl: unknown): string | undefined {
+    if (!cl || typeof cl !== 'object') return undefined;
+    return (cl as Record<string, unknown>).rgb as string | undefined;
+}
+
+function parseFont(raw: Record<string, unknown>): ExcelFont | undefined {
+    const font: ExcelFont = {};
+    let has = false;
+    if (raw.ff) { font.family = raw.ff as string; has = true; }
+    if (raw.fs) { font.size = raw.fs as number; has = true; }
+    if (raw.bl === 1) { font.bold = true; has = true; }
+    if (raw.it === 1) { font.italic = true; has = true; }
+    if (raw.ul && typeof raw.ul === 'object' && (raw.ul as Record<string, unknown>).s === 1) {
+        font.underline = true; has = true;
     }
-    return [parseInt(match[2]) - 1, col - 1];
+    if (raw.st && typeof raw.st === 'object' && (raw.st as Record<string, unknown>).s === 1) {
+        font.strikethrough = true; has = true;
+    }
+    const cl = parseColor(raw.cl);
+    if (cl) { font.color = cl; has = true; }
+    return has ? font : undefined;
 }
 
-/** 样式字段名称映射 */
-const STYLE_FIELD_NAMES: Record<string, string> = {
-    ff: 'fontFamily',
-    fs: 'fontSize',
-    bl: 'bold',
-    it: 'italic',
-    ul: 'underline',
-    st: 'strikethrough',
-    bg: 'background',
-    cl: 'foreground',
-    bd: 'border',
-    n: 'numberFormat',
-    ht: 'horizontalAlign',
-    vt: 'verticalAlign',
-    tb: 'wrapStrategy',
-    tr: 'textRotation',
-    pd: 'padding',
-};
-
-/** 解析单条边框样式 */
-function parseBorderSide(side: Record<string, unknown> | undefined): BorderSide | undefined {
-    if (!side) return undefined;
-    const s = side.s as number | undefined;
-    if (s === undefined || s === 0) return undefined;
-    const cl = side.cl as Record<string, unknown> | undefined;
-    return {
-        style: s,
-        color: (cl?.rgb as string) || '#000000',
-    };
+function parseBorder(side: unknown): ExcelBorder | undefined {
+    if (!side || typeof side !== 'object') return undefined;
+    const s = (side as Record<string, unknown>).s as number;
+    if (!s || s === 0) return undefined;
+    const style = BORDER_STYLE[s];
+    if (!style) return undefined;
+    const cl = parseColor((side as Record<string, unknown>).cl);
+    return { style, color: cl || '#000000' };
 }
 
-/** 解析边框数据 bd 字段 */
-function parseBorderData(bd: Record<string, unknown> | undefined): CellBorderData | undefined {
+function parseBorders(bd: unknown): ExcelBorders | undefined {
     if (!bd || typeof bd !== 'object') return undefined;
-    const borders: CellBorderData = {};
-    const t = parseBorderSide(bd.t as Record<string, unknown> | undefined);
-    const r = parseBorderSide(bd.r as Record<string, unknown> | undefined);
-    const b = parseBorderSide(bd.b as Record<string, unknown> | undefined);
-    const l = parseBorderSide(bd.l as Record<string, unknown> | undefined);
-    if (t) borders.top = t;
-    if (r) borders.right = r;
-    if (b) borders.bottom = b;
-    if (l) borders.left = l;
-    return Object.keys(borders).length > 0 ? borders : undefined;
+    const raw = bd as Record<string, unknown>;
+    const borders: ExcelBorders = {};
+    let has = false;
+    const t = parseBorder(raw.t); if (t) { borders.top = t; has = true; }
+    const r = parseBorder(raw.r); if (r) { borders.right = r; has = true; }
+    const b = parseBorder(raw.b); if (b) { borders.bottom = b; has = true; }
+    const l = parseBorder(raw.l); if (l) { borders.left = l; has = true; }
+    return has ? borders : undefined;
 }
 
-/** 解析富文本 IDocumentData */
-function parseRichText(docData: Record<string, unknown>): {
-    text: string;
-    textRuns: Array<{ text: string; range: string; style: Record<string, unknown> | null }> | null;
-} {
+function parsePadding(pd: unknown): ExcelStyle['padding'] | undefined {
+    if (!pd || typeof pd !== 'object') return undefined;
+    const raw = pd as Record<string, unknown>;
+    const result: NonNullable<ExcelStyle['padding']> = {};
+    let has = false;
+    if (raw.t != null) { result.top = raw.t as number; has = true; }
+    if (raw.r != null) { result.right = raw.r as number; has = true; }
+    if (raw.b != null) { result.bottom = raw.b as number; has = true; }
+    if (raw.l != null) { result.left = raw.l as number; has = true; }
+    return has ? result : undefined;
+}
+
+function parseStyle(raw: Record<string, unknown>): ExcelStyle | undefined {
+    const style: ExcelStyle = {};
+    let has = false;
+
+    const font = parseFont(raw);
+    if (font) { style.font = font; has = true; }
+
+    if (raw.ht != null) {
+        const align = H_ALIGN[raw.ht as number];
+        if (align) { style.align = align; has = true; }
+    }
+    if (raw.vt != null) {
+        const valign = V_ALIGN[raw.vt as number];
+        if (valign) { style.valign = valign; has = true; }
+    }
+    if (raw.tb != null && WRAP[raw.tb as number]) {
+        style.wrap = true; has = true;
+    }
+    if (raw.tr && typeof raw.tr === 'object') {
+        const a = (raw.tr as Record<string, unknown>).a as number;
+        if (a) { style.rotation = a; has = true; }
+    }
+
+    const bg = parseColor(raw.bg);
+    if (bg) { style.fill = bg; has = true; }
+
+    const borders = parseBorders(raw.bd);
+    if (borders) { style.borders = borders; has = true; }
+
+    if (raw.n && typeof raw.n === 'object') {
+        const pattern = (raw.n as Record<string, unknown>).pattern as string;
+        if (pattern) { style.numberFormat = pattern; has = true; }
+    }
+
+    const padding = parsePadding(raw.pd);
+    if (padding) { style.padding = padding; has = true; }
+
+    return has ? style : undefined;
+}
+
+function parseRichText(docData: Record<string, unknown>): ExcelRichText | undefined {
     const body = docData.body as Record<string, unknown> | undefined;
     const dataStream = (body?.dataStream as string) || (docData.dataStream as string) || '';
-    const cleanText = dataStream.replace(/[\r\n]+$/, '');
+    const text = dataStream.replace(/[\r\n]+$/, '');
 
-    let textRuns: Array<{ text: string; range: string; style: Record<string, unknown> | null }> | null = null;
+    if (!body) return undefined;
 
-    if (body) {
-        const rawRuns = body.textRuns as Array<Record<string, unknown>> | undefined;
-        if (rawRuns && rawRuns.length > 0) {
-            textRuns = rawRuns.map(run => {
-                const start = run.st as number;
-                const end = run.ed as number;
-                const ts = run.ts as Record<string, unknown> | undefined;
-                return {
-                    text: cleanText.slice(start, end),
-                    range: `${start}-${end}`,
-                    style: ts ? parseStyleData(ts) : null,
-                };
-            });
-        }
-    }
+    const rawRuns = body.textRuns as Array<Record<string, unknown>> | undefined;
+    if (!rawRuns || rawRuns.length === 0) return undefined;
 
-    return { text: cleanText, textRuns };
-}
-
-/** 解析样式对象，缩写键名 → 可读字段名 */
-function parseStyleData(style: Record<string, unknown> | undefined): Record<string, unknown> | null {
-    if (!style || typeof style !== 'object') return null;
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(style)) {
-        const readableKey = STYLE_FIELD_NAMES[key] || key;
-        result[readableKey] = value;
-    }
-    return Object.keys(result).length > 0 ? result : null;
-}
-
-/** 从原始样式中提取边框数据 */
-function extractBordersFromStyle(rawStyle: Record<string, unknown> | undefined): CellBorderData | undefined {
-    if (!rawStyle || typeof rawStyle !== 'object') return undefined;
-    const bd = rawStyle.bd as Record<string, unknown> | undefined;
-    return parseBorderData(bd);
-}
-
-/** 解析行尺寸数据 */
-function parseRowDimensions(rawRowData: Record<string, unknown> | undefined): Record<string, RowDimension> {
-    const rows: Record<string, RowDimension> = {};
-    if (!rawRowData) return rows;
-    for (const [idx, row] of Object.entries(rawRowData)) {
-        const r = row as Record<string, unknown>;
-        rows[idx] = {
-            height: (r.h as number) ?? 0,
-            hidden: r.hd === 1,
+    const segments = rawRuns.map(run => {
+        const start = run.st as number;
+        const end = run.ed as number;
+        const ts = run.ts as Record<string, unknown> | undefined;
+        return {
+            text: text.slice(start, end),
+            style: ts ? parseFont(ts) : undefined,
         };
-    }
-    return rows;
+    });
+
+    return { text, segments };
 }
 
-/** 解析列尺寸数据 */
-function parseColumnDimensions(rawColData: Record<string, unknown> | undefined): Record<string, ColumnDimension> {
-    const columns: Record<string, ColumnDimension> = {};
-    if (!rawColData) return columns;
-    for (const [idx, col] of Object.entries(rawColData)) {
-        const c = col as Record<string, unknown>;
-        columns[idx] = {
-            width: (c.w as number) ?? 0,
-            hidden: c.hd === 1,
-        };
-    }
-    return columns;
-}
+// ─── 主函数 ──────────────────────────────────────────────────
 
 /**
- * 从 FWorkbook 提取完整工作簿快照
+ * 从 FWorkbook 提取完整工作簿快照（Excel 友好格式）
  */
-export function extractSnapshot(fWorkbook: FWorkbook): WorkbookSnapshot {
+export function extractSnapshot(fWorkbook: FWorkbook): ExcelWorkbook {
     const snapshot = fWorkbook.save();
-
-    // 解析全局样式表
-    const stylesMap = (snapshot as Record<string, unknown>).styles as Record<string, Record<string, unknown>> | undefined;
-    const styles: Record<string, Record<string, unknown>> = {};
-    if (stylesMap && typeof stylesMap === 'object') {
-        for (const [styleId, styleData] of Object.entries(stylesMap)) {
-            const parsed = parseStyleData(styleData);
-            if (parsed) styles[styleId] = parsed;
-        }
-    }
-
-    // 工作表顺序
-    const sheetOrder = ((snapshot as Record<string, unknown>).sheetOrder as string[]) || [];
-
-    // 遍历所有工作表
     const rawSheets = (snapshot as Record<string, unknown>).sheets as Record<string, Record<string, unknown>> | undefined;
-    const sheets: SnapshotSheet[] = [];
+    const globalStyles = (snapshot as Record<string, unknown>).styles as Record<string, Record<string, unknown>> | undefined;
 
-    if (!rawSheets) return { styles, sheets, sheetOrder };
+    if (!rawSheets) return { sheets: [] };
+
+    const sheets: ExcelSheet[] = [];
 
     for (const [sheetId, sheetData] of Object.entries(rawSheets)) {
-        const sheetName = (sheetData.name as string) || sheetId;
+        const sheet: ExcelSheet = {
+            id: sheetId,
+            name: (sheetData.name as string) || 'Sheet',
+            rowCount: (sheetData.rowCount as number) ?? 1000,
+            columnCount: (sheetData.columnCount as number) ?? 26,
+            defaultRowHeight: (sheetData.defaultRowHeight as number) ?? 24,
+            defaultColumnWidth: (sheetData.defaultColumnWidth as number) ?? 88,
+            merges: [],
+            cells: [],
+            rows: [],
+            columns: [],
+        };
 
-        // 工作表尺寸
-        const defaultRowHeight = (sheetData.defaultRowHeight as number) ?? 20;
-        const defaultColumnWidth = (sheetData.defaultColumnWidth as number) ?? 73;
-        const rowCount = (sheetData.rowCount as number) ?? 1000;
-        const columnCount = (sheetData.columnCount as number) ?? 26;
+        // 合并区域
+        const mergeData = sheetData.mergeData as Array<Record<string, number>> | undefined;
+        if (mergeData) {
+            for (const m of mergeData) {
+                const merge: ExcelMerge = {
+                    startRow: m.startRow,
+                    startCol: m.startColumn,
+                    rowSpan: m.endRow - m.startRow + 1,
+                    colSpan: m.endColumn - m.startColumn + 1,
+                };
+                sheet.merges.push(merge);
+            }
+        }
 
-        // 合并单元格信息
-        const rawMergeData = sheetData.mergeData as Array<Record<string, number>> | undefined;
-        const mergeData = (rawMergeData || []).map(m => ({
-            startRow: m.startRow,
-            startColumn: m.startColumn,
-            endRow: m.endRow,
-            endColumn: m.endColumn,
-        }));
-
-        // slave 查找表
+        // slave 集合
         const slavePositions = new Set<string>();
-        for (const m of mergeData) {
-            for (let r = m.startRow; r <= m.endRow; r++) {
-                for (let c = m.startColumn; c <= m.endColumn; c++) {
-                    if (r !== m.startRow || c !== m.startColumn) {
+        for (const m of sheet.merges) {
+            for (let r = m.startRow; r < m.startRow + m.rowSpan; r++) {
+                for (let c = m.startCol; c < m.startCol + m.colSpan; c++) {
+                    if (r !== m.startRow || c !== m.startCol) {
                         slavePositions.add(`${r},${c}`);
                     }
                 }
             }
         }
 
-        // master 合并信息查找表
-        const mergeLookup = new Map<string, SnapshotCell['merge']>();
-        for (const m of mergeData) {
-            const rangeLabel = `${rowColToA1(m.startRow, m.startColumn)}:${rowColToA1(m.endRow, m.endColumn)}`;
-            mergeLookup.set(`${m.startRow},${m.startColumn}`, {
-                mergeRange: rangeLabel,
-                startRow: m.startRow,
-                startColumn: m.startColumn,
-                endRow: m.endRow,
-                endColumn: m.endColumn,
-            });
-        }
-
         // 单元格数据
         const cellData = sheetData.cellData as Record<string, Record<string, Record<string, unknown>>> | undefined;
-        const cells: SnapshotCell[] = [];
-
         if (cellData) {
             for (const [rowStr, rowData] of Object.entries(cellData)) {
                 const row = parseInt(rowStr);
-                for (const [colStr, cell] of Object.entries(rowData)) {
+                for (const [colStr, rawCell] of Object.entries(rowData)) {
                     const col = parseInt(colStr);
-                    const key = `${row},${col}`;
+                    if (slavePositions.has(`${row},${col}`)) continue;
 
-                    if (slavePositions.has(key)) continue;
-
-                    // 解析样式
-                    const rawStyle = cell.s;
-                    let styleData: Record<string, unknown> | null = null;
+                    // 解析样式（处理全局样式引用）
                     let resolvedStyle: Record<string, unknown> | undefined;
-                    if (rawStyle) {
-                        if (typeof rawStyle === 'string') {
-                            resolvedStyle = stylesMap ? stylesMap[rawStyle] : undefined;
-                            styleData = parseStyleData(resolvedStyle);
-                        } else if (typeof rawStyle === 'object') {
-                            resolvedStyle = rawStyle as Record<string, unknown>;
-                            styleData = parseStyleData(resolvedStyle);
+                    const s = rawCell.s;
+                    if (s) {
+                        if (typeof s === 'string') {
+                            resolvedStyle = globalStyles?.[s];
+                        } else if (typeof s === 'object') {
+                            resolvedStyle = s as Record<string, unknown>;
                         }
                     }
 
-                    // 提取边框数据
-                    const borders = extractBordersFromStyle(resolvedStyle);
-
-                    // 解析富文本
-                    let richText: SnapshotCell['richText'] | undefined;
+                    // 富文本
+                    let richText: ExcelRichText | undefined;
                     let richTextValue: string | null = null;
-                    if (cell.p && typeof cell.p === 'object') {
-                        const parsed = parseRichText(cell.p as Record<string, unknown>);
-                        richTextValue = parsed.text || null;
-                        if (parsed.textRuns) {
-                            richText = { text: parsed.text, textRuns: parsed.textRuns };
-                        }
+                    if (rawCell.p && typeof rawCell.p === 'object') {
+                        richText = parseRichText(rawCell.p as Record<string, unknown>);
+                        richTextValue = richText?.text || null;
                     }
 
-                    const value = (cell.v != null && cell.v !== '') ? cell.v : richTextValue;
-                    if (value == null && !cell.f && !richText && !borders) continue;
+                    const value = (rawCell.v != null && rawCell.v !== '')
+                        ? rawCell.v as string | number | boolean
+                        : richTextValue;
 
-                    const mergeInfo = mergeLookup.get(key) || undefined;
+                    const formula = (typeof rawCell.f === 'string' && rawCell.f.startsWith('='))
+                        ? rawCell.f.slice(1)
+                        : undefined;
 
-                    const snapshotCell: SnapshotCell = {
-                        cell: rowColToA1(row, col),
+                    const style = resolvedStyle ? parseStyle(resolvedStyle) : undefined;
+
+                    if (value == null && !formula && !richText && !style) continue;
+
+                    const cell: ExcelCell = {
+                        row,
+                        col,
+                        ref: rowColToA1(row, col),
                         value: value ?? null,
                     };
-                    if (richText) snapshotCell.richText = richText;
-                    if (cell.f) snapshotCell.formula = cell.f as string;
-                    if (styleData) snapshotCell.style = styleData;
-                    if (borders) snapshotCell.borders = borders;
-                    if (mergeInfo) snapshotCell.merge = mergeInfo;
+                    if (formula) cell.formula = formula;
+                    if (richText) cell.richText = richText;
+                    if (style) cell.style = style;
 
-                    cells.push(snapshotCell);
+                    sheet.cells.push(cell);
                 }
             }
         }
 
         // 按行列排序
-        cells.sort((a, b) => {
-            const [ar, ac] = a1ToRowCol(a.cell);
-            const [br, bc] = a1ToRowCol(b.cell);
-            return ar - br || ac - bc;
-        });
+        sheet.cells.sort((a, b) => a.row - b.row || a.col - b.col);
 
-        // 行/列尺寸
+        // 行配置
         const rawRowData = sheetData.rowData as Record<string, unknown> | undefined;
-        const rawColumnData = sheetData.columnData as Record<string, unknown> | undefined;
-        const rows = parseRowDimensions(rawRowData);
-        const columns = parseColumnDimensions(rawColumnData);
+        if (rawRowData) {
+            for (const [idx, r] of Object.entries(rawRowData)) {
+                const raw = r as Record<string, unknown>;
+                sheet.rows.push({
+                    index: parseInt(idx),
+                    height: (raw.h as number) ?? sheet.defaultRowHeight,
+                    hidden: raw.hd === 1,
+                });
+            }
+        }
 
-        sheets.push({
-            sheetId,
-            name: sheetName,
-            cells,
-            mergeData,
-            defaultRowHeight,
-            defaultColumnWidth,
-            rowCount,
-            columnCount,
-            rows,
-            columns,
-        });
+        // 列配置
+        const rawColData = sheetData.columnData as Record<string, unknown> | undefined;
+        if (rawColData) {
+            for (const [idx, c] of Object.entries(rawColData)) {
+                const raw = c as Record<string, unknown>;
+                sheet.columns.push({
+                    index: parseInt(idx),
+                    width: (raw.w as number) ?? sheet.defaultColumnWidth,
+                    hidden: raw.hd === 1,
+                });
+            }
+        }
+
+        sheets.push(sheet);
     }
 
-    return { styles, sheets, sheetOrder };
+    return { sheets };
 }

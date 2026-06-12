@@ -6,7 +6,7 @@ export type { UniverSheetProps, UniverSheetHandle } from '@/components/univer/ty
 export { findBlockAtCell } from '@/core/geometry';
 
 // 枚举
-export { MessageType, BorderStyleType } from './types';
+export { MessageType } from './types';
 
 // 类型导出
 export type {
@@ -22,14 +22,17 @@ export type {
     MessageConfig,
     // 拖拽
     FieldDropInfo,
-    // 边框
-    BorderSide,
-    CellBorderData,
-    // 行列尺寸
-    RowDimension,
-    ColumnDimension,
-    // 快照
-    SnapshotCell,
-    SnapshotSheet,
-    WorkbookSnapshot,
+    // Excel 快照
+    ExcelWorkbook,
+    ExcelSheet,
+    ExcelCell,
+    ExcelStyle,
+    ExcelFont,
+    ExcelBorders,
+    ExcelBorder,
+    ExcelBorderStyle,
+    ExcelRichText,
+    ExcelMerge,
+    ExcelRow,
+    ExcelColumn,
 } from './types';
