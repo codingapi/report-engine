@@ -62,6 +62,13 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. 代码提交纪律
+
+**完成修改后不要立即 git commit/push，等用户确认后再提交。**
+
+- 代码改完后先展示变更摘要，等用户说"提交"或"commit"再执行
+- 除非用户明确允许，不要自动提交和推送
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,17 +36,24 @@ public class FontController {
     }
 
     /**
-     * 返回当前可用的字体列表（已排序）。
+     * 返回当前可用的自定义字体列表（已排序、按族名去重）。
      * <p>
-     * 前端通过此接口获取字体后，调用 univerAPI.addFonts() 注册到 Univer。
-     * 仅返回 regular 样式的字体（bold/italic 变体不单独列出）。
+     * 每个字体族仅返回第一个文件（目录已按文件名排序，第一个即首选变体）。
+     * 不返回内置字体（Univer 已自带，重复添加会抛异常，且 @font-face 会覆盖系统字体）。
      * </p>
      */
     @GetMapping("/list")
     public List<FontItem> listFonts() {
-        // 仅返回自定义字体（内置字体 Univer 已自带，重复添加会抛异常）
+        // 收集内置字体的 family 名称（排除与内置同名的自定义字体，避免 @font-face 覆盖系统字体）
+        Set<String> builtinFamilies = fontRegistry.getBuiltinFontCatalog().stream()
+                .map(f -> f.getFamily().toLowerCase())
+                .collect(Collectors.toSet());
+
+        // 返回自定义字体，按族名去重，排除内置字体
+        Set<String> seen = new HashSet<>();
         return fontRegistry.getCustomFontCatalog().stream()
-                .filter(f -> "regular".equals(f.getStyle()))
+                .filter(f -> !builtinFamilies.contains(f.getFamily().toLowerCase()))
+                .filter(f -> seen.add(f.getFamily()))
                 .map(f -> new FontItem(f.getFamily(), f.getFilename()))
                 .collect(Collectors.toList());
     }

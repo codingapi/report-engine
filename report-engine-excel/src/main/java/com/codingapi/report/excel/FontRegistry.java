@@ -59,6 +59,9 @@ public class FontRegistry {
     /** 字体清单（扫描后缓存，内置 + 自定义） */
     private volatile List<FontInfo> catalog;
 
+    /** 内置字体清单（扫描后缓存） */
+    private volatile List<FontInfo> builtinCatalog;
+
     /** 自定义字体清单（扫描后缓存） */
     private volatile List<FontInfo> customCatalog;
 
@@ -183,6 +186,7 @@ public class FontRegistry {
         result.addAll(customFonts);
 
         catalog = Collections.unmodifiableList(result);
+        builtinCatalog = Collections.unmodifiableList(builtinFonts);
         customCatalog = Collections.unmodifiableList(customFonts);
         LOG.info("字体扫描完成，共 " + result.size() + " 个字体（内置 "
                 + builtinFonts.size() + "，自定义 " + customFonts.size() + "）");
@@ -229,6 +233,18 @@ public class FontRegistry {
             scanDirectory();
         }
         return catalog;
+    }
+
+    /**
+     * 获取内置字体清单。如果尚未扫描，会先触发扫描。
+     *
+     * @return 不可变的内置字体信息列表
+     */
+    public List<FontInfo> getBuiltinFontCatalog() {
+        if (builtinCatalog == null) {
+            scanDirectory();
+        }
+        return builtinCatalog;
     }
 
     /**

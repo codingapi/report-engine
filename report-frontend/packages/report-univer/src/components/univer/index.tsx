@@ -124,8 +124,8 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 () => onFieldDropRef.current,
             );
 
-            // 通知父组件 Univer 已就绪
-            props.onReady?.();
+            // 延迟通知父组件，确保 useImperativeHandle 已执行、ref 可用
+            setTimeout(() => props.onReady?.(), 0);
 
             return () => {
                 cleanupDragDrop();
