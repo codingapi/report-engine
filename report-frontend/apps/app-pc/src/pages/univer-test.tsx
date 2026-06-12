@@ -170,57 +170,14 @@ const UniverTestPage: React.FC = () => {
     },
   ]), [loopBlocks]);
 
-  // ─── Univer 就绪后加载字体 ──────────────────────────────
+  // ─── 字体请求（框架内部处理缓存和注入，这里只负责 API 调用）───
 
-  const handleReady = useCallback(async () => {
-    const CACHE_KEY = 'report-fonts-v1';
-
+  const handleFontRequest = useCallback(async () => {
     try {
-      // 优先从 localStorage 读取缓存
-      let items: { family: string; filename: string }[] | null = null;
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) items = JSON.parse(cached);
-      } catch { /* 缓存解析失败，走 API */ }
-
-      // 缓存未命中，从 API 获取并写入缓存
-      if (!items) {
-        items = await fetchFonts();
-        if (items.length > 0) {
-          try { localStorage.setItem(CACHE_KEY, JSON.stringify(items)); } catch { /* 忽略 */ }
-        }
-      }
-
-      if (!items || items.length === 0) return;
-
-      // .ttc（TrueType Collection）浏览器 @font-face 无法加载，跳过
-      const loadable = items.filter(
-        (item) => !item.filename.toLowerCase().endsWith('.ttc'),
-      );
-      if (loadable.length === 0) return;
-
-      // 已注入过 @font-face 且 Univer 已注册则跳过
-      if (document.getElementById('report-engine-fonts')) {
-        return;
-      }
-
-      // 注入 @font-face 规则（字体文件由浏览器 HTTP 缓存提供，不重复下载）
-      const styleEl = document.createElement('style');
-      styleEl.id = 'report-engine-fonts';
-      styleEl.textContent = loadable.map((item) => `
-@font-face {
-  font-family: '${item.family}';
-  src: url('/api/fonts/file/${encodeURIComponent(item.filename)}');
-  font-display: swap;
-}`).join('\n');
-      document.head.appendChild(styleEl);
-
-      // 注册到 Univer 字体下拉菜单
-      sheetRef.current?.addFonts(
-        loadable.map((item) => ({ value: item.family, label: item.family })),
-      );
+      return await fetchFonts();
     } catch {
-      console.warn('加载后端字体列表失败，将仅使用内置字体');
+      console.warn('加载后端字体列表失败');
+      return null;
     }
   }, []);
 
@@ -568,7 +525,7 @@ const UniverTestPage: React.FC = () => {
         <UniverSheet
           ref={sheetRef}
           style={{ flex: 1, height: '100%' }}
-          onReady={handleReady}
+          onFontRequest={handleFontRequest}
           onCellSelect={handleCellSelect}
           onFieldDrop={handleFieldDrop}
           contextMenuGroups={contextMenuGroups}

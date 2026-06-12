@@ -1,5 +1,5 @@
 import http from './index';
-import type { ExcelWorkbook } from '@coding-report/report-univer';
+import type { ExcelWorkbook, FontItem } from '@coding-report/report-univer';
 
 /**
  * 导出 Excel 文件
@@ -27,12 +27,6 @@ export async function importExcel(file: File): Promise<ExcelWorkbook> {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data as ExcelWorkbook;
-}
-
-/** 后端字体列表项（含文件名，用于 @font-face 加载） */
-export interface FontItem {
-  family: string;
-  filename: string;
 }
 
 /**

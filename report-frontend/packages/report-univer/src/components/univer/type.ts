@@ -18,6 +18,16 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
     /** Univer 初始化完成后的回调（可安全调用 ref 方法） */
     onReady?: () => void;
 
+    // ─── 字体 ───
+
+    /**
+     * 字体数据请求回调。
+     * 框架在需要字体时调用此回调，由父组件负责从 API 获取并返回。
+     * 框架内部自动处理 localStorage 缓存、@font-face 注入和 Univer 注册。
+     * 返回 null 或空数组表示不加载自定义字体。
+     */
+    onFontRequest?: () => Promise<FontItem[] | null>;
+
     // ─── 单元格 ───
 
     /** 单元格选中回调（含操作句柄和属性） */
@@ -64,6 +74,16 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
     mergeProps?: Record<string, TCellProp[]>;
     /** 循环块属性: key = blockId */
     loopBlockProps?: Record<string, TLoopProp[]>;
+}
+
+/** 字体文件信息（由父组件通过 onFontRequest 返回） */
+export interface FontItem {
+    /** 字体族名（用于 CSS font-family） */
+    family: string;
+    /** 字体文件名 */
+    filename: string;
+    /** 字体文件下载地址（用于 @font-face src） */
+    url: string;
 }
 
 /** Univer 字体配置（对应 IFontConfig） */

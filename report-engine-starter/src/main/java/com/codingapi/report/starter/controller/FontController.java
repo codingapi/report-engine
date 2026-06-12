@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
@@ -54,7 +56,10 @@ public class FontController {
         return MultiResponse.of(fontRegistry.getCustomFontCatalog().stream()
                 .filter(f -> !builtinFamilies.contains(f.getFamily().toLowerCase()))
                 .filter(f -> seen.add(f.getFamily()))
-                .map(f -> new FontItem(f.getFamily(), f.getFilename()))
+                .map(f -> new FontItem(
+                        f.getFamily(),
+                        f.getFilename(),
+                        "/api/fonts/file/" + URLEncoder.encode(f.getFilename(), StandardCharsets.UTF_8)))
                 .collect(Collectors.toList()));
     }
 
@@ -89,6 +94,13 @@ public class FontController {
             "ttc", "font/collection"
     );
 
-    public record FontItem(String family, String filename) {
+    /**
+     * 字体列表响应项。
+     *
+     * @param family   字体族名（用于 CSS font-family 和 Univer value）
+     * @param filename 字体文件名
+     * @param url      字体文件下载地址（用于 @font-face src）
+     */
+    public record FontItem(String family, String filename, String url) {
     }
 }
