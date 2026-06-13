@@ -1,11 +1,10 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Group } from 'react-resizable-panels';
-import { Button, Drawer, Space } from 'antd';
 import Header from './components/layout/header';
 import Panel from './components/layout/panel';
 import DataSourcePanel from './components/datasource';
 import SheetPanel from './components/engine';
-import LoopBlockModal from './components/engine/loop-block-modal';
+import LoopBlockDrawer from './components/engine/loop-block-drawer';
 import PropertyPanel from './components/properties';
 import type { SheetPanelHandle } from './components/engine';
 import type { ReportEngineProps } from './types';
@@ -42,9 +41,8 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
 
     // ========== 循环块状态 ==========
     const [loopBlocks, setLoopBlocks] = useState<Record<string, LoopBlockConfig>>({});
-    const [editingLoopBlock, setEditingLoopBlock] = useState<LoopBlockConfig | null>(null);
-    const [loopBlockModalOpen, setLoopBlockModalOpen] = useState(false);
     const [loopBlockDrawerOpen, setLoopBlockDrawerOpen] = useState(false);
+    const [activeLoopBlockId, setActiveLoopBlockId] = useState<string | undefined>(undefined);
 
     // ========== 导入导出 ==========
     const handleImportFile = useCallback(async (file: File) => {
@@ -92,44 +90,33 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
         const id = generateId();
         const newBlock: LoopBlockConfig = { id, ...range, label: '循环块' };
         setLoopBlocks((prev) => ({ ...prev, [id]: newBlock }));
-        setEditingLoopBlock(newBlock);
-        setLoopBlockModalOpen(true);
+        setActiveLoopBlockId(id);
+        setLoopBlockDrawerOpen(true);
     }, []);
 
     const handleEditLoopBlock = useCallback((id: string) => {
-        setLoopBlocks((prev) => {
-            const block = prev[id];
-            if (block) {
-                setEditingLoopBlock(block);
-                setLoopBlockModalOpen(true);
-            }
-            return prev;
-        });
+        setActiveLoopBlockId(id);
+        setLoopBlockDrawerOpen(true);
     }, []);
 
-    const handleSaveLoopBlock = useCallback((config: LoopBlockConfig) => {
-        setLoopBlocks((prev) => ({ ...prev, [config.id]: config }));
-        setLoopBlockModalOpen(false);
-        setEditingLoopBlock(null);
+    const handleLoopBlockLabelChange = useCallback((id: string, label: string) => {
+        setLoopBlocks((prev) => {
+            const block = prev[id];
+            if (!block) return prev;
+            return { ...prev, [id]: { ...block, label } };
+        });
     }, []);
 
     const handleRemoveLoopBlock = useCallback((id: string) => {
         setLoopBlocks((prev) => {
             const next = { ...prev };
             delete next[id];
+            // 切换到剩余的第一个 tab，无则关闭抽屉
+            const remaining = Object.keys(next);
+            setActiveLoopBlockId(remaining[0]);
+            if (remaining.length === 0) setLoopBlockDrawerOpen(false);
             return next;
         });
-        setLoopBlockModalOpen(false);
-        setEditingLoopBlock(null);
-    }, []);
-
-    const handleCloseLoopBlockModal = useCallback(() => {
-        setLoopBlockModalOpen(false);
-        setEditingLoopBlock(null);
-    }, []);
-
-    const handleLoopBlockChange = useCallback((id: string, config: LoopBlockConfig) => {
-        setLoopBlocks((prev) => ({ ...prev, [id]: config }));
     }, []);
 
     // ========== 字段拖入回调 ==========
@@ -143,7 +130,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
         return info.data;
     }, []);
 
-    // ========== SheetPanel（设计/预览共用）==========
+    // ========== SheetPanel ==========
     const sheetPanel = (
         <SheetPanel
             ref={sheetPanelRef}
@@ -157,6 +144,8 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
         />
     );
 
+    const loopBlockCount = Object.keys(loopBlocks).length;
+
     return (
         <div className="report-engine">
             <Header
@@ -166,7 +155,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
                 onExport={onExport ? handleExport : undefined}
                 mode={mode}
                 onModeToggle={handleModeToggle}
-                loopBlockCount={Object.keys(loopBlocks).length}
+                loopBlockCount={loopBlockCount}
                 onManageLoopBlocks={() => setLoopBlockDrawerOpen(true)}
                 importing={importing}
                 exporting={exporting}
@@ -191,81 +180,21 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
                                 dataConfig={dataConfig}
                                 cellProperties={cellProperties}
                                 onCellPropertyChange={handleCellPropertyChange}
-                                loopBlocks={loopBlocks}
-                                onLoopBlockChange={handleLoopBlockChange}
-                                onLoopBlockRemove={handleRemoveLoopBlock}
                             />
                         </Panel>
                     </Group>
                 )}
             </div>
 
-            {/* 循环块编辑弹窗 */}
-            <LoopBlockModal
-                open={loopBlockModalOpen}
-                config={editingLoopBlock}
-                onSave={handleSaveLoopBlock}
-                onRemove={handleRemoveLoopBlock}
-                onClose={handleCloseLoopBlockModal}
-            />
-
-            {/* 循环块管理抽屉 */}
-            <Drawer
-                title="循环块管理"
+            <LoopBlockDrawer
                 open={loopBlockDrawerOpen}
                 onClose={() => setLoopBlockDrawerOpen(false)}
-                width={320}
-            >
-                {Object.keys(loopBlocks).length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '32px 0', color: '#999' }}>
-                        <p>暂无循环块</p>
-                        <p style={{ fontSize: 12 }}>在表格中选中多个单元格后右键 → 循环块 → 设置</p>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {Object.values(loopBlocks).map((block) => (
-                            <div
-                                key={block.id}
-                                style={{
-                                    padding: '8px 12px',
-                                    border: '1px solid #e8e8e8',
-                                    borderRadius: 6,
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontWeight: 600 }}>{block.label || '未命名循环块'}</div>
-                                    <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-                                        行 {block.startRow + 1}–{block.endRow + 1}，列 {block.startColumn + 1}–{block.endColumn + 1}
-                                    </div>
-                                </div>
-                                <Space>
-                                    <Button
-                                        size="small"
-                                        type="link"
-                                        onClick={() => {
-                                            setLoopBlockDrawerOpen(false);
-                                            handleEditLoopBlock(block.id);
-                                        }}
-                                    >
-                                        编辑
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        type="link"
-                                        danger
-                                        onClick={() => handleRemoveLoopBlock(block.id)}
-                                    >
-                                        删除
-                                    </Button>
-                                </Space>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </Drawer>
+                loopBlocks={loopBlocks}
+                activeId={activeLoopBlockId}
+                onActiveChange={setActiveLoopBlockId}
+                onLabelChange={handleLoopBlockLabelChange}
+                onRemove={handleRemoveLoopBlock}
+            />
         </div>
     );
 };

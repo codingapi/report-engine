@@ -13,14 +13,10 @@ import {
 export interface HeaderProps {
     title?: string;
     onSave?: () => void;
-    /** 导入：接收 File，由外层处理 API 调用 */
     onImport?: (file: File) => void;
-    /** 导出：由外层处理快照获取和 API 调用 */
     onExport?: () => void;
-    /** 当前模式 */
     mode?: 'design' | 'preview';
     onModeToggle?: () => void;
-    /** 循环块数量（用于显示徽标） */
     loopBlockCount?: number;
     onManageLoopBlocks?: () => void;
     importing?: boolean;
@@ -54,6 +50,16 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="report-engine__header-right">
                 <Space>
+                    {/* 循环块 */}
+                    <Tooltip title="管理循环块">
+                        <Button icon={<AppstoreOutlined />} onClick={onManageLoopBlocks}>
+                            循环块{loopBlockCount > 0 ? ` (${loopBlockCount})` : ''}
+                        </Button>
+                    </Tooltip>
+
+                    <Divider vertical style={{ margin: 0 }} />
+
+                    {/* 导入 / 导出 */}
                     {onImport && (
                         <>
                             <input
@@ -85,7 +91,10 @@ const Header: React.FC<HeaderProps> = ({
                             </Button>
                         </Tooltip>
                     )}
-                    {(onImport || onExport) && <Divider type="vertical" style={{ margin: 0 }} />}
+
+                    <Divider vertical style={{ margin: 0 }} />
+
+                    {/* 预览 / 设计 */}
                     <Tooltip title={mode === 'design' ? '切换到预览模式' : '切换到设计模式'}>
                         <Button
                             icon={mode === 'design' ? <EyeOutlined /> : <EditOutlined />}
@@ -94,23 +103,18 @@ const Header: React.FC<HeaderProps> = ({
                             {mode === 'design' ? '预览' : '设计'}
                         </Button>
                     </Tooltip>
-                    <Divider type="vertical" style={{ margin: 0 }} />
-                    <Tooltip title="管理循环块">
-                        <Button
-                            icon={<AppstoreOutlined />}
-                            onClick={onManageLoopBlocks}
-                        >
-                            循环块{loopBlockCount > 0 ? ` (${loopBlockCount})` : ''}
-                        </Button>
-                    </Tooltip>
-                    {onSave && (
-                        <>
-                            <Divider type="vertical" style={{ margin: 0 }} />
-                            <Button type="primary" icon={<SaveOutlined />} onClick={onSave}>
-                                保存
-                            </Button>
-                        </>
-                    )}
+
+                    <Divider vertical style={{ margin: 0 }} />
+
+                    {/* 保存 */}
+                    <Button
+                        type="primary"
+                        icon={<SaveOutlined />}
+                        onClick={onSave}
+                        disabled={!onSave}
+                    >
+                        保存
+                    </Button>
                 </Space>
             </div>
         </div>
