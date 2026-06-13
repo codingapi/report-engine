@@ -1,7 +1,7 @@
 # 报表模型设计说明
 
 > 模型源码：`src/main/java/com/example/report/model/`
-> 验证测试：`ReportModelTest`（8 个用例，同时充当可执行文档）
+> 验证测试：`ReportModelTest`（9 个用例，同时充当可执行文档）
 
 本模型用于设计报表引擎的**核心能力**，先把概念建清楚，再考虑系统交互如何落地。
 
@@ -28,6 +28,8 @@
 - **关系挂在数据模型上，不属于任何单个数据源。** 因此能连接来自不同连接的数据集
   （人事库的"员工" ↔ 薪资库的"薪资"）。
 - **关系永远非强制。** 不设关系时，多个字段就是各自独立扩展的并列列表。
+- **Dataset 也可以是 UNION 派生数据集**：成员是若干数据集查询 + 字段映射到统一列名，
+  引擎提取时逐个提取、按映射对齐列、纵向追加行。成员间无需关系，覆盖"多个源按同列拼成一张表"的场景。
 
 ---
 
@@ -39,7 +41,7 @@
 ```
 DataModel（可复用语义层，维护一次）          Report A ─┐
 ├── datasources  连接（只负责提取）           Report B ─┼─ 都引用同一个 DataModel
-├── datasets     选出的单表/单查询            Report C ─┘   关系不必重复维护
+├── datasets     单表/单查询，或 UNION 派生    Report C ─┘   关系不必重复维护
 └── relationships 跨数据集关联（可跨源）
 
 Report（报表层，引用一个 DataModel）
@@ -110,6 +112,11 @@ DataSource ──提取──► RawTable(类型归一) ──Java算子(join/fi
 | 部门 | 部门 | VERTICAL | GROUP | ✅ | 单位格 |
 | 明细 | 数据 | VERTICAL | LIST | ❌ | 部门格 |
 
+**小计/总计** `SummaryRow`：`groupBy` 指向某分组列 → 每组结束插一行小计（标签可用 `${group}`
+带出分组名 + 聚合）；`groupBy=null` → 全表末尾插总计。渲染器用<b>控制断点</b>在分组边界插入，
+行位置随数据量自适应。**粗粒度聚合列**（如"总人数"）则用 `FieldCell` 聚合 + `parentCell`
+指向更粗的分组列，按该层级汇总并跨行合并。
+
 ---
 
 ## 五、参数系统：显式参数 + 循环字段
@@ -151,11 +158,13 @@ DataSource ──提取──► RawTable(类型归一) ──Java算子(join/fi
 | 测试类 / 用例 | 验证的能力 | 输出文件 |
 |---|---|---|
 | `FullChainTest` | 跨两份 CSV join + 参数过滤 + 平均分聚合 + 参数标题 | — |
-| `ReportScenarioTest#simpleList` | 简单列表（标题/表头 + 逐行） | simple-list.xlsx |
+| `ReportScenarioTest#simpleList` | 简单列表（标题/表头 + 逐行 + 底部合计行） | simple-list.xlsx |
 | `ReportScenarioTest#mergedList` | 带合并列表（分类 GROUP 跨行合并） | merged-list.xlsx |
-| `ReportScenarioTest#statistics` | 统计列表（单位/部门分组 + 人数 COUNT + 单位合并） | statistics.xlsx |
+| `ReportScenarioTest#statistics` | 统计列表（单位/部门分组 + 人数 COUNT + 总人数粗粒度聚合列跨单位合并） | statistics.xlsx |
 | `ReportScenarioTest#masterDetailMergedList` | 主从关联+合并（员工 join 学历 1:N，主表列跨多条学历合并） | master-detail-merge.xlsx |
+| `ReportScenarioTest#salarySubtotalAndGrandTotal` | 分组小计+总计（单位部门薪资：明细→单位小计→总计，控制断点） | salary-subtotal.xlsx |
 | `ReportScenarioTest#payslipLoop` | 循环块横向薪资条（每人 标题/表头/数据 三行，跨源按 LoopField 查） | payslip.xlsx |
+| `ReportScenarioTest#unionTwoDepartments` | UNION 派生数据集：A、B 两部门人员（不同源、列名不同）按映射对齐后纵向拼成一张列表 | union-people.xlsx |
 | `StyleAdaptationTest` | 样式适配：模板的合并标题/富文本/边框，渲染填值后保留；扩展行继承声明格样式 | styled.xlsx |
 
 执行层关键类：`DataExtractor`/`CsvDataExtractor`（提取）、`RawTable`（内存表）、
@@ -173,11 +182,59 @@ DataSource ──提取──► RawTable(类型归一) ──Java算子(join/fi
 
 ---
 
-## 八、尚未涉及（后续）
+## 八、能力盘点（已支持 / 待补齐）
 
-- **渲染器完整化**：交叉表横向展开、循环块嵌套、N+1 批量预取
-- **更多提取器**：DB(JDBC) / Excel / JSON / ES / MONGO
-- **计算字段**：表达式支持（如 `total = base + bonus`，当前由 CSV 预先算好）
-- 工程优化：单源过滤下推、提取缓存、聚合前置、内存护栏
-- 交互设计：扩展方向/父格怎么在界面上设、参数面板怎么暴露给最终用户
-- 模型与前端 JSON 契约对齐
+按层对照"模型里是否表达得出来 + 执行层是否实现"。这是后续开发的跟进清单。
+
+### 数据层
+
+| 能力 | 模型 | 执行层 | 说明 |
+|---|---|---|---|
+| 多数据源 / 多数据集 / 跨源关系 | ✅ | ✅ | `DataModel` 三层 |
+| 跨库 JOIN（Java 内存） | ✅ | ⚠️ 仅 INNER | `JoinType` 有 LEFT/RIGHT/FULL，`Operators.join` 仅实现 INNER |
+| UNION 派生数据集（多数据集纵向拼行） | ✅ | ✅ | `Dataset.union` + `UnionMember` 字段映射 |
+| 参数化查询（External 参数 + 条件） | ✅ | ✅ | `ValueRef.Param` + `ParamContext.external` |
+| 过滤 / 聚合 | ✅ | ✅ | `Operators.filter` / `aggregate` |
+| 提取器：CSV | ✅ | ✅ | `CsvDataExtractor` |
+| 提取器：DB(JDBC) | ✅ 类型 | ❌ | `DataSourceType.DB` 已预留，待实现 `JdbcDataExtractor` |
+| 提取器：Excel / JSON / ES / MONGO | ✅ 类型 | ❌ | 同上 |
+| 单源过滤下推 | — | ❌ | `Query.filters` 模型有，渲染器没下推到提取器 |
+| `Query.orderBy` 排序 | — | ❌ | 模型有，渲染器只按分组元组排序，未实现用户自定义排序 |
+| 计算字段（表达式） | ❌ | ❌ | 当前靠 CSV 预算，模型需加 `ComputedField` 或 `Expression` |
+
+### 展现层
+
+| 能力 | 模型 | 执行层 | 说明 |
+|---|---|---|---|
+| 简单列表 | ✅ | ✅ | |
+| 分组 + 合并（多级父格链） | ✅ | ✅ | `FieldCell.expandMode=GROUP` + `parentCell` |
+| 聚合：单值 / 每组 / 粗粒度列 | ✅ | ✅ | `parentCell` 决定汇总层级 |
+| 小计 + 总计（控制断点） | ✅ | ✅ | `SummaryRow`（`groupBy` 指向分组列 / null） |
+| 循环块（薪资条，LoopField） | ✅ | ✅ | `ValueRef.LoopField` + `ParamContext.setLoopRow` |
+| 样式适配（模板覆盖） | ✅ | ✅ | `ReportRenderer.render(..., template)` |
+| 横向扩展 / 交叉表（矩阵） | ✅ 类型 | ❌ | `Expansion.HORIZONTAL` 模型有，渲染器未实现 |
+| 多 band 堆叠（不同列的块上下排） | ❌ | ❌ | 渲染器假设单条带，未引入显式 `Block` 概念 |
+| 嵌套循环块 | — | ❌ | 作用域链已建模（祖先循环可见），渲染器只处理单层 |
+| 单元格联动 `ParamSource.Cell` | ✅ 类型 | ❌ | 渲染器未读取 |
+| 条件格式（按数据变样式） | ❌ | ❌ | 未建模 |
+
+### 输出层 / 工程
+
+| 能力 | 状态 | 说明 |
+|---|---|---|
+| 导出 Excel（样式 / 合并 / 富文本） | ✅ | `ExcelExporter` |
+| 分页 / 页眉页脚（每人一页） | ❌ | 循环块分页未实现 |
+| 提取缓存 | ⚠️ | 渲染内单次提取缓存；跨报表/跨请求缓存未实现 |
+| 内存护栏（limit / 行数上限） | ❌ | |
+| 聚合前置（能在提取阶段做的分组聚合下推） | ❌ | |
+
+### 交互 / 集成
+
+| 能力 | 状态 | 说明 |
+|---|---|---|
+| 交互设计（扩展方向/父格/条件怎么在界面上设） | 待设计 | |
+| 参数面板（External 参数如何暴露给最终用户） | 待设计 | |
+| 前后端 JSON 契约对齐 | 待对齐 | 模型类型 vs 前端 TypeScript 类型 |
+
+> 原则：模型主干（三层数据 / 扩展 / 参数 / 小计 / 循环 / 样式 / UNION）经过 7 类场景、18 个测试
+> 验证站得住，**可基于此继续开发**。后续补齐按"执行层填实现优先，模型主干仅必要时微调"节奏走。

@@ -2,6 +2,7 @@ package com.example.report.model;
 
 import com.example.report.model.grid.CellBinding;
 import com.example.report.model.grid.LoopBlock;
+import com.example.report.model.grid.SummaryRow;
 import com.example.report.model.param.Parameter;
 import com.example.report.model.source.Relationship;
 import lombok.Builder;
@@ -55,4 +56,7 @@ public class Report {
 
     private List<CellBinding> cellBindings;
     private List<LoopBlock> loopBlocks;
+
+    /** 小计/总计行：分组断点处的汇总（如单位小计、总计） */
+    private List<SummaryRow> summaries;
 }

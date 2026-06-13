@@ -16,6 +16,8 @@ import com.example.report.model.grid.ExpandMode;
 import com.example.report.model.grid.Expansion;
 import com.example.report.model.grid.FieldCell;
 import com.example.report.model.grid.LoopBlock;
+import com.example.report.model.grid.SummaryCell;
+import com.example.report.model.grid.SummaryRow;
 import com.example.report.model.grid.TextCell;
 import com.example.report.model.param.ParamSource;
 import com.example.report.model.param.Parameter;
@@ -30,6 +32,7 @@ import com.example.report.model.source.JoinType;
 import com.example.report.model.source.Query;
 import com.example.report.model.source.RelationOrigin;
 import com.example.report.model.source.Relationship;
+import com.example.report.model.source.UnionMember;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -80,7 +83,12 @@ class ReportScenarioTest {
         TextCell h2 = label(1, 1, "价格");
         FieldCell nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
         FieldCell priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
-        Report report = report("r_prod", dm, List.of(title, h1, h2, nameCol, priceCol), List.of(), List.of());
+        // 总计行：合计 + 总价（groupBy=null）
+        SummaryRow total = SummaryRow.builder().groupBy(null).cells(List.of(
+                SummaryCell.label(0, "合计"),
+                SummaryCell.agg(1, new FieldRef("d_prod", "price"), Aggregation.SUM))).build();
+        Report report = report("r_prod", dm, List.of(title, h1, h2, nameCol, priceCol),
+                List.of(), List.of(), List.of(total));
 
         Sheet sheet = run(dm, report, Map.of(), "simple-list");
 
@@ -91,7 +99,9 @@ class ReportScenarioTest {
         assertEquals(5.0, number(sheet, 2, 1), 0.0001);
         assertEquals("香蕉", text(sheet, 3, 0));
         assertEquals("橙子", text(sheet, 4, 0));
-        assertNull(findCell(sheet, 5, 0), "只有 3 行数据");
+        // 列表后追加合计行：苹果5+香蕉3+橙子4=12
+        assertEquals("合计", text(sheet, 5, 0));
+        assertEquals(12.0, number(sheet, 5, 1), 0.0001);
     }
 
     // ============================================================
@@ -157,6 +167,7 @@ class ReportScenarioTest {
         TextCell h1 = label(1, 0, "单位");
         TextCell h2 = label(1, 1, "部门");
         TextCell h3 = label(1, 2, "人数");
+        TextCell h4 = label(1, 3, "总人数");
         CellRef unitRef = new CellRef("sheet1", 2, 0);
         CellRef deptRef = new CellRef("sheet1", 2, 1);
         FieldCell unitCol = FieldCell.builder().cell(unitRef).field(new FieldRef("d_staff", "unit"))
@@ -164,26 +175,36 @@ class ReportScenarioTest {
         FieldCell deptCol = FieldCell.builder().cell(deptRef).field(new FieldRef("d_staff", "dept"))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
                 .parentCell(unitRef).build();
+        // 人数：按 部门 粒度 COUNT（parent=部门）
         FieldCell countCol = FieldCell.builder().cell(new CellRef("sheet1", 2, 2))
                 .field(new FieldRef("d_staff", "name"))
                 .expansion(Expansion.VERTICAL).aggregation(Aggregation.COUNT).parentCell(deptRef).build();
+        // 总人数：按 单位 粒度 COUNT（parent=单位），跨该单位的部门行合并
+        FieldCell unitTotalCol = FieldCell.builder().cell(new CellRef("sheet1", 2, 3))
+                .field(new FieldRef("d_staff", "name"))
+                .expansion(Expansion.VERTICAL).aggregation(Aggregation.COUNT).parentCell(unitRef)
+                .mergeRepeated(true).build();
         Report report = report("r_staff", dm,
-                List.of(title, h1, h2, h3, unitCol, deptCol, countCol), List.of(), List.of());
+                List.of(title, h1, h2, h3, h4, unitCol, deptCol, countCol, unitTotalCol), List.of(), List.of());
 
         Sheet sheet = run(dm, report, Map.of(), "statistics");
 
         assertEquals("人员统计", text(sheet, 0, 0));
         assertEquals("人数", text(sheet, 1, 2));
+        assertEquals("总人数", text(sheet, 1, 3));
         // 数据从第 2 行起；排序：市场中心 < 研发中心；研发中心内 前端组 < 后端组
         assertEquals("市场中心", text(sheet, 2, 0));
         assertEquals("销售组", text(sheet, 2, 1));
         assertEquals(1.0, number(sheet, 2, 2), 0.0001);
+        assertEquals(1.0, number(sheet, 2, 3), 0.0001);    // 市场中心总人数 1
         assertEquals("研发中心", text(sheet, 3, 0));        // 合并区顶格
         assertEquals("前端组", text(sheet, 3, 1));
         assertEquals(1.0, number(sheet, 3, 2), 0.0001);
+        assertEquals(3.0, number(sheet, 3, 3), 0.0001);    // 研发中心总人数 3（顶格）
         assertEquals("后端组", text(sheet, 4, 1));
         assertEquals(2.0, number(sheet, 4, 2), 0.0001);    // 后端组 2 人
-        assertTrue(hasMerge(sheet, 3, 0, 2), "研发中心应跨 2 行合并");
+        assertTrue(hasMerge(sheet, 3, 0, 2), "研发中心(单位)应跨 2 行合并");
+        assertTrue(hasMerge(sheet, 3, 3, 2), "研发中心总人数列应跨 2 行合并");
     }
 
     // ============================================================
@@ -338,6 +359,142 @@ class ReportScenarioTest {
     }
 
     // ============================================================
+    // 6. 分组小计 + 总计：单位部门薪资统计表（明细 → 单位小计 → 总计）
+    // ============================================================
+
+    @Test
+    @DisplayName("分组小计+总计：每个单位的部门明细后插单位小计，全表末尾插总计 → xlsx")
+    void salarySubtotalAndGrandTotal() throws Exception {
+        DataSource src = csv("ds_sal_detail", "/data/salary_detail.csv");
+        Dataset sal = Dataset.builder().id("d_sd").datasourceId("ds_sal_detail").sourceTable("salary_detail.csv")
+                .fields(List.of(
+                        Field.builder().name("unit").dataType(DataType.STRING).build(),
+                        Field.builder().name("dept").dataType(DataType.STRING).build(),
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("salary").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_sd").name("薪资明细模型")
+                .datasources(List.of(src)).datasets(List.of(sal)).relationships(List.of()).build();
+
+        TextCell title = label(0, 0, "单位部门薪资统计表");
+        TextCell h0 = label(1, 0, "单位");
+        TextCell h1 = label(1, 1, "部门");
+        TextCell h2 = label(1, 2, "姓名");
+        TextCell h3 = label(1, 3, "薪资");
+
+        CellRef unitRef = new CellRef("sheet1", 2, 0);
+        FieldCell unitCol = groupMerge(unitRef, new FieldRef("d_sd", "unit"), null);
+        FieldCell deptCol = groupMerge(new CellRef("sheet1", 2, 1), new FieldRef("d_sd", "dept"), unitRef);
+        FieldCell nameCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_sd", "name"));
+        FieldCell salaryCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_sd", "salary"));
+
+        // 单位小计：每个单位结束后，部门列放"${单位}小计"标签，薪资列放 SUM
+        SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit")).cells(List.of(
+                SummaryCell.label(1, "${group}小计"),
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+        // 总计：全表末尾
+        SummaryRow grandTotal = SummaryRow.builder().groupBy(null).cells(List.of(
+                SummaryCell.label(0, "总计"),
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+
+        Report report = report("r_sd", dm,
+                List.of(title, h0, h1, h2, h3, unitCol, deptCol, nameCol, salaryCol),
+                List.of(), List.of(), List.of(unitSubtotal, grandTotal));
+
+        Sheet sheet = run(dm, report, Map.of(), "salary-subtotal");
+
+        assertEquals("单位部门薪资统计表", text(sheet, 0, 0));
+        // 排序：市场中心 < 研发中心；研发中心内 前端组 < 后端组
+        // row2 市场中心/销售组/赵六/7000
+        assertEquals("市场中心", text(sheet, 2, 0));
+        assertEquals("赵六", text(sheet, 2, 2));
+        assertEquals(7000.0, number(sheet, 2, 3), 0.0001);
+        // row3 市场中心小计 7000
+        assertEquals("市场中心小计", text(sheet, 3, 1));
+        assertEquals(7000.0, number(sheet, 3, 3), 0.0001);
+        // row4-6 研发中心：前端王五8000 / 后端张三10000 / 后端李四9000
+        assertEquals("研发中心", text(sheet, 4, 0));        // 单位合并顶格
+        assertEquals("前端组", text(sheet, 4, 1));
+        assertEquals("王五", text(sheet, 4, 2));
+        assertEquals("后端组", text(sheet, 5, 1));          // 部门合并顶格
+        assertEquals("张三", text(sheet, 5, 2));
+        assertEquals("李四", text(sheet, 6, 2));
+        // row7 研发中心小计 27000
+        assertEquals("研发中心小计", text(sheet, 7, 1));
+        assertEquals(27000.0, number(sheet, 7, 3), 0.0001);
+        // row8 总计 34000
+        assertEquals("总计", text(sheet, 8, 0));
+        assertEquals(34000.0, number(sheet, 8, 3), 0.0001);
+
+        // 单位列：研发中心跨明细行 4-6 合并（不含小计行）
+        assertTrue(hasMerge(sheet, 4, 0, 3), "研发中心应跨其 3 条明细合并");
+        // 部门列：后端组跨 5-6 合并
+        assertTrue(hasMerge(sheet, 5, 1, 2), "后端组应跨 2 条明细合并");
+    }
+
+    // ============================================================
+    // 7. 多数据集 UNION：两个部门人员（不同源/不同列名）拼成一张列表
+    // ============================================================
+
+    @Test
+    @DisplayName("UNION：A、B 两部门人员（不同源、列名不同）按映射对齐后纵向拼成一张列表 → xlsx")
+    void unionTwoDepartments() throws Exception {
+        DataSource aSrc = csv("ds_a", "/data/dept_a.csv");
+        DataSource bSrc = csv("ds_b", "/data/dept_b.csv");
+        // A 列名 name/gender/age
+        Dataset a = Dataset.builder().id("d_a").datasourceId("ds_a").sourceTable("dept_a.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("gender").dataType(DataType.STRING).build(),
+                        Field.builder().name("age").dataType(DataType.NUMBER).build()))
+                .build();
+        // B 列名 xm/xb/nl（与 A 不同）
+        Dataset b = Dataset.builder().id("d_b").datasourceId("ds_b").sourceTable("dept_b.csv")
+                .fields(List.of(
+                        Field.builder().name("xm").dataType(DataType.STRING).build(),
+                        Field.builder().name("xb").dataType(DataType.STRING).build(),
+                        Field.builder().name("nl").dataType(DataType.NUMBER).build()))
+                .build();
+        // UNION 派生数据集：统一列 姓名/性别/年龄，各成员按映射对齐
+        Dataset people = Dataset.builder().id("d_people").alias("全部人员")
+                .fields(List.of(
+                        Field.builder().name("姓名").dataType(DataType.STRING).build(),
+                        Field.builder().name("性别").dataType(DataType.STRING).build(),
+                        Field.builder().name("年龄").dataType(DataType.NUMBER).build()))
+                .union(List.of(
+                        new UnionMember("d_a", Map.of("姓名", "name", "性别", "gender", "年龄", "age")),
+                        new UnionMember("d_b", Map.of("姓名", "xm", "性别", "xb", "年龄", "nl"))))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_people").name("人员合集模型")
+                .datasources(List.of(aSrc, bSrc)).datasets(List.of(a, b, people))
+                .relationships(List.of()).build();
+
+        TextCell title = label(0, 0, "全部人员名单");
+        TextCell h0 = label(1, 0, "姓名");
+        TextCell h1 = label(1, 1, "性别");
+        TextCell h2 = label(1, 2, "年龄");
+        FieldCell nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_people", "姓名"));
+        FieldCell genderCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_people", "性别"));
+        FieldCell ageCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_people", "年龄"));
+        Report report = report("r_people", dm,
+                List.of(title, h0, h1, h2, nameCol, genderCol, ageCol), List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "union-people");
+
+        assertEquals("全部人员名单", text(sheet, 0, 0));
+        // A 的两人在前，B 的两人在后（保持成员顺序）
+        assertEquals("A张三", text(sheet, 2, 0));
+        assertEquals("男", text(sheet, 2, 1));
+        assertEquals(32.0, number(sheet, 2, 2), 0.0001);
+        assertEquals("A李四", text(sheet, 3, 0));
+        assertEquals("B王五", text(sheet, 4, 0));
+        assertEquals(34.0, number(sheet, 4, 2), 0.0001);
+        assertEquals("B赵六", text(sheet, 5, 0));
+        assertEquals(40.0, number(sheet, 5, 2), 0.0001);
+        assertNull(findCell(sheet, 6, 0), "共 4 人");
+    }
+
+    // ============================================================
     // ---- 公共构造 / 运行 / 断言辅助 ----
     // ============================================================
 
@@ -377,8 +534,13 @@ class ReportScenarioTest {
 
     private static Report report(String id, DataModel dm, List<CellBinding> cells,
                                  List<Parameter> params, List<LoopBlock> loops) {
+        return report(id, dm, cells, params, loops, List.of());
+    }
+
+    private static Report report(String id, DataModel dm, List<CellBinding> cells,
+                                 List<Parameter> params, List<LoopBlock> loops, List<SummaryRow> summaries) {
         return Report.builder().id(id).name(id).dataModelId(dm.getId()).templateId("tpl_" + id)
-                .parameters(params).cellBindings(cells).loopBlocks(loops).build();
+                .parameters(params).cellBindings(cells).loopBlocks(loops).summaries(summaries).build();
     }
 
     /** 渲染 → 导出到 target/reports/{name}.xlsx → 从本地文件回读 → 返回第一个 sheet */

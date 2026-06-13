@@ -14,12 +14,16 @@ import com.example.report.model.grid.ExpandMode;
 import com.example.report.model.grid.Expansion;
 import com.example.report.model.grid.FieldCell;
 import com.example.report.model.grid.LoopBlock;
+import com.example.report.model.grid.SummaryCell;
+import com.example.report.model.grid.SummaryRow;
 import com.example.report.model.grid.TextCell;
 import com.example.report.model.source.DataSource;
 import com.example.report.model.source.Dataset;
+import com.example.report.model.source.Field;
 import com.example.report.model.source.FieldRef;
 import com.example.report.model.source.Query;
 import com.example.report.model.source.Relationship;
+import com.example.report.model.source.UnionMember;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
@@ -87,42 +91,66 @@ public class ReportRenderer {
     // ============================================================
 
     private void renderFree(Report report, ParamContext ctx, Canvas canvas) {
+        List<TextCell> textCells = new ArrayList<>();
         List<FieldCell> fieldCells = new ArrayList<>();
         for (CellBinding b : report.getCellBindings()) {
             if (inAnyLoop(report, b.getCell())) {
                 continue;
             }
             if (b instanceof TextCell tc) {
-                place(canvas, tc.getCell(), tc.getCell().row(), tc.getCell().column(), substitute(tc.getTemplate(), ctx));
+                textCells.add(tc);
             } else if (b instanceof FieldCell fc) {
                 fieldCells.add(fc);
             }
         }
-        if (fieldCells.isEmpty()) {
-            return;
-        }
 
-        RawTable combined = buildCombinedTable(fieldCells);
-        RawTable filtered = Operators.filter(combined, collectConditions(fieldCells), ctx);
-
+        RawTable filtered = null;
         List<FieldCell> band = new ArrayList<>();
-        for (FieldCell fc : fieldCells) {
-            if (fc.getExpansion() == Expansion.VERTICAL) {
-                band.add(fc);
-            } else {
-                Object v = isAgg(fc)
-                        ? Operators.aggregate(filtered.getRows(), fc.getField(), fc.getAggregation())
-                        : firstValue(filtered, fc.getField());
-                place(canvas, fc.getCell(), fc.getCell().row(), fc.getCell().column(), v);
+        List<FieldCell> singles = new ArrayList<>();
+        if (!fieldCells.isEmpty()) {
+            RawTable combined = buildCombinedTable(fieldCells);
+            filtered = Operators.filter(combined, collectConditions(fieldCells), ctx);
+            for (FieldCell fc : fieldCells) {
+                (fc.getExpansion() == Expansion.VERTICAL ? band : singles).add(fc);
             }
         }
+
+        // 先渲染纵向带，拿到展开行数 N 与带的起始行
+        int n = 0;
+        int bandBase = Integer.MAX_VALUE;
         if (!band.isEmpty()) {
-            renderBand(band, filtered, canvas);
+            for (FieldCell fc : band) {
+                bandBase = Math.min(bandBase, fc.getCell().row());
+            }
+            n = renderBand(band, report.getSummaries(), filtered, bandBase, canvas);
+        }
+        final int shift = n > 0 ? n - 1 : 0;
+        final int base = bandBase;
+
+        // 带下方的格子随展开下移（合计行等会落在列表之后，位置随数据量自适应）
+        for (TextCell tc : textCells) {
+            int row = tc.getCell().row() > base ? tc.getCell().row() + shift : tc.getCell().row();
+            place(canvas, tc.getCell(), row, tc.getCell().column(), substitute(tc.getTemplate(), ctx));
+        }
+        for (FieldCell fc : singles) {
+            Object v = isAgg(fc)
+                    ? Operators.aggregate(filtered.getRows(), fc.getField(), fc.getAggregation())
+                    : firstValue(filtered, fc.getField());
+            int row = fc.getCell().row() > base ? fc.getCell().row() + shift : fc.getCell().row();
+            place(canvas, fc.getCell(), row, fc.getCell().column(), v);
         }
     }
 
-    /** 渲染一条纵向带：分组列(GROUP)、明细列(LIST)、聚合列(agg)。 */
-    private void renderBand(List<FieldCell> band, RawTable filtered, Canvas canvas) {
+    /**
+     * 渲染一条纵向带，游标 + 控制断点：
+     * 明细行按分组排序输出；分组断点处插入对应层级的小计行；末尾插入总计行。
+     * 行位置由游标决定（小计/总计会把后续行下推）。返回产出的总行数。
+     *
+     * <p>聚合列（agg）按 parentCell 决定汇总层级：parent 指向粗粒度分组列 → 跨该组明细行合并
+     * （如"总人数"按单位汇总、跨部门行合并）；不指定则按最细粒度逐行算。
+     */
+    private int renderBand(List<FieldCell> band, List<SummaryRow> summaries, RawTable filtered,
+                           int bandBase, Canvas canvas) {
         List<FieldCell> groupCols = new ArrayList<>();
         List<FieldCell> listCols = new ArrayList<>();
         List<FieldCell> aggCols = new ArrayList<>();
@@ -146,47 +174,113 @@ public class ReportRenderer {
         rows.sort(Comparator.comparing(r -> tupleKey(r, groupCols)));
 
         boolean hasDetail = !listCols.isEmpty();
-        List<Unit> units = hasDetail ? oneUnitPerRow(rows, groupCols) : groupByTuple(rows, groupCols);
+        List<Unit> details = hasDetail ? oneUnitPerRow(rows, groupCols) : groupByTuple(rows, groupCols);
 
-        for (int i = 0; i < units.size(); i++) {
-            Unit unit = units.get(i);
-            for (int d = 0; d < groupCols.size(); d++) {
-                FieldCell gc = groupCols.get(d);
-                place(canvas, gc.getCell(), gc.getCell().row() + i, gc.getCell().column(), unit.tuple.get(d));
-            }
-            for (FieldCell lc : listCols) {
-                Object v = unit.rows.get(0).get(Operators.qualified(lc.getField()));
-                place(canvas, lc.getCell(), lc.getCell().row() + i, lc.getCell().column(), v);
-            }
-            for (FieldCell ac : aggCols) {
-                Object v = Operators.aggregate(unit.rows, ac.getField(), ac.getAggregation());
-                place(canvas, ac.getCell(), ac.getCell().row() + i, ac.getCell().column(), v);
+        // 小计/总计按层级归类（level = 分组列下标；-1 = 总计）
+        Map<Integer, List<SummaryRow>> byLevel = new HashMap<>();
+        if (summaries != null) {
+            for (SummaryRow s : summaries) {
+                int level = -1;
+                if (s.getGroupBy() != null) {
+                    for (int d = 0; d < groupCols.size(); d++) {
+                        if (groupCols.get(d).getField().equals(s.getGroupBy())) {
+                            level = d;
+                            break;
+                        }
+                    }
+                }
+                byLevel.computeIfAbsent(level, k -> new ArrayList<>()).add(s);
             }
         }
 
-        // 合并：分组列 mergeRepeated → 相同前缀元组的连续行合并
-        for (int d = 0; d < groupCols.size(); d++) {
-            FieldCell gc = groupCols.get(d);
-            if (!gc.isMergeRepeated()) {
-                continue;
-            }
-            int runStart = 0;
-            for (int i = 1; i <= units.size(); i++) {
-                boolean samePrefix = i < units.size() && samePrefix(units.get(i), units.get(runStart), d);
-                if (!samePrefix) {
-                    int len = i - runStart;
-                    if (len > 1) {
-                        Merge m = new Merge();
-                        m.setStartRow(gc.getCell().row() + runStart);
-                        m.setStartCol(gc.getCell().column());
-                        m.setRowSpan(len);
-                        m.setColSpan(1);
-                        canvas.merges.add(m);
+        // 控制断点：明细行 + 断点处插小计
+        List<Out> seq = new ArrayList<>();
+        int[] groupStart = new int[Math.max(1, groupCols.size())];
+        for (int i = 0; i < details.size(); i++) {
+            seq.add(detailOut(details.get(i), groupCols, listCols, aggCols, rows, groupByCell));
+            boolean last = i == details.size() - 1;
+            int breakLevel = last ? 0 : firstDiffLevel(details.get(i).tuple, details.get(i + 1).tuple, groupCols.size());
+            if (last || breakLevel >= 0) {
+                int to = last ? 0 : breakLevel;
+                for (int d = groupCols.size() - 1; d >= to; d--) {
+                    List<SummaryRow> ss = byLevel.get(d);
+                    if (ss != null) {
+                        List<Map<String, Object>> groupRows = flatten(details, groupStart[d], i);
+                        Object groupVal = details.get(i).tuple.get(d);
+                        for (SummaryRow s : ss) {
+                            seq.add(summaryOut(s, groupRows, groupVal));
+                        }
                     }
-                    runStart = i;
+                }
+                for (int d = to; d < groupCols.size(); d++) {
+                    groupStart[d] = i + 1;
                 }
             }
         }
+        List<SummaryRow> grand = byLevel.get(-1);
+        if (grand != null) {
+            for (SummaryRow s : grand) {
+                seq.add(summaryOut(s, rows, null));
+            }
+        }
+
+        // 落格（游标 = bandBase + 序号）
+        for (int k = 0; k < seq.size(); k++) {
+            Out o = seq.get(k);
+            int outRow = bandBase + k;
+            for (Map.Entry<Integer, Object> e : o.values.entrySet()) {
+                place(canvas, o.sources.get(e.getKey()), outRow, e.getKey(), e.getValue());
+            }
+        }
+
+        // 分组列合并：相同前缀(0..d)的连续明细行
+        for (int d = 0; d < groupCols.size(); d++) {
+            FieldCell gc = groupCols.get(d);
+            if (gc.isMergeRepeated()) {
+                mergeColumn(canvas, seq, bandBase, gc.getCell().column(), d + 1);
+            }
+        }
+        // 粗粒度聚合列合并（如总人数按单位跨行合并）
+        for (FieldCell ac : aggCols) {
+            int p = aggPrefixLen(ac, groupCols, groupByCell);
+            if (ac.isMergeRepeated() && p < groupCols.size()) {
+                mergeColumn(canvas, seq, bandBase, ac.getCell().column(), p);
+            }
+        }
+        return seq.size();
+    }
+
+    private Out detailOut(Unit unit, List<FieldCell> groupCols, List<FieldCell> listCols,
+                          List<FieldCell> aggCols, List<Map<String, Object>> rows,
+                          Map<CellRef, FieldCell> groupByCell) {
+        Out o = new Out(true, unit.tuple);
+        for (int d = 0; d < groupCols.size(); d++) {
+            FieldCell gc = groupCols.get(d);
+            o.values.put(gc.getCell().column(), unit.tuple.get(d));
+            o.sources.put(gc.getCell().column(), gc.getCell());
+        }
+        for (FieldCell lc : listCols) {
+            o.values.put(lc.getCell().column(), unit.rows.get(0).get(Operators.qualified(lc.getField())));
+            o.sources.put(lc.getCell().column(), lc.getCell());
+        }
+        for (FieldCell ac : aggCols) {
+            int p = aggPrefixLen(ac, groupCols, groupByCell);
+            List<Map<String, Object>> groupRows = rowsWithPrefix(rows, groupCols, unit.tuple, p);
+            o.values.put(ac.getCell().column(), Operators.aggregate(groupRows, ac.getField(), ac.getAggregation()));
+            o.sources.put(ac.getCell().column(), ac.getCell());
+        }
+        return o;
+    }
+
+    private Out summaryOut(SummaryRow s, List<Map<String, Object>> groupRows, Object groupVal) {
+        Out o = new Out(false, null);
+        for (SummaryCell sc : s.getCells()) {
+            Object v = sc.getLabel() != null
+                    ? sc.getLabel().replace("${group}", groupVal == null ? "" : String.valueOf(groupVal))
+                    : Operators.aggregate(groupRows, sc.getField(), sc.getAggregation());
+            o.values.put(sc.getColumn(), v);
+        }
+        return o;
     }
 
     // ============================================================
@@ -282,9 +376,11 @@ public class ReportRenderer {
             canvas.cells.put(key(outRow, outCol), cell);
         }
         cell.setValue(toNode(value));
-        Cell src = canvas.template.get(key(source.row(), source.column()));
-        if (src != null && src.getStyle() != null) {
-            cell.setStyle(src.getStyle());
+        if (source != null) {
+            Cell src = canvas.template.get(key(source.row(), source.column()));
+            if (src != null && src.getStyle() != null) {
+                cell.setStyle(src.getStyle());
+            }
         }
     }
 
@@ -364,16 +460,48 @@ public class ReportRenderer {
     }
 
     private RawTable extract(String datasetId) {
-        return cache.computeIfAbsent(datasetId, id -> {
-            Dataset ds = dm.getDatasets().stream()
-                    .filter(d -> d.getId().equals(id)).findFirst().orElseThrow();
+        RawTable cached = cache.get(datasetId);
+        if (cached != null) {
+            return cached;
+        }
+        Dataset ds = dm.getDatasets().stream()
+                .filter(d -> d.getId().equals(datasetId)).findFirst().orElseThrow();
+
+        RawTable result;
+        if (ds.getUnion() != null && !ds.getUnion().isEmpty()) {
+            result = extractUnion(ds);
+        } else {
             DataSource src = dm.getDatasources().stream()
                     .filter(s -> s.getId().equals(ds.getDatasourceId())).findFirst().orElseThrow();
             DataExtractor extractor = extractors.stream()
                     .filter(e -> e.supports(src.getType())).findFirst()
                     .orElseThrow(() -> new IllegalStateException("无提取器支持类型: " + src.getType()));
-            return extractor.extract(src, ds);
-        });
+            result = extractor.extract(src, ds);
+        }
+        cache.put(datasetId, result);
+        return result;
+    }
+
+    /** UNION 派生数据集：逐成员提取，按映射把成员字段对齐到统一列，纵向追加 */
+    private RawTable extractUnion(Dataset ds) {
+        List<String> columns = new ArrayList<>();
+        for (Field f : ds.getFields()) {
+            columns.add(ds.getId() + "." + f.getName());
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (UnionMember member : ds.getUnion()) {
+            RawTable memberTable = extract(member.datasetId());
+            for (Map<String, Object> mr : memberTable.getRows()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (Field f : ds.getFields()) {
+                    String memberField = member.mapping().get(f.getName());
+                    Object v = memberField == null ? null : mr.get(member.datasetId() + "." + memberField);
+                    row.put(ds.getId() + "." + f.getName(), v);
+                }
+                rows.add(row);
+            }
+        }
+        return new RawTable(columns, rows);
     }
 
     // ============================================================
@@ -444,13 +572,79 @@ public class ReportRenderer {
         return units;
     }
 
-    private boolean samePrefix(Unit a, Unit b, int depth) {
-        for (int d = 0; d <= depth; d++) {
-            if (!Objects.equals(a.tuple.get(d), b.tuple.get(d))) {
+    /** 两个元组在前 size 个分量里，第一个不同的层级；都相同返回 -1 */
+    private int firstDiffLevel(List<Object> a, List<Object> b, int size) {
+        for (int d = 0; d < size; d++) {
+            if (!Objects.equals(a.get(d), b.get(d))) {
+                return d;
+            }
+        }
+        return -1;
+    }
+
+    /** 两个元组的前 p 个分量是否相等 */
+    private boolean prefixEq(List<Object> a, List<Object> b, int p) {
+        for (int d = 0; d < p; d++) {
+            if (!Objects.equals(a.get(d), b.get(d))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /** 聚合列的汇总前缀长度：parentCell 指向的分组列深度 +1；未指定则按最细粒度 */
+    private int aggPrefixLen(FieldCell ac, List<FieldCell> groupCols, Map<CellRef, FieldCell> groupByCell) {
+        CellRef p = ac.getParentCell();
+        if (p != null && groupByCell.containsKey(p)) {
+            return depth(groupByCell.get(p), groupByCell) + 1;
+        }
+        return groupCols.size();
+    }
+
+    /** 取出与 target 前 p 个分组分量相同的所有行 */
+    private List<Map<String, Object>> rowsWithPrefix(List<Map<String, Object>> rows, List<FieldCell> groupCols,
+                                                     List<Object> target, int p) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            if (prefixEq(tuple(r, groupCols), target, p)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /** 展开 details[from..to] 的所有源行 */
+    private List<Map<String, Object>> flatten(List<Unit> details, int from, int to) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int i = from; i <= to; i++) {
+            out.addAll(details.get(i).rows);
+        }
+        return out;
+    }
+
+    /** 把某列中"前 prefixLen 个分组分量相同"的连续明细行合并 */
+    private void mergeColumn(Canvas canvas, List<Out> seq, int bandBase, int column, int prefixLen) {
+        int i = 0;
+        while (i < seq.size()) {
+            if (!seq.get(i).detail) {
+                i++;
+                continue;
+            }
+            int j = i + 1;
+            while (j < seq.size() && seq.get(j).detail
+                    && prefixEq(seq.get(j).tuple, seq.get(i).tuple, prefixLen)) {
+                j++;
+            }
+            if (j - i > 1) {
+                Merge m = new Merge();
+                m.setStartRow(bandBase + i);
+                m.setStartCol(column);
+                m.setRowSpan(j - i);
+                m.setColSpan(1);
+                canvas.merges.add(m);
+            }
+            i = j;
+        }
     }
 
     private RawTable distinctBy(RawTable t, String datasetId, List<String> fields) {
@@ -544,6 +738,19 @@ public class ReportRenderer {
         Unit(List<Object> tuple, List<Map<String, Object>> rows) {
             this.tuple = tuple;
             this.rows = rows;
+        }
+    }
+
+    /** 输出序列里的一行：明细行(detail=true，带分组元组用于合并)或小计/总计行 */
+    private static final class Out {
+        final boolean detail;
+        final List<Object> tuple;
+        final Map<Integer, Object> values = new LinkedHashMap<>();
+        final Map<Integer, CellRef> sources = new HashMap<>();
+
+        Out(boolean detail, List<Object> tuple) {
+            this.detail = detail;
+            this.tuple = tuple;
         }
     }
 }
