@@ -1,7 +1,20 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { UniverSheet, MessageType, findBlockAtCell } from '@coding-report/report-univer';
-import type { MenuGroupDef, CellRange, MessageConfig, FieldDropInfo, UniverSheetHandle } from '@coding-report/report-univer';
+import type {
+    MenuGroupDef,
+    CellRange,
+    MessageConfig,
+    FieldDropInfo,
+    UniverSheetHandle,
+    ExcelWorkbook,
+    FontItem,
+} from '@coding-report/report-univer';
 import type { SelectedCellInfo, LoopBlockConfig } from '../properties/types';
+
+export interface SheetPanelHandle {
+    getSnapshot: () => ExcelWorkbook | null;
+    loadSnapshot: (snapshot: ExcelWorkbook) => void;
+}
 
 export interface SheetPanelProps {
     /** 单元格选中回调 */
@@ -16,20 +29,27 @@ export interface SheetPanelProps {
     loopBlocks?: Record<string, LoopBlockConfig>;
     /** 字段拖入回调 — 返回要写入单元格的值（返回 undefined 则不写入） */
     onFieldDrop?: (info: FieldDropInfo) => string | undefined;
+    /** 字体加载回调 */
+    onFontRequest?: () => Promise<FontItem[]>;
 }
 
-const SheetPanel: React.FC<SheetPanelProps> = ({
+const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(({
     onCellSelect,
     onCreateLoopBlock,
     onEditLoopBlock,
     onRemoveLoopBlock,
     loopBlocks = {},
     onFieldDrop,
-}) => {
+    onFontRequest,
+}, ref) => {
     const [message, setMessage] = useState<MessageConfig | null>(null);
     const sheetRef = useRef<UniverSheetHandle>(null);
 
-    // 声明式右键菜单定义
+    useImperativeHandle(ref, () => ({
+        getSnapshot: () => sheetRef.current?.getSnapshot() ?? null,
+        loadSnapshot: (snapshot) => { sheetRef.current?.loadSnapshot(snapshot); },
+    }));
+
     const contextMenuGroups = useMemo<MenuGroupDef[]>(() => ([
         {
             id: 'loop-block',
@@ -78,7 +98,6 @@ const SheetPanel: React.FC<SheetPanelProps> = ({
         },
     ]), [onCreateLoopBlock, onEditLoopBlock, onRemoveLoopBlock, loopBlocks]);
 
-    // 处理字段拖入
     const handleFieldDrop = (info: FieldDropInfo) => {
         if (!onFieldDrop) return;
         const value = onFieldDrop(info);
@@ -96,11 +115,14 @@ const SheetPanel: React.FC<SheetPanelProps> = ({
                 contextMenuGroups={contextMenuGroups}
                 loopBlocks={loopBlocks}
                 onFieldDrop={handleFieldDrop}
+                onFontRequest={onFontRequest}
                 message={message}
                 onMessageConsumed={() => setMessage(null)}
             />
         </div>
     );
-};
+});
+
+SheetPanel.displayName = 'SheetPanel';
 
 export default SheetPanel;

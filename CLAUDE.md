@@ -82,17 +82,17 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 ### 后端 (Java 17 + Maven)
 
 ```bash
-# 编译全部模块（framework + excel + example）
+# 编译全部模块
 ./mvnw clean compile
 
 # 运行 excel 模块测试（纯 POI 测试，无外部依赖）
 ./mvnw test -pl report-engine-excel
 
-# 运行 framework 模块测试（需要本地 PostgreSQL: localhost:5432/report）
+# 运行 framework 模块测试（纯内存测试，无外部依赖）
 ./mvnw test -pl report-engine-framework
 
 # 运行单个测试类
-./mvnw test -pl report-engine-excel -Dtest=ExcelImporterTest
+./mvnw test -pl report-engine-framework -Dtest=ReportScenarioTest
 
 # 仅编译 travis profile（framework 模块 + JaCoCo 覆盖率）
 ./mvnw clean test -P travis
@@ -100,7 +100,7 @@ Report Engine 是一个报表引擎框架，支持用户通过电子表格界面
 # 发布到 Maven Central（需要 GPG 签名）
 ./mvnw clean deploy -P ossrh
 
-# 启动 example 应用（端口 8080）
+# 启动 example 应用（端口 8090）
 ./mvnw spring-boot:run -pl report-engine-example
 ```
 
@@ -130,10 +130,10 @@ pnpm push
 
 ```
 report-engine/
-├── report-engine-framework/     # 后端核心框架（数据源/组件/元数据，可发布到 Maven Central）
+├── report-engine-framework/     # 报表核心框架（数据模型 + 渲染引擎，可发布到 Maven Central）
 ├── report-engine-excel/         # Excel 构建与解析模块（Apache POI 封装 + 字体管理）
 ├── report-engine-starter/       # Spring Boot 自动配置模块（Controller + Bean 装配）
-├── report-engine-example/       # 后端示例 Spring Boot 应用（仅含启动类）
+├── report-engine-example/       # 示例 Spring Boot 应用（仅启动类）
 └── report-frontend/             # 前端 pnpm monorepo
     ├── packages/report-univer/  # @coding-report/report-univer — Univer 电子表格 React 封装
     ├── packages/report-engine/  # @coding-report/report-engine — 报表设计器核心组件库
@@ -145,16 +145,92 @@ report-engine/
 ### 模块关系
 
 ```
-report-engine-example (演示应用)
+report-engine-example (演示应用，仅 ServerApplication 启动类)
   ├── report-engine-starter (自动配置 + REST API)
   │     └── report-engine-excel (Excel + 字体)
-  └── report-engine-framework (数据源/组件)
+  └── report-engine-framework (数据模型 + 渲染引擎)
+        └── report-engine-excel (Excel POJO，ReportRenderer 用于输出)
 ```
 
-- `report-engine-excel`：独立的 Excel 构建/解析库 + 字体管理。封装 Apache POI，提供 JSON ↔ .xlsx 双向转换。不依赖 Spring，纯 Java 实现
-- `report-engine-starter`：Spring Boot 自动配置模块。注册 FontRegistry Bean、提供 FontController 和 ExcelController REST API。`@ConditionalOnClass(RestController.class)` 控制 Web 组件按需装配
-- `report-engine-framework`：报表核心框架（数据源、组件体系、元数据扫描），自动配置通过 `AutoConfiguration.imports` 注册
+- `report-engine-framework`：报表核心框架 — 声明式数据模型 + 内存渲染引擎。不依赖 Spring，纯 Java 实现
+- `report-engine-excel`：独立的 Excel 构建/解析库 + 字体管理。封装 Apache POI，提供 JSON ↔ .xlsx 双向转换
+- `report-engine-starter`：Spring Boot 自动配置模块。注册 FontRegistry Bean、提供 FontController 和 ExcelController REST API
 - `report-engine-example`：仅含 `ServerApplication` 启动类，业务逻辑全部在 starter/framework 中
+
+### report-engine-framework 模块 (`com.codingapi.report`)
+
+framework 采用**声明式模型 + 内存计算**架构，模板层（Excel/Univer 视觉呈现）与语义层（数据绑定与计算）完全分离。
+
+#### 数据模型 (`model/`)
+
+**源模型 (`model/source/`)** — 数据从哪来：
+
+| 类 | 职责 |
+|---|---|
+| `DataSource` | 物理连接配置（id/name/type/config），支持 DB/API/EXCEL/CSV/JSON |
+| `Dataset` | 单个数据表/查询，含字段列表和可选的 UNION 成员 |
+| `Field` / `FieldRef` | 字段定义 + 稳定引用（`record(datasetId, field)`） |
+| `Relationship` | 跨数据集 JOIN 规范（left/right FieldRef + JoinType + RelationOrigin） |
+| `UnionMember` | UNION 数据集的字段映射 |
+| `Query` | 驱动查询：datasetId + filters + groupBy + orderBy |
+| `DataModel` | 可复用的语义层：datasources + datasets + relationships |
+
+**网格模型 (`model/grid/`)** — 数据如何映射到单元格：
+
+| 类 | 职责 |
+|---|---|
+| `CellBinding` | `sealed interface`：`TextCell`（文本插值）或 `FieldCell`（字段绑定） |
+| `TextCell` | 文本 + `${paramName}` 占位符模板 |
+| `FieldCell` | 字段绑定：expansion（VERTICAL/HORIZONTAL/NONE）、expandMode（GROUP/LIST）、mergeRepeated、parentCell（多级分组链）、aggregation、conditions |
+| `Condition` | 过滤条件：`FieldRef left` + `CompareOperator` + `ValueRef value` |
+| `CompareOperator` | 12 种运算符（EQ/NE/GT/GE/LT/LE/LIKE/IN/NOT_IN/IS_NULL/IS_NOT_NULL/BETWEEN） |
+| `Aggregation` | 聚合方式（NONE/COUNT/COUNT_DISTINCT/SUM/AVG/MAX/MIN） |
+| `LoopBlock` | 循环区域定义：start/end CellRef + Query 驱动源 |
+| `SummaryRow` / `SummaryCell` | 小计/合计行 |
+| `CellRef` | 单元格坐标引用 `record(sheetId, row, column)` |
+
+**参数模型 (`model/param/`)** — 运行时值解析：
+
+| 类 | 职责 |
+|---|---|
+| `Parameter` | 命名参数声明（name + dataType + ParamSource） |
+| `ParamSource` | `sealed interface`：`External`（调用方传入）/ `Cell`（单元格联动）/ `Constant`（固定值） |
+| `ValueRef` | `sealed interface`：条件右侧值引用 — `Literal`（字面量）/ `Param`（引用 Parameter）/ `LoopField`（循环迭代字段） |
+
+**顶层组合**：`Report` = dataModelId + templateId + parameters + cellBindings + loopBlocks + summaries + extraRelationships
+
+#### 渲染引擎 (`engine/`)
+
+| 类 | 职责 |
+|---|---|
+| `ReportRenderer` | 核心引擎：DataModel + Report + ParamContext → Workbook 输出 |
+| `DataExtractor` | SPI 接口：按 DataSourceType 提取数据，每种类型一个实现 |
+| `CsvDataExtractor` | CSV 实现：读 classpath CSV → RawTable |
+| `RawTable` | 统一中间格式：`List<String> columns`（限定名 `datasetId.field`）+ `List<Map<String, Object>> rows` |
+| `Operators` | 内存计算：filter（条件求值）、join（hash inner join）、aggregate |
+| `ParamContext` | 运行时作用域：external（报表参数）+ loopRows（循环迭代），inner-first 解析 |
+
+#### 渲染流水线
+
+```
+render(dataModel, report, paramContext, templateWorkbook)
+  1. seedTemplate    — 加载模板单元格/样式
+  2. renderFree      — 非循环区域：
+     a. buildCombinedTable — 提取数据集 + greedy-join
+     b. filter by Conditions — ParamContext 解析 ValueRef
+     c. renderBand — VERTICAL 展开（GROUP/LIST + 聚合）
+     d. TextCell — ${placeholder} 替换
+  3. renderLoop      — 循环块：
+     a. 提取驱动数据集 + Query.filters 过滤
+     b. 逐行迭代：更新 ParamContext loop scope → 渲染块内单元格
+  4. buildWorkbook   — Canvas → Workbook 输出
+```
+
+**关键设计决策**：所有计算在 Java 内存中完成（不依赖 SQL JOIN），支持跨数据源 JOIN（如 MySQL + CSV）。
+
+#### 测试数据
+
+测试使用 CSV 文件（`src/test/resources/data/`）作为数据源，覆盖 7 种报表场景：简单列表、合并列表、多级统计、工资条循环、主从合并、小计合计、跨源 UNION。
 
 ### report-engine-excel 模块 (`com.codingapi.report.excel`)
 
@@ -193,33 +269,6 @@ POJO 模型同时作为前后端 JSON 契约：前端 `ExcelWorkbook` TypeScript
 - 内部自动处理：localStorage 缓存 → .ttc 过滤 → @font-face 注入 → `addFonts()` 注册
 - 父组件（如 `univer-test.tsx`）只负责调用 API 返回 `FontItem[]`（含 family/filename/url）
 - 字体文件 URL 由后端 API 返回（`FontItem.url`），框架不硬编码路径
-
-### framework 核心包结构 (`com.codingapi.report`)
-
-| 包 | 职责 |
-|---|---|
-| `components/` | 报表组件体系：`IComponent` → `Text` / `Image` / `Table` / `Layout` |
-| `content/` | 内容标记接口：`IContent` → `TextContent` / `DataContent` |
-| `data/` | 数据源查询链：`IDataSource` → `BaseDataSource` → `SQLDataSource` |
-| `context/` | `JdbcTemplateContext` 单例，封装 JDBC 查询和元数据扫描 |
-| `meta/` | 数据库元数据模型：`DBTable` / `DBColumn` / `DBColumnKey` / `DataType` 枚举 |
-| `scanner/` | `DBScanner` 通过 JDBC DatabaseMetaData 扫描表/列/主键/外键 |
-| `paper/` + `panel/` | 纸张和面板容器模型 |
-| `display/` | 布局系统：`Display` → `FlexDisplay` |
-| `stype/` | 样式定义（注意包名是 `stype` 而非 `style`） |
-| `format/` | 数据格式化：`DataFormat` → `StringFormat` |
-
-### 自动配置机制
-
-`AutoConfiguration` → `JdbcTemplateContextRegister`：当 classpath 中存在 `JdbcTemplate` 时，自动将其实例注入到 `JdbcTemplateContext` 单例。同时注册了 Spring Boot 2.x (`spring.factories`) 和 3.x (`AutoConfiguration.imports`) 两种格式。
-
-### 数据查询流程
-
-`SQLDataSource.data(params)` → `BaseDataSource.verifyParams()` 校验 → `BaseDataSource.toParamArgs()` 转换 → `JdbcTemplateContext.queryForList(sql, args)` 执行查询 → 返回 `DataResult`(内含 `List<DataRow>` → `List<DataItem>`)
-
-### 测试数据
-
-测试使用 JPA 实体（学生/班级/成绩/考试/科目），通过 `DataService` 初始化数据，验证 SQL 查询和元数据扫描功能。
 
 ## 前端架构
 
@@ -297,8 +346,7 @@ app-pc (演示应用, Rsbuild)
 
 ## 注意事项
 
-- 后端默认数据库为 PostgreSQL（localhost:5432/report），运行 framework 测试前需确保数据库可用
-- `report-engine-excel` 的测试不需要外部依赖（纯 POI 单元测试），可独立运行
+- 后端 framework 和 excel 模块的测试均**不需要外部依赖**（纯内存/POI 测试），可直接运行
 - 前端库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力，消费方需要自行处理依赖
-- 后端 `stype` 包名是 `style` 的拼写变体，重命名时需注意
 - 使用 Lombok（`@Data` / `@Builder`），但部分类未加注解导致缺少 getter/setter
+- framework 的 `model/` 和 `engine/` 包大量使用 Java 17 sealed interface + record，确保 switch 表达式覆盖所有子类型
