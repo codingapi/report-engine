@@ -8,9 +8,9 @@
 
 ```
 后端 (Java 17 + Maven)
-├── report-engine-excel       Excel 构建/解析 + 字体管理（纯 Java，Apache POI 封装）
+├── report-engine-framework   报表核心框架（声明式数据模型 + 内存渲染引擎）
+├── report-engine-excel       Excel 构建/解析 + 字体管理（Apache POI 封装）
 ├── report-engine-starter     Spring Boot 自动配置 + REST API
-├── report-engine-framework   报表核心框架（数据源/组件/元数据）
 └── report-engine-example     示例应用（仅启动类）
 
 前端 (React 18 + TypeScript + pnpm monorepo)
@@ -21,7 +21,7 @@
 
 ### 核心技术栈
 
-- **后端**：Spring Boot 3.5 / Apache POI 5.x / Jackson
+- **后端**：Spring Boot 3.5 / Apache POI 5.x / Jackson / Lombok
 - **前端**：React 18 / Univer 0.25 / Ant Design 6 / Rslib + Rsbuild
 - **数据契约**：前后端共享 `ExcelWorkbook` JSON 结构（Java POJO ↔ TypeScript 类型一一对应）
 
@@ -39,29 +39,21 @@
 - [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据源 / 表格 / 属性），可拖拽调整宽度
 - [x] **循环块管理**：右键菜单创建/删除，蓝色虚线高亮，属性绑定
 - [x] **单元格操作句柄**（`CellHandle`）：样式读写、值设置、富文本支持
+- [x] **声明式数据模型**（`report-engine-framework`）：
+  - 源模型：DataSource / Dataset / Field / Relationship / Query / UnionMember
+  - 网格模型：CellBinding（TextCell / FieldCell）、Condition、Aggregation、LoopBlock、SummaryRow
+  - 参数模型：Parameter / ParamSource（External/Cell/Constant）/ ValueRef（Literal/Param/LoopField）
+- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）
+- [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联
 
 ### 待开发
 
-- [ ] **数据源管理**
-  - 数据库连接配置与测试
-  - 表/字段/主键/外键元数据扫描
-  - 数据源树形浏览面板（前端 antd Tree）
-
-- [ ] **报表配置逻辑**
-  - 字段拖入单元格绑定
-  - X/Y 轴条件规则配置（12 种运算符，按数据类型智能过滤）
-  - 聚合计算方式（COUNT/SUM/AVG/MAX/MIN 等）
-  - 单元格属性模板系统
-
-- [ ] **报表数据呈现**
-  - 数据源查询执行（SQL 参数化 + 条件拼接）
-  - 循环块数据展开（主从表嵌套渲染）
-  - 条件格式与动态样式
-
-- [ ] **报表数据导出**
-  - 报表模板 → 填充数据 → 生成 .xlsx 下载
-  - 多 Sheet 导出
-  - 打印预览与分页
+- [ ] **表达式抽象**：统一 ValueRef / ParamSource / 文本插值的表达式类型体系
+- [ ] **前端参数绑定**：ConditionRule 支持 Param/LoopField 值引用（目前仅支持字面量）
+- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源树
+- [ ] **报表配置持久化**：DataModel / Report 模型的存储与加载
+- [ ] **报表数据呈现**：前端实时预览填充数据后的报表效果
+- [ ] **报表数据导出**：报表模板 → 填充数据 → 生成 .xlsx 下载
 
 ## 快速开始
 
@@ -71,10 +63,13 @@
 # 编译全部模块
 ./mvnw clean compile
 
+# 运行 framework 模块测试（纯内存，无外部依赖）
+./mvnw test -pl report-engine-framework
+
 # 运行 Excel 模块测试（纯 POI，无外部依赖）
 ./mvnw test -pl report-engine-excel
 
-# 启动示例应用（端口 8080）
+# 启动示例应用（端口 8090）
 ./mvnw spring-boot:run -pl report-engine-example
 ```
 
