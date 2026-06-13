@@ -40,7 +40,7 @@ import { PROP_KINDS, PROP_KIND_MAP } from './univer-test-props';
 import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
 // API
-import { exportExcel, importExcel, fetchFonts } from '@/api/example';
+import { exportExcel, importExcel, fetchFonts } from '@coding-report/report-api';
 import { mockDataConfig } from '../data/mock-data';
 
 // ─── 字段选项构建 ──────────────────────────────────────

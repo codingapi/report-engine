@@ -5,10 +5,12 @@
   "main": "index.js",
   "scripts": {
     "build:report-univer": "pnpm -F @coding-report/report-univer build",
+    "build:report-api": "pnpm -F @coding-report/report-api build",
     "build:report-engine": "pnpm -F @coding-report/report-engine build",
-    "build": "pnpm run build:report-univer && pnpm run build:report-engine",
+    "build": "pnpm run build:report-univer && pnpm run build:report-api && pnpm run build:report-engine",
     "watch:report-engine": "pnpm -F @coding-report/report-engine dev",
     "watch:report-univer": "pnpm -F @coding-report/report-univer dev",
+    "watch:report-api": "pnpm -F @coding-report/report-api dev",
     "push:report-engine": "pnpm -F @coding-report/report-engine push",
     "push:report-univer": "pnpm -F @coding-report/report-univer push",
     "push": "pnpm run push:report-univer && pnpm run push:report-engine",
