@@ -154,6 +154,7 @@ DataSource ──提取──► RawTable(类型归一) ──Java算子(join/fi
 | `ReportScenarioTest#simpleList` | 简单列表（标题/表头 + 逐行） | simple-list.xlsx |
 | `ReportScenarioTest#mergedList` | 带合并列表（分类 GROUP 跨行合并） | merged-list.xlsx |
 | `ReportScenarioTest#statistics` | 统计列表（单位/部门分组 + 人数 COUNT + 单位合并） | statistics.xlsx |
+| `ReportScenarioTest#masterDetailMergedList` | 主从关联+合并（员工 join 学历 1:N，主表列跨多条学历合并） | master-detail-merge.xlsx |
 | `ReportScenarioTest#payslipLoop` | 循环块横向薪资条（每人 标题/表头/数据 三行，跨源按 LoopField 查） | payslip.xlsx |
 | `StyleAdaptationTest` | 样式适配：模板的合并标题/富文本/边框，渲染填值后保留；扩展行继承声明格样式 | styled.xlsx |
 

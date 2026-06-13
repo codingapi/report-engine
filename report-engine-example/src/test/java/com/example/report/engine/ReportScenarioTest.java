@@ -262,6 +262,82 @@ class ReportScenarioTest {
     }
 
     // ============================================================
+    // 5. 主从关联 + 合并：员工(1) ↔ 学历(N)，主表列跨多条学历合并
+    // ============================================================
+
+    @Test
+    @DisplayName("主从关联+合并：员工 join 学历(1:N)，姓名/性别/年龄跨该员工的多条学历合并 → xlsx")
+    void masterDetailMergedList() throws Exception {
+        DataSource empSrc = csv("ds_emp2", "/data/emp_basic.csv");
+        DataSource eduSrc = csv("ds_edu", "/data/emp_education.csv");
+        Dataset emp = Dataset.builder().id("d_emp2").datasourceId("ds_emp2").sourceTable("emp_basic.csv")
+                .fields(List.of(
+                        Field.builder().name("id").dataType(DataType.NUMBER).primaryKey(true).build(),
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("gender").dataType(DataType.STRING).build(),
+                        Field.builder().name("age").dataType(DataType.NUMBER).build()))
+                .build();
+        Dataset edu = Dataset.builder().id("d_edu").datasourceId("ds_edu").sourceTable("emp_education.csv")
+                .fields(List.of(
+                        Field.builder().name("emp_id").dataType(DataType.NUMBER).build(),
+                        Field.builder().name("school").dataType(DataType.STRING).build(),
+                        Field.builder().name("major").dataType(DataType.STRING).build(),
+                        Field.builder().name("graduate_time").dataType(DataType.NUMBER).build()))
+                .build();
+        // 关系：学历.emp_id = 员工.id（1 个员工 → 多条学历）
+        Relationship rel = Relationship.builder().id("rel_emp_edu")
+                .left(new FieldRef("d_edu", "emp_id")).right(new FieldRef("d_emp2", "id"))
+                .joinType(JoinType.INNER).origin(RelationOrigin.MANUAL).build();
+        DataModel dm = DataModel.builder().id("dm_edu").name("员工学历模型")
+                .datasources(List.of(empSrc, eduSrc)).datasets(List.of(emp, edu))
+                .relationships(List.of(rel)).build();
+
+        // 标题 + 表头
+        TextCell title = label(0, 0, "员工学历信息表");
+        TextCell h0 = label(1, 0, "姓名");
+        TextCell h1 = label(1, 1, "性别");
+        TextCell h2 = label(1, 2, "年龄");
+        TextCell h3 = label(1, 3, "学校名称");
+        TextCell h4 = label(1, 4, "专业名称");
+        TextCell h5 = label(1, 5, "毕业时间");
+
+        // 主表列：姓名/性别/年龄 = GROUP + 合并，父格链 姓名→性别→年龄（同一员工共变）
+        CellRef nameRef = new CellRef("sheet1", 2, 0);
+        CellRef genderRef = new CellRef("sheet1", 2, 1);
+        FieldCell nameCol = groupMerge(nameRef, new FieldRef("d_emp2", "name"), null);
+        FieldCell genderCol = groupMerge(genderRef, new FieldRef("d_emp2", "gender"), nameRef);
+        FieldCell ageCol = groupMerge(new CellRef("sheet1", 2, 2), new FieldRef("d_emp2", "age"), genderRef);
+        // 从表列：学校/专业/毕业 = LIST 明细
+        FieldCell schoolCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_edu", "school"));
+        FieldCell majorCol = listCol(new CellRef("sheet1", 2, 4), new FieldRef("d_edu", "major"));
+        FieldCell gradCol = listCol(new CellRef("sheet1", 2, 5), new FieldRef("d_edu", "graduate_time"));
+
+        Report report = report("r_edu", dm,
+                List.of(title, h0, h1, h2, h3, h4, h5, nameCol, genderCol, ageCol, schoolCol, majorCol, gradCol),
+                List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "master-detail-merge");
+
+        assertEquals("员工学历信息表", text(sheet, 0, 0));
+        assertEquals("毕业时间", text(sheet, 1, 5));
+
+        // 排序：张三(5F20) < 李四(674E)。张三 2 条学历(行2-3)，李四 1 条(行4)
+        assertEquals("张三", text(sheet, 2, 0));           // 合并区顶格
+        assertEquals("男", text(sheet, 2, 1));
+        assertEquals(32.0, number(sheet, 2, 2), 0.0001);
+        assertEquals("北京大学", text(sheet, 2, 3));
+        assertEquals("北京大学研究生院", text(sheet, 3, 3));
+        assertEquals(2013.0, number(sheet, 3, 5), 0.0001);
+        assertEquals("李四", text(sheet, 4, 0));
+        assertEquals("清华大学", text(sheet, 4, 3));
+
+        // 张三的姓名/性别/年龄三列都跨 行2-3 合并；李四单行不合并
+        assertTrue(hasMerge(sheet, 2, 0, 2), "姓名应跨张三的 2 条学历合并");
+        assertTrue(hasMerge(sheet, 2, 1, 2), "性别应跨张三的 2 条学历合并");
+        assertTrue(hasMerge(sheet, 2, 2, 2), "年龄应跨张三的 2 条学历合并");
+    }
+
+    // ============================================================
     // ---- 公共构造 / 运行 / 断言辅助 ----
     // ============================================================
 
@@ -278,6 +354,13 @@ class ReportScenarioTest {
     private static FieldCell listCol(CellRef cell, FieldRef field) {
         return FieldCell.builder().cell(cell).field(field)
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).build();
+    }
+
+    /** 分组列（去重 + 合并），可指定父格构成层级 */
+    private static FieldCell groupMerge(CellRef cell, FieldRef field, CellRef parent) {
+        return FieldCell.builder().cell(cell).field(field)
+                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
+                .parentCell(parent).build();
     }
 
     /** 薪资条块内数据格：取 d_sal 的某字段，按 emp_id = 循环当前员工 id 过滤 */
