@@ -109,6 +109,16 @@ com.codingapi.report
 
 **求值策略**：每种节点对应一个 `ValueEvaluator` 实现，`ExpressionEngine` 按 `supports()` 选中分发。新增节点 = 新增实现 + 注册，零改动接入。
 
+**文本语法**（`Templates.parse()`）：用户输入的 `${...}` 文本自动编译为 Value 树：
+- `${name}` → `NameRef`（晚绑定）
+- `${d.name}` → `FieldValue`（限定字段引用）
+- `${COUNT(d.name)}` → `Aggregate`（聚合函数：COUNT/SUM/AVG/MAX/MIN/COUNT_DISTINCT）
+- `${format(d.name)}` → `FunctionCall`（通用函数）
+- `合计 ${SUM(d.salary)} 元` → `Template([Text, Hole(Aggregate), Text])`
+- 纯文本无洞 → `Literal`；整个字符串一个洞 → 直接返回洞内 Value（不套 Template）
+
+`Templates.containsAggregate(value)` 递归检测表达式树中是否含聚合节点，用于 `evalSingle` 判断走行集合还是首行上下文。
+
 **扩展点统一范式**（`supports()` + 注册表）：
 - `DataExtractor` — 新数据源类型
 - `ConditionPredicate` — 新比较算子
@@ -132,11 +142,14 @@ com.codingapi.report
 
 ```
 render(dataModel, report, paramContext, templateWorkbook)
-  1. seedTemplate    — 加载模板单元格/样式到画布
+  1. seedTemplate    — 加载模板单元格/样式/合并区域到画布
   2. renderFree      — 非循环区：提取数据集 → greedy-join → 按条件过滤 → 纵向带展开 → 文本插值
   3. renderLoop      — 循环块：提取驱动数据集 → 逐行迭代更新 ParamContext → 渲染块内格子
+                      → 后续迭代按 rowOffset 复制模板合并区域（第 1 次由 seedTemplate 载入）
   4. buildWorkbook   — 画布 → Workbook 输出
 ```
+
+**样式继承**：`place()` 方法将值写入画布时，从 `canvas.template` 中查找源格（`CellBinding.cell` 坐标）并继承其 style。循环块内每次迭代都从同一模板源格继承样式。
 
 #### Sealed Types (编译期穷尽)
 
@@ -164,24 +177,66 @@ Spring Boot 自动配置。注册 `FontRegistry` Bean、提供 `FontController` 
 - `POST /api/excel/generate` — 生成 .xlsx 下载
 - `POST /api/excel/import` — 导入 .xlsx
 
+### Example Module (`report-engine-example`)
+
+演示应用，同时承载**数据集配置层**和**报表渲染 API**（这些不属于通用 starter，是应用级逻辑）。
+
+**数据集配置** (`DatasetConfig.java`)：
+- 扫描 `classpath:data/*.json` 描述文件，每个 JSON 对应一个 CSV 数据集（字段名/别名/类型/主键）
+- 每个数据集自动创建独立 `DataSource`（`config.path` 指向 CSV classpath 路径）
+- `data/relationships.json` 定义跨数据集 JOIN（`Relationship` with `JoinType` + `RelationOrigin.MANUAL`）
+- 构建 `DataModel` Bean，全局注入
+
+**报表渲染 API** (`ReportRenderController.java`)：
+- `POST /api/report/render` — 接收前端配置 + 模板快照 → 调用 `ReportRenderer.render()` → 返回填充数据的 `.xlsx`
+- 使用 DTO 层（`RenderRequest` / `BindingDTO` / `ValueDTO` 等）匹配前端 JSON 格式
+- 内部转换为 framework 领域对象（`CellBinding` / `Value` / `LoopBlock` / `SummaryRow`）
+- `Value` 等 sealed interface **未加 Jackson 多态注解**，所以用 DTO 中间层而非直接反序列化
+
+**数据集 API** (`DatasetController.java`)：
+- `GET /api/datasets` — 数据集列表（含字段定义），供前端左面板树形展示
+- `GET /api/datasets/{id}/preview?limit=20` — 预览前 N 行数据
+
+**CSV 数据集**（`src/main/resources/data/`）：10 个 CSV + 对应 JSON 描述 + `relationships.json`。
+
 ### Frontend Architecture
 
 **技术栈**：React 18 + TypeScript 5.9 + Ant Design 6 + Univer 0.25（插件模式）+ pnpm 10 workspaces。
 
-**构建顺序**：必须先构建 `report-univer`，再构建 `report-engine`（pnpm build 脚本已处理）。
+**构建顺序**：`report-univer` → `report-api` → `report-engine`（pnpm build 脚本已处理）。
 
-**三栏式布局**（`ReportEngine` 组件）：
-- 左面板：数据源树形浏览
-- 中面板：Univer 电子表格（支持单元格选中、右键菜单、循环块配置）
-- 右面板：单元格属性配置（条件 + 计算方式）
+#### Package 职责
 
-状态管理使用纯 React hooks，无外部状态库。
+- **`report-univer`**：Univer 电子表格 React 封装。提供 `UniverSheet` 组件 + `UniverSheetHandle` 命令式句柄（`getSnapshot` / `loadSnapshot` / `setCellValue` / `getActiveSheetId`）。三层属性存储（cellProps / mergeProps / loopBlockProps）通过泛型自定义。
+- **`report-api`**：后端 API 客户端。axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `fetchDatasets` / `fetchDatasetPreview` / `renderReport` / `exportExcel` / `importExcel` / `fetchFonts`。
+- **`report-engine`**：报表设计器组件库（纯 UI，不直接调 API）。
 
-**API 响应结构**：后端统一使用 `SingleResponse<T>` / `MultiResponse<T>` / `MapResponse` 包装。前端 axios 拦截器自动解包（检测 `success` 字段）。
+#### ReportEngine 组件
 
-**Excel 数据流**：`report-univer` 提供双向快照能力，与后端共享同一 JSON 结构（`ExcelWorkbook`）。导出：`getSnapshot() → extractSnapshot() → JSON → POST /api/excel/generate`。导入：`POST /api/excel/import → JSON → loadSnapshot()`。
+**Props 驱动**：`datasets`（数据集列表）+ `templates`（模板预设，可选）+ `onExport` / `onImport` / `onFontRequest` 回调。数据由 app-pc 从 API 获取后传入。
 
-**字体管理**：`UniverSheet` 框架内置字体加载能力，与后端解耦。通过 `onFontRequest` 回调向父组件请求字体数据，内部自动处理 localStorage 缓存 → @font-face 注入 → `addFonts()` 注册。字体文件 URL 由后端 API 返回，框架不硬编码路径。
+**三栏式布局**：
+- 左面板 `DatasetTree`：Ant Design Tree，字段节点 `draggable` + `dataTransfer` 携带 `datasetId.field`
+- 中面板 `SheetPanel`：`forwardRef` 封装 UniverSheet，暴露 `getActiveSheetId()` 获取实际 sheet ID
+- 右面板 `PropertyPanel`：选中单元格的绑定信息展示（当前只读）
+- 顶部模板栏：`TemplatePreset[]` 按钮，点击调用 `applyTemplate` 填充配置
+
+**模板预设**（`TemplatePreset` 接口在 report-engine types.ts，具体数据在 app-pc）：
+- `cellValues`：表格显示文本（标题/表头）
+- `bindings`：`CellBinding[]` 配置
+- `summaries` / `loopBlocks`：可选
+- 应用时自动 remap cellKey/parentCell 到实际 sheet ID + 清空旧模板区域
+
+**类型体系**：枚举值使用大写字符串联合类型（`'VERTICAL'` / `'SUM'` / `'FieldValue'`），对齐 Java enum `name()`。
+
+#### Excel 数据流
+
+`report-univer` 提供双向快照能力，与后端共享同一 JSON 结构（`ExcelWorkbook`）。
+- **导出渲染报表**：`getSnapshot() → renderReport({ cellBindings, loopBlocks, summaries, template }) → POST /api/report/render → .xlsx Blob`
+- **导出空模板**：`getSnapshot() → exportExcel(workbook) → POST /api/excel/generate → .xlsx Blob`
+- **导入**：`POST /api/excel/import → JSON → loadSnapshot()`
+
+**字体管理**：`UniverSheet` 通过 `onFontRequest` 回调向父组件请求字体数据，内部自动处理 localStorage 缓存 → @font-face 注入 → `addFonts()` 注册。
 
 ## Testing
 
@@ -202,3 +257,7 @@ Spring Boot 自动配置。注册 `FontRegistry` Bean、提供 `FontController` 
 - 使用 Lombok（`@Data` / `@Builder`），但部分类未加注解导致缺少 getter/setter
 - framework 大量使用 Java 17 sealed interface + record
 - 前端 `UniverSheet` 裁剪了大量菜单项，仅保留报表设计所需的最小功能集
+- **跨模块修改**：修改 framework/excel/starter 后必须 `./mvnw install -DskipTests` 再启动 example，否则 example 使用的是本地仓库中的旧 JAR
+- **Univer 默认 sheet ID**：UniverSheet 创建的默认 sheet ID 不一定是 `'sheet1'`（可能是 UUID），需要通过 `getActiveSheetId()` 从快照获取实际 ID
+- **Value sealed interface 无 Jackson 注解**：前后端传输使用 DTO 层（`ValueDTO` 等）中间转换，而非直接在 Value 上加 `@JsonTypeInfo`
+- **模板层样式继承**：`renderLoop` 中后续迭代的合并区域需要显式复制（`seedTemplate` 只载入原始位置的 merge），样式通过 `place()` 从模板源格继承
