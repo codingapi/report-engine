@@ -1,0 +1,9 @@
+{
+  "alias": "部门薪资明细",
+  "fields": [
+    { "name": "unit", "alias": "单位", "dataType": "STRING" },
+    { "name": "dept", "alias": "部门", "dataType": "STRING" },
+    { "name": "name", "alias": "姓名", "dataType": "STRING" },
+    { "name": "salary", "alias": "薪资", "dataType": "NUMBER" }
+  ]
+}
