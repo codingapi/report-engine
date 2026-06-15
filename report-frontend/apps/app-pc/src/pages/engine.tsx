@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Spin } from 'antd';
-import { ReportEngine, ALL_TEMPLATES } from '@coding-report/report-engine';
+import { ReportEngine } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow } from '@coding-report/report-engine';
+import { ALL_TEMPLATES } from './templates';
 import { importExcel, fetchFonts, fetchDatasets, renderReport } from '@coding-report/report-api';
 import type { RenderBindingDTO, RenderValueDTO } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';

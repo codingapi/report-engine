@@ -22,6 +22,8 @@ export type {
   LoopBlock,
   SummaryCell,
   SummaryRow,
+  // 模板预设
+  TemplatePreset,
   // 组件 Props
   ReportEngineProps,
 } from './types';
@@ -36,13 +38,3 @@ export {
   findField,
 } from './types';
 
-export type { TemplatePreset } from './templates';
-export {
-  ALL_TEMPLATES,
-  simpleListTemplate,
-  mergedListTemplate,
-  statisticsTemplate,
-  masterDetailTemplate,
-  subtotalTemplate,
-  payslipLoopTemplate,
-} from './templates';

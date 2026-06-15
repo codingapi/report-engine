@@ -8,7 +8,7 @@
  * - loopBlocks: 循环块配置（仅 payslipLoop 使用）
  */
 
-import type { CellBinding, LoopBlock, SummaryRow, ReportValue } from './types';
+import type { ReportValue, TemplatePreset } from '@coding-report/report-engine';
 
 // ─── 辅助函数 ──────────────────────────────────
 
@@ -35,16 +35,6 @@ function cellValue(row: number, col: number, text: string) {
 }
 
 // ─── 模板定义 ──────────────────────────────────
-
-export interface TemplatePreset {
-  id: string;
-  label: string;
-  description: string;
-  cellValues: Array<{ row: number; col: number; text: string }>;
-  bindings: CellBinding[];
-  summaries?: SummaryRow[];
-  loopBlocks?: LoopBlock[];
-}
 
 /** 1. 简单列表：商品名 + 价格 + 合计 */
 export const simpleListTemplate: TemplatePreset = {

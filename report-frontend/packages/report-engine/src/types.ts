@@ -146,6 +146,18 @@ export const findField = (datasets: Dataset[], ref: string): DatasetField | null
   return ds?.fields.find((f) => f.name === ref.slice(dot + 1)) ?? null;
 };
 
+// ─── 模板预设 ────────────────────────────────
+
+export interface TemplatePreset {
+  id: string;
+  label: string;
+  description: string;
+  cellValues: Array<{ row: number; col: number; text: string }>;
+  bindings: CellBinding[];
+  summaries?: SummaryRow[];
+  loopBlocks?: LoopBlock[];
+}
+
 // ─── 组件 Props ────────────────────────────────
 
 export interface ReportEngineProps {

@@ -8,7 +8,7 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel';
 import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset } from './types';
-import type { TemplatePreset } from './templates';
+import type { TemplatePreset } from './types';
 import './index.css';
 
 export interface ReportEngineHandle {
