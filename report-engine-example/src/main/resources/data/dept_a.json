@@ -1,0 +1,8 @@
+{
+  "alias": "A部门人员",
+  "fields": [
+    { "name": "name", "alias": "姓名", "dataType": "STRING" },
+    { "name": "gender", "alias": "性别", "dataType": "STRING" },
+    { "name": "age", "alias": "年龄", "dataType": "NUMBER" }
+  ]
+}

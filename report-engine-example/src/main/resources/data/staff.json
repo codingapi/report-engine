@@ -1,0 +1,8 @@
+{
+  "alias": "人员组织",
+  "fields": [
+    { "name": "unit", "alias": "单位", "dataType": "STRING" },
+    { "name": "dept", "alias": "部门", "dataType": "STRING" },
+    { "name": "name", "alias": "姓名", "dataType": "STRING" }
+  ]
+}

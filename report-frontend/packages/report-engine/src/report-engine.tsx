@@ -1,9 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Button, Upload, message } from 'antd';
-import {
-  ExportOutlined,
-  ImportOutlined,
-} from '@ant-design/icons';
+import { Button, Upload, Space, Tooltip, message } from 'antd';
+import { ExportOutlined, ImportOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Group, Panel as ResizablePanel } from 'react-resizable-panels';
 import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig } from '@coding-report/report-univer';
 import DatasetTree from './components/dataset-tree';
@@ -11,14 +8,24 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel';
 import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset } from './types';
+import type { TemplatePreset } from './templates';
 import './index.css';
+
+export interface ReportEngineHandle {
+  applyTemplate: (template: TemplatePreset) => void;
+}
 
 /**
  * 报表设计器：三栏布局（数据集树 + 电子表格 + 属性面板）。
  */
-export const ReportEngine: React.FC<ReportEngineProps> = ({
+export const ReportEngine: React.FC<ReportEngineProps & {
+  templates?: TemplatePreset[];
+  engineRef?: React.Ref<ReportEngineHandle>;
+}> = ({
   datasets,
   title = '报表设计器',
+  templates,
+  engineRef,
   onExport,
   onImport,
   onFontRequest,
@@ -29,9 +36,30 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
   // ─── 状态 ───
   const [selectedCell, setSelectedCell] = useState<SheetCellSelectInfo | null>(null);
   const [cellBindings, setCellBindings] = useState<CellBinding[]>([]);
-  const [loopBlocks] = useState<Record<string, LoopBlockConfig>>({});
+  const [loopBlocks, setLoopBlocks] = useState<LoopBlock[]>([]);
+  const [summaries, setSummaries] = useState<SummaryRow[]>([]);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+
+  // ─── 应用模板 ───
+  const applyTemplate = useCallback((tpl: TemplatePreset) => {
+    setActiveTemplate(tpl.id);
+
+    // 设置单元格显示文本
+    for (const cv of tpl.cellValues) {
+      sheetRef.current?.setCellValue('sheet1', cv.row, cv.col, cv.text);
+    }
+
+    setCellBindings(tpl.bindings);
+    setLoopBlocks(tpl.loopBlocks || []);
+    setSummaries(tpl.summaries || []);
+
+    messageApi.success(`已加载模板：${tpl.label}`);
+  }, [messageApi]);
+
+  // 暴露 ref
+  React.useImperativeHandle(engineRef, () => ({ applyTemplate }), [applyTemplate]);
 
   // ─── cellProps：CellBinding → Univer CellProp 映射 ───
   const cellProps: Record<string, CellProp[]> = {};
@@ -50,6 +78,20 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
     }];
   }
 
+  // loopBlockConfigs: LoopBlock → LoopBlockConfig 映射
+  const loopBlockConfigs: Record<string, LoopBlockConfig> = {};
+  for (const lb of loopBlocks) {
+    loopBlockConfigs[lb.id] = {
+      id: lb.id,
+      sheetId: lb.sheetId,
+      startRow: lb.startRow,
+      startColumn: lb.startColumn,
+      endRow: lb.endRow,
+      endColumn: lb.endColumn,
+      label: lb.label,
+    };
+  }
+
   // ─── 单元格选中 ───
   const handleCellSelect = useCallback((info: SheetCellSelectInfo) => {
     setSelectedCell(info);
@@ -61,15 +103,13 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
       try {
         const data = JSON.parse(info.data);
         if (data.datasetId && data.field) {
-          const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
+          const ck = `${info.sheetId}:${info.row}:${info.column}`;
           const fieldRef = `${data.datasetId}.${data.field}`;
 
-          // 设置单元格显示文本
           handle.setValue(data.alias || data.field);
 
-          // 创建绑定
           const binding: CellBinding = {
-            cellKey,
+            cellKey: ck,
             value: { type: 'FieldValue', payload: fieldRef },
             expansion: 'VERTICAL',
             expandMode: 'LIST',
@@ -79,9 +119,10 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
           };
 
           setCellBindings((prev) => {
-            const filtered = prev.filter((b) => b.cellKey !== cellKey);
+            const filtered = prev.filter((b) => b.cellKey !== ck);
             return [...filtered, binding];
           });
+          setActiveTemplate(null);
 
           messageApi.success(`已绑定 ${data.alias || data.field}`);
         }
@@ -102,16 +143,14 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
     }
     setExporting(true);
     try {
-      const loops: LoopBlock[] = [];
-      const summaries: SummaryRow[] = [];
-      await onExport(cellBindings, loops, summaries, snapshot);
+      await onExport(cellBindings, loopBlocks, summaries, snapshot);
       messageApi.success('导出成功');
     } catch (e) {
       messageApi.error(`导出失败: ${e}`);
     } finally {
       setExporting(false);
     }
-  }, [onExport, cellBindings, messageApi]);
+  }, [onExport, cellBindings, loopBlocks, summaries, messageApi]);
 
   // ─── 导入 ───
   const handleImport = useCallback(
@@ -149,7 +188,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
               }}
             >
               <Button icon={<ImportOutlined />} loading={importing}>
-                导入
+                导入模板
               </Button>
             </Upload>
           )}
@@ -160,11 +199,33 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
               loading={exporting}
               onClick={handleExport}
             >
-              导出
+              导出报表
             </Button>
           )}
         </div>
       </div>
+
+      {/* 模板栏 */}
+      {templates && templates.length > 0 && (
+        <div className="re-template-bar">
+          <Space size={4} wrap>
+            <span className="re-template-bar__label">
+              <FileTextOutlined /> 快速模板：
+            </span>
+            {templates.map((tpl) => (
+              <Tooltip key={tpl.id} title={tpl.description}>
+                <Button
+                  size="small"
+                  type={activeTemplate === tpl.id ? 'primary' : 'default'}
+                  onClick={() => applyTemplate(tpl)}
+                >
+                  {tpl.label}
+                </Button>
+              </Tooltip>
+            ))}
+          </Space>
+        </div>
+      )}
 
       {/* 三栏主体 */}
       <div className="re-body">
@@ -177,7 +238,7 @@ export const ReportEngine: React.FC<ReportEngineProps> = ({
             <SheetPanel
               ref={sheetRef}
               cellProps={cellProps}
-              loopBlocks={loopBlocks}
+              loopBlocks={loopBlockConfigs}
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
               onFontRequest={onFontRequest}

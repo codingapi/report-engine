@@ -1,0 +1,9 @@
+{
+  "alias": "员工学历",
+  "fields": [
+    { "name": "emp_id", "alias": "工号", "dataType": "STRING" },
+    { "name": "school", "alias": "学校", "dataType": "STRING" },
+    { "name": "major", "alias": "专业", "dataType": "STRING" },
+    { "name": "graduate_time", "alias": "毕业时间", "dataType": "STRING" }
+  ]
+}

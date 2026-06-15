@@ -10,6 +10,16 @@
 .re-header__title { font-size: 16px; font-weight: 600; color: #1f1f1f; }
 .re-header__actions { display: flex; align-items: center; gap: 8px; }
 
+/* ─── 模板栏 ─── */
+.re-template-bar {
+  display: flex; align-items: center;
+  padding: 6px 16px; background: #fafafa;
+  border-bottom: 1px solid #f0f0f0; min-height: 36px;
+}
+.re-template-bar__label {
+  font-size: 13px; color: #666; white-space: nowrap;
+}
+
 /* ─── 主体三栏 ─── */
 .re-body { flex: 1; overflow: hidden; }
 

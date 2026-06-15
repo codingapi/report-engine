@@ -1,0 +1,9 @@
+{
+  "alias": "员工基本信息",
+  "fields": [
+    { "name": "id", "alias": "工号", "dataType": "STRING", "primaryKey": true },
+    { "name": "name", "alias": "姓名", "dataType": "STRING" },
+    { "name": "gender", "alias": "性别", "dataType": "STRING" },
+    { "name": "age", "alias": "年龄", "dataType": "NUMBER" }
+  ]
+}

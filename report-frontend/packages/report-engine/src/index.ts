@@ -35,3 +35,14 @@ export {
   findDataset,
   findField,
 } from './types';
+
+export type { TemplatePreset } from './templates';
+export {
+  ALL_TEMPLATES,
+  simpleListTemplate,
+  mergedListTemplate,
+  statisticsTemplate,
+  masterDetailTemplate,
+  subtotalTemplate,
+  payslipLoopTemplate,
+} from './templates';

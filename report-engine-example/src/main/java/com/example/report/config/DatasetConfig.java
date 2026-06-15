@@ -7,7 +7,11 @@ import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.relation.JoinType;
+import com.codingapi.report.data.relation.RelationOrigin;
+import com.codingapi.report.data.relation.Relationship;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +47,37 @@ public class DatasetConfig {
         return new CsvDataExtractor();
     }
 
+    private List<Relationship> loadRelationships(ObjectMapper mapper) {
+        String path = "classpath:" + datasetsDir + "relationships.json";
+        try {
+            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+            Resource resource = resolver.getResource(path);
+            if (!resource.exists()) return List.of();
+
+            try (InputStream is = resource.getInputStream()) {
+                JsonNode arr = mapper.readTree(is);
+                List<Relationship> result = new ArrayList<>();
+                int idx = 0;
+                for (JsonNode node : arr) {
+                    JsonNode l = node.get("left");
+                    JsonNode r = node.get("right");
+                    result.add(Relationship.builder()
+                            .id("rel-" + (++idx))
+                            .left(new FieldRef(l.get("datasetId").asText(), l.get("field").asText()))
+                            .right(new FieldRef(r.get("datasetId").asText(), r.get("field").asText()))
+                            .joinType(JoinType.valueOf(node.get("joinType").asText()))
+                            .origin(RelationOrigin.MANUAL)
+                            .build());
+                }
+                log.info("加载关系: {} 条", result.size());
+                return result;
+            }
+        } catch (Exception e) {
+            log.warn("加载关系文件失败: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     @Bean
     public DataModel dataModel() throws Exception {
         String pattern = "classpath:" + datasetsDir + "*.json";
@@ -55,7 +90,7 @@ public class DatasetConfig {
 
         for (Resource resource : resources) {
             String filename = resource.getFilename();
-            if (filename == null) continue;
+            if (filename == null || "relationships.json".equals(filename)) continue;
             String id = filename.replace(".json", "");
 
             try (InputStream is = resource.getInputStream()) {
@@ -95,12 +130,15 @@ public class DatasetConfig {
             }
         }
 
+        // 加载关系
+        List<Relationship> relationships = loadRelationships(mapper);
+
         return DataModel.builder()
                 .id("default")
                 .name("默认数据模型")
                 .datasources(datasources)
                 .datasets(new ArrayList<>(datasets))
-                .relationships(List.of())
+                .relationships(relationships)
                 .build();
     }
 }
