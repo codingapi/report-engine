@@ -217,6 +217,12 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             highlightManagerRef.current.sync(props.loopBlocks || {});
         }, [props.loopBlocks]);
 
+        // 同步配置单元格高亮
+        useEffect(() => {
+            if (!highlightManagerRef.current) return;
+            highlightManagerRef.current.syncCells(props.highlightCells || []);
+        }, [props.highlightCells]);
+
         // 同步只读模式
         useEffect(() => {
             const api = univerAPIRef.current;

@@ -5,6 +5,7 @@ import type {
     CellProp,
     FieldDropInfo,
     LoopBlockConfig,
+    CellRange,
     MenuGroupDef,
     MessageConfig,
     ExcelWorkbook,
@@ -46,6 +47,12 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
 
     /** 循环块数据 — 变化时自动同步半透明高亮覆盖 */
     loopBlocks?: Record<string, LoopBlockConfig>;
+
+    /**
+     * 配置单元格 — 变化时自动同步蓝底高亮（非持久装饰层，不写入导出）。
+     * 用于在设计态标识"哪些单元格存在数据/表达式配置"。
+     */
+    highlightCells?: CellRange[];
 
     // ─── 拖拽 ───
 

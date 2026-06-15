@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Spin } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { Spin, Button, Space, Tooltip } from 'antd';
+import { FileTextOutlined } from '@ant-design/icons';
 import { ReportEngine } from '@coding-report/report-engine';
+import type { ReportEngineHandle, TemplatePreset } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow } from '@coding-report/report-engine';
 import { ALL_TEMPLATES } from './templates';
 import { importExcel, fetchFonts, fetchDatasets, renderReport } from '@coding-report/report-api';
@@ -53,11 +55,49 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// ─── 标题区域（含快捷模板） ────────────────────
+
+function TitleBar({
+  templates,
+  activeTemplate,
+  onApply,
+}: {
+  templates: TemplatePreset[];
+  activeTemplate: string | null;
+  onApply: (tpl: TemplatePreset) => void;
+}) {
+  return (
+    <>
+      <span>报表设计器</span>
+      {templates.length > 0 && (
+        <Space size={4} wrap style={{ marginLeft: 12 }}>
+          <span style={{ fontSize: 13, color: '#666', fontWeight: 'normal' }}>
+            <FileTextOutlined /> 快速模板：
+          </span>
+          {templates.map((tpl) => (
+            <Tooltip key={tpl.id} title={tpl.description}>
+              <Button
+                size="small"
+                type={activeTemplate === tpl.id ? 'primary' : 'default'}
+                onClick={() => onApply(tpl)}
+              >
+                {tpl.label}
+              </Button>
+            </Tooltip>
+          ))}
+        </Space>
+      )}
+    </>
+  );
+}
+
 // ─── 页面组件 ──────────────────────────────────
 
 const EnginePage = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const engineRef = useRef<ReportEngineHandle>(null);
 
   useEffect(() => {
     fetchDatasets()
@@ -98,6 +138,11 @@ const EnginePage = () => {
     downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const handleApplyTemplate = (tpl: TemplatePreset) => {
+    engineRef.current?.applyTemplate(tpl);
+    setActiveTemplate(tpl.id);
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -109,8 +154,14 @@ const EnginePage = () => {
   return (
     <ReportEngine
       datasets={datasets}
-      title="报表设计器"
-      templates={ALL_TEMPLATES}
+      title={
+        <TitleBar
+          templates={ALL_TEMPLATES}
+          activeTemplate={activeTemplate}
+          onApply={handleApplyTemplate}
+        />
+      }
+      engineRef={engineRef}
       onImport={handleImport}
       onExport={handleExport}
       onFontRequest={fetchFonts}

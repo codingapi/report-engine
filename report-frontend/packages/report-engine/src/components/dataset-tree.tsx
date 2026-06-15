@@ -5,6 +5,7 @@ import type { Dataset } from '../types';
 
 interface DatasetTreeProps {
   datasets: Dataset[];
+  title?: string;
 }
 
 interface FieldDragData {
@@ -16,7 +17,7 @@ interface FieldDragData {
 /**
  * 数据集树：展示数据集和字段的层级结构，字段节点支持拖拽。
  */
-const DatasetTree: React.FC<DatasetTreeProps> = ({ datasets }) => {
+const DatasetTree: React.FC<DatasetTreeProps> = ({ datasets, title = '数据模型' }) => {
   const treeData = datasets.map((ds) => ({
     key: ds.id,
     title: (
@@ -54,7 +55,7 @@ const DatasetTree: React.FC<DatasetTreeProps> = ({ datasets }) => {
 
   return (
     <div className="re-panel">
-      <div className="re-panel__title">数据集</div>
+      <div className="re-panel__title">{title}</div>
       <div className="re-panel__content">
         <div className="re-dataset-tree">
           <Tree

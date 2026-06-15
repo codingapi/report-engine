@@ -8,6 +8,7 @@ import {
   type FieldDropInfo,
   type CellProp,
   type LoopBlockConfig,
+  type CellRange,
   type FontItem,
   type ExcelWorkbook,
 } from '@coding-report/report-univer';
@@ -28,6 +29,7 @@ export interface SheetCellSelectInfo {
 interface SheetPanelProps {
   cellProps?: Record<string, CellProp[]>;
   loopBlocks?: Record<string, LoopBlockConfig>;
+  highlightCells?: CellRange[];
   onCellSelect?: (info: SheetCellSelectInfo) => void;
   onFieldDrop?: (info: FieldDropInfo, handle: CellHandle) => void;
   onFontRequest?: () => Promise<FontItem[]>;
@@ -38,7 +40,7 @@ interface SheetPanelProps {
  * Univer 电子表格封装：转发 ref 句柄，简化 props 传递。
  */
 const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
-  ({ cellProps, loopBlocks, onCellSelect, onFieldDrop, onFontRequest, onReady }, ref) => {
+  ({ cellProps, loopBlocks, highlightCells, onCellSelect, onFieldDrop, onFontRequest, onReady }, ref) => {
     const univerRef = useRef<UniverSheetHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -66,6 +68,7 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
         style={{ height: '100%' }}
         cellProps={cellProps}
         loopBlocks={loopBlocks}
+        highlightCells={highlightCells}
         onCellSelect={handleCellSelect}
         onFieldDrop={onFieldDrop}
         onFontRequest={onFontRequest}

@@ -1,4 +1,5 @@
 export { ReportEngine } from './report-engine';
+export type { ReportEngineHandle } from './report-engine';
 
 export type {
   // 枚举

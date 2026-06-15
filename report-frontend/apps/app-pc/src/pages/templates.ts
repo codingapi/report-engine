@@ -56,6 +56,7 @@ export const simpleListTemplate: TemplatePreset = {
   summaries: [
     {
       id: 'sum-total',
+      row: 3,
       groupBy: null,
       cells: [
         { column: 0, kind: 'label', payload: '合计' },
@@ -169,6 +170,7 @@ export const subtotalTemplate: TemplatePreset = {
   summaries: [
     {
       id: 'sum-unit',
+      row: 3,
       groupBy: { datasetId: 'salary_detail', field: 'unit' },
       cells: [
         { column: 1, kind: 'label', payload: '${group}小计' },
@@ -177,6 +179,7 @@ export const subtotalTemplate: TemplatePreset = {
     },
     {
       id: 'sum-total',
+      row: 4,
       groupBy: null,
       cells: [
         { column: 0, kind: 'label', payload: '总计' },

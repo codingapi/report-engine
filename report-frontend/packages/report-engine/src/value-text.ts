@@ -1,0 +1,126 @@
+/**
+ * 值 ↔ 文本 互转工具 — 对齐 framework `Templates` 的取值/插值语义。
+ *
+ * 两个用途：
+ * 1. 属性面板修改 value 后，回写到 Univer 单元格的"显示文本"（设计态占位）
+ * 2. Template 值的可逆编辑：parts 结构 ↔ `${...}` 文本字符串
+ */
+
+import type { ReportValue, Dataset, SummaryCell } from './types';
+import { findField } from './types';
+
+// ─── 字段引用 → 别名 ───────────────────────────
+
+/** "datasetId.field" → 字段别名（找不到回退字段名 / 原串） */
+function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
+  if (!ref) return '';
+  const f = findField(datasets, ref);
+  if (f) return f.alias || f.name;
+  const dot = ref.indexOf('.');
+  return dot === -1 ? ref : ref.slice(dot + 1);
+}
+
+// ─── 值 → 单元格显示文本（友好占位） ───────────
+
+/**
+ * 值 → 单元格显示文本。数据绑定类（FieldValue/Aggregate）显示别名/表达式摘要，
+ * 纯文本类（Literal/Template）显示真实文本。
+ */
+export function valueDisplayText(value: ReportValue, datasets: Dataset[]): string {
+  switch (value.type) {
+    case 'Literal':
+      return value.payload || '';
+    case 'FieldValue':
+      return fieldLabel(value.payload, datasets);
+    case 'Aggregate': {
+      const fn = value.aggregation || 'SUM';
+      const inner = value.operand ? valueDisplayText(value.operand, datasets) : '';
+      return `${fn}(${inner})`;
+    }
+    case 'NameRef':
+    case 'ParamValue':
+      return value.payload ? `\${${value.payload}}` : '';
+    case 'LoopFieldValue': {
+      const ref = value.payload || '';
+      const dot = ref.indexOf('.');
+      return dot === -1 ? ref : ref.slice(dot + 1);
+    }
+    case 'FunctionCall': {
+      const args = (value.args || []).map((a) => valueDisplayText(a, datasets)).join(', ');
+      return `${value.funcName || 'fn'}(${args})`;
+    }
+    case 'Template':
+      return templateToString(value);
+    default:
+      return '';
+  }
+}
+
+/** 汇总单元格 → 显示文本：文本格显原文，聚合格显 `SUM(别名)` 摘要 */
+export function summaryCellText(cell: SummaryCell, datasets: Dataset[]): string {
+  if (cell.kind === 'label') return cell.payload || '';
+  const fn = cell.aggregation || 'SUM';
+  return `${fn}(${fieldLabel(cell.payload, datasets)})`;
+}
+
+// ─── Template parts ↔ `${...}` 文本 ────────────
+
+/** Template 节点 → 可逆的 `${...}` 文本（也用作单元格占位） */
+export function templateToString(value: ReportValue): string {
+  if (value.type !== 'Template' || !value.parts) return value.payload || '';
+  return value.parts
+    .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToSource(p.value)}}`))
+    .join('');
+}
+
+/** 洞内表达式 → 源码字符串（用原始 payload，保证可逆 parse） */
+function exprToSource(v: ReportValue | undefined): string {
+  if (!v) return '';
+  switch (v.type) {
+    case 'NameRef':
+    case 'ParamValue':
+    case 'FieldValue':
+    case 'LoopFieldValue':
+    case 'Literal':
+      return v.payload || '';
+    case 'Aggregate':
+      return `${v.aggregation || 'SUM'}(${exprToSource(v.operand)})`;
+    case 'FunctionCall':
+      return `${v.funcName || ''}(${(v.args || []).map(exprToSource).join(', ')})`;
+    default:
+      return '';
+  }
+}
+
+const HOLE_RE = /\$\{([^}]*)\}/g;
+const AGG_RE = /^(COUNT_DISTINCT|COUNT|SUM|AVG|MAX|MIN)\(([^)]*)\)$/;
+
+/**
+ * `${...}` 文本 → Template 节点（对齐 Java `Templates.parse` 核心规则）：
+ * - `${name}` → NameRef（晚绑定）
+ * - `${d.field}` → FieldValue（含 `.` 的限定引用）
+ * - `${SUM(d.field)}` → Aggregate（聚合函数）
+ */
+export function parseTemplate(str: string): ReportValue {
+  const parts: NonNullable<ReportValue['parts']> = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  HOLE_RE.lastIndex = 0;
+  while ((m = HOLE_RE.exec(str)) !== null) {
+    if (m.index > last) parts.push({ kind: 'text', text: str.slice(last, m.index) });
+    parts.push({ kind: 'hole', value: parseExpr(m[1].trim()) });
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) parts.push({ kind: 'text', text: str.slice(last) });
+  return { type: 'Template', parts };
+}
+
+/** 洞内表达式源码 → Value 节点 */
+function parseExpr(expr: string): ReportValue {
+  const agg = AGG_RE.exec(expr);
+  if (agg) {
+    return { type: 'Aggregate', aggregation: agg[1] as ReportValue['aggregation'], operand: parseExpr(agg[2].trim()) };
+  }
+  if (expr.includes('.')) return { type: 'FieldValue', payload: expr };
+  return { type: 'NameRef', payload: expr };
+}

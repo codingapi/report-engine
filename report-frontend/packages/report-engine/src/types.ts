@@ -4,6 +4,7 @@
  * 枚举值使用大写字符串联合类型，与 Java enum name() 一致。
  */
 
+import type { ReactNode } from 'react';
 import type { ExcelWorkbook, FontItem } from '@coding-report/report-univer';
 
 // ─── 枚举 ─────────────────────────────────────
@@ -125,6 +126,11 @@ export interface SummaryCell {
 
 export interface SummaryRow {
   id: string;
+  /**
+   * 设计态锚定行号（0-based）——汇总行在模板表格中占据的实际行。
+   * 仅前端设计态使用；渲染时 framework 仍按 groupBy 动态追加，后端忽略此字段。
+   */
+  row: number;
   groupBy: { datasetId: string; field: string } | null;
   cells: SummaryCell[];
 }
@@ -163,8 +169,8 @@ export interface TemplatePreset {
 export interface ReportEngineProps {
   /** 数据集列表（由父组件从 API 获取后传入） */
   datasets: Dataset[];
-  /** 报表标题 */
-  title?: string;
+  /** 报表标题（支持 ReactNode，可在标题区域嵌入自定义内容） */
+  title?: ReactNode;
   /** 导出回调：接收配置 + 表格快照 */
   onExport?: (
     bindings: CellBinding[],
