@@ -195,7 +195,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       || sheetRef.current?.getActiveSheetId() || 'sheet1';
     for (const s of summaries) {
       for (const cell of s.cells) {
-        if (cell.kind !== 'agg') continue;
+        // 聚合格、或含 ${} 占位的标签格（如 ${group}小计）都属于配置项
+        const isExpr = cell.kind === 'agg' || /\$\{[^}]*\}/.test(cell.payload || '');
+        if (!isExpr) continue;
         ranges.push({ sheetId: sumSheet, startRow: s.row, startColumn: cell.column, endRow: s.row, endColumn: cell.column });
       }
     }

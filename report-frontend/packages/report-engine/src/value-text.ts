@@ -20,47 +20,56 @@ function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
   return dot === -1 ? ref : ref.slice(dot + 1);
 }
 
-// ─── 值 → 单元格显示文本（友好占位） ───────────
+// ─── 值 → 单元格显示文本（统一 ${} + 友好别名） ───
 
 /**
- * 值 → 单元格显示文本。数据绑定类（FieldValue/Aggregate）显示别名/表达式摘要，
- * 纯文本类（Literal/Template）显示真实文本。
+ * 表达式 → `${}` 内部的友好字符串（不含 ${} 包裹）。
+ * 数据模型字段显示别名；运行时名字（NameRef/ParamValue）显示名字本身。
  */
-export function valueDisplayText(value: ReportValue, datasets: Dataset[]): string {
-  switch (value.type) {
+function exprToDisplay(v: ReportValue, datasets: Dataset[]): string {
+  switch (v.type) {
     case 'Literal':
-      return value.payload || '';
+      return v.payload || '';
     case 'FieldValue':
-      return fieldLabel(value.payload, datasets);
-    case 'Aggregate': {
-      const fn = value.aggregation || 'SUM';
-      const inner = value.operand ? valueDisplayText(value.operand, datasets) : '';
-      return `${fn}(${inner})`;
-    }
-    case 'NameRef':
-    case 'ParamValue':
-      return value.payload ? `\${${value.payload}}` : '';
+      return fieldLabel(v.payload, datasets);
     case 'LoopFieldValue': {
-      const ref = value.payload || '';
+      const ref = v.payload || '';
       const dot = ref.indexOf('.');
       return dot === -1 ? ref : ref.slice(dot + 1);
     }
-    case 'FunctionCall': {
-      const args = (value.args || []).map((a) => valueDisplayText(a, datasets)).join(', ');
-      return `${value.funcName || 'fn'}(${args})`;
-    }
-    case 'Template':
-      return templateToString(value);
+    case 'NameRef':
+    case 'ParamValue':
+      return v.payload || '';
+    case 'Aggregate':
+      return `${v.aggregation || 'SUM'}(${v.operand ? exprToDisplay(v.operand, datasets) : ''})`;
+    case 'FunctionCall':
+      return `${v.funcName || 'fn'}(${(v.args || []).map((a) => exprToDisplay(a, datasets)).join(', ')})`;
     default:
       return '';
   }
 }
 
-/** 汇总单元格 → 显示文本：文本格显原文，聚合格显 `SUM(别名)` 摘要 */
+/**
+ * 值 → 单元格显示文本（设计态占位）。统一规则：
+ * - 纯文本 Literal：直接显示文字，不带 ${}
+ * - Template：文本段原样 + 每个洞包成 ${友好表达式}
+ * - 其余取值/计算类（字段/聚合/函数/名称引用）：整体包成 ${友好表达式}
+ */
+export function valueDisplayText(value: ReportValue, datasets: Dataset[]): string {
+  if (value.type === 'Literal') return value.payload || '';
+  if (value.type === 'Template') {
+    if (!value.parts) return '';
+    return value.parts
+      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets)}}`))
+      .join('');
+  }
+  return `\${${exprToDisplay(value, datasets)}}`;
+}
+
+/** 汇总单元格 → 显示文本：文本格显原文（含 ${group}），聚合格显 ${SUM(别名)} */
 export function summaryCellText(cell: SummaryCell, datasets: Dataset[]): string {
   if (cell.kind === 'label') return cell.payload || '';
-  const fn = cell.aggregation || 'SUM';
-  return `${fn}(${fieldLabel(cell.payload, datasets)})`;
+  return `\${${cell.aggregation || 'SUM'}(${fieldLabel(cell.payload, datasets)})}`;
 }
 
 // ─── Template parts ↔ `${...}` 文本 ────────────

@@ -113,6 +113,28 @@
 .re-prop-func-arg-row { display: flex; gap: 4px; align-items: center; }
 .re-prop-func-arg-row > :first-child { flex: 1; min-width: 0; }
 
+/* ─── 表达式实时预览 ─── */
+.re-prop-expr-preview {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 6px 8px;
+  background: #f0f6ff; border: 1px solid #d6e4ff; border-radius: 4px;
+}
+.re-prop-expr-preview__label {
+  font-size: 11px; color: #1677ff; flex-shrink: 0; font-weight: 500;
+}
+.re-prop-expr-preview code {
+  font-size: 12px; color: #1554ad; word-break: break-all;
+  background: transparent; padding: 0;
+}
+
+/* ─── 分组小计 ${group} 提示 ─── */
+.re-prop-group-hint {
+  margin-top: 4px; font-size: 11px; color: #999; line-height: 1.6;
+}
+.re-prop-group-hint code {
+  background: #f0f0f0; padding: 0 4px; border-radius: 2px; color: #d63384;
+}
+
 /* ─── 扩展设置编辑器 ─── */
 .re-prop-exp-section { margin-bottom: 12px; }
 .re-prop-exp-section__label {

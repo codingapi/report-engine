@@ -3,6 +3,7 @@ import { Button, Input, Select, Radio, Popconfirm, Space } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { SummaryRow, SummaryCell, Dataset, Aggregation } from '../../types';
 import { findDataset, AGG_LABELS } from '../../types';
+import { summaryCellText } from '../../value-text';
 import SectionLabel from './section-label';
 
 interface SummaryRowEditorProps {
@@ -49,6 +50,13 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   };
 
   const { datasetId } = parseRef(cell?.payload || '');
+
+  // 当前分组字段别名（用于 ${group} 说明）
+  const groupFieldLabel = isGroup
+    ? findDataset(datasets, summaryRow.groupBy!.datasetId)?.fields.find(
+        (f) => f.name === summaryRow.groupBy!.field,
+      )?.alias || summaryRow.groupBy!.field || '分组'
+    : '';
 
   return (
     <div>
@@ -139,12 +147,29 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
             </Radio.Group>
 
             {cell.kind === 'label' ? (
-              <Input
-                size="small"
-                value={cell.payload}
-                onChange={(e) => setCell({ payload: e.target.value })}
-                placeholder={isGroup ? '${group}小计' : '合计'}
-              />
+              <>
+                <Input
+                  size="small"
+                  value={cell.payload}
+                  onChange={(e) => setCell({ payload: e.target.value })}
+                  placeholder={isGroup ? '${group}小计' : '合计'}
+                />
+                {isGroup && (
+                  <div className="re-prop-group-hint">
+                    <span>
+                      可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）
+                    </span>
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => setCell({ payload: `${cell.payload || ''}\${group}` })}
+                      style={{ padding: 0 }}
+                    >
+                      插入 ${'{group}'}
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="re-prop-field-cascade">
                 <Select
@@ -180,6 +205,11 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
                 />
               </div>
             )}
+
+            <div className="re-prop-expr-preview">
+              <span className="re-prop-expr-preview__label">单元格预览</span>
+              <code>{summaryCellText(cell, datasets) || '（空）'}</code>
+            </div>
 
             <Button
               type="link"

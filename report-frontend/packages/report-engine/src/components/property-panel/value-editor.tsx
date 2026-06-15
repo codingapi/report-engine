@@ -12,7 +12,7 @@ import {
   AGG_LABELS,
   findDataset,
 } from '../../types';
-import { templateToString, parseTemplate } from '../../value-text';
+import { templateToString, parseTemplate, valueDisplayText } from '../../value-text';
 
 interface ValueEditorProps {
   value: ReportValue;
@@ -323,6 +323,12 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
     <div>
       {typeSelector}
       {form}
+      {!compact && (
+        <div className="re-prop-expr-preview">
+          <span className="re-prop-expr-preview__label">表达式预览</span>
+          <code>{valueDisplayText(value, datasets) || '（空）'}</code>
+        </div>
+      )}
     </div>
   );
 };
