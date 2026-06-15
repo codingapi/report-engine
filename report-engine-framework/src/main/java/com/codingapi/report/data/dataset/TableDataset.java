@@ -34,7 +34,7 @@ public final class TableDataset implements Dataset {
 
     /**
      * 字段列表：描述该表有哪些列、每列的类型和是否主键。
-     * <p>报表的 {@code FieldCell} 通过 {@link FieldRef} 引用这里的字段，而非直接写字段名字符串。
+     * <p>报表的 {@link com.codingapi.report.expression.Value.FieldValue} 通过 {@link FieldRef} 引用这里的字段，而非直接写字段名字符串。
      */
     private List<Field> fields;
 }

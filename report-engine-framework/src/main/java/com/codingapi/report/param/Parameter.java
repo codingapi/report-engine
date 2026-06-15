@@ -22,7 +22,7 @@ import lombok.Data;
  * </ul>
  *
  * <h3>循环字段不是参数</h3>
- * <p>循环块的迭代值（如"当前员工的 id"）通过 {@link ValueRef.LoopField} 直接引用，
+ * <p>循环块的迭代值（如"当前员工的 id"）通过 {@link com.codingapi.report.expression.Value.LoopFieldValue} 直接引用，
  * 无需在 Parameter 列表里登记。这避免了 Parameter 列表被循环变量污染。
  * <p>两者在作用域链中共同构成可引用的取值来源：
  * <pre>
@@ -41,7 +41,7 @@ import lombok.Data;
 @Data
 @Builder
 public class Parameter {
-    /** 参数名，被 {@link ValueRef.Param} 引用（如 {@code :deptId}） */
+    /** 参数名，被 {@link com.codingapi.report.expression.Value.ParamValue} 引用（如 {@code :deptId}） */
     private String name;
     /** 数据类型，决定前端参数面板的输入控件和后端值转换 */
     private DataType dataType;

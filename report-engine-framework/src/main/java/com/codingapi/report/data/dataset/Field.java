@@ -9,7 +9,7 @@ import lombok.Data;
  * <h3>在模型中的位置</h3>
  * <pre>
  *   Dataset → List&lt;Field&gt;     ← 你在这里
- *   FieldCell → FieldRef(datasetId, field) → 按 name 找到本对象
+ *   Value.FieldValue → FieldRef(datasetId, field) → 按 name 找到本对象
  * </pre>
  * Field 是数据集的 schema 描述，报表通过 {@link FieldRef}（datasetId + 字段名）引用它，
  * 渲染时再按 name 查到具体的 Field 对象获取 {@link #dataType} 等信息。

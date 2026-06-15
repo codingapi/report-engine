@@ -22,7 +22,7 @@ import java.util.List;
  * <pre>
  *   员工报表 + SummaryRow(groupBy=单位) + SummaryRow(groupBy=null)：
  *
- *   单位  部门  姓名  工资        ← 表头（FieldCell）
+ *   单位  部门  姓名  工资        ← 表头（CellBinding）
  *   总部  研发  张三  8000
  *   总部  研发  李四  9000
  *   总部  测试  王五  7500

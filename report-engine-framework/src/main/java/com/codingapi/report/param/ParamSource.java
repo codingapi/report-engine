@@ -33,10 +33,10 @@ import com.codingapi.report.render.grid.CellRef;
  * <p>参数来源只有这三种（穷尽），密封接口 + record 实现让编译器帮助检查完整性：
  * 如果新增了一种来源，所有 switch/instanceof 的地方都会编译报错，强制处理新情况。
  *
- * <h3>与 ValueRef 的关系</h3>
+ * <h3>与 Value 表达式的关系</h3>
  * <p>ParamSource 决定参数"从哪取值"（配置视角），
- * {@link ValueRef} 决定条件右值"引用什么"（使用视角）。
- * ParamSource.External 参数 → 被 ValueRef.Param 引用 → 运行时求值。
+ * {@link com.codingapi.report.expression.Value} 表达式决定单元格/条件/汇总"计算什么值"（使用视角）。
+ * ParamSource.External 参数 → 被 {@code Value.ParamValue} 引用 → 运行时求值。
  */
 public sealed interface ParamSource
         permits ParamSource.External, ParamSource.Cell, ParamSource.Constant {

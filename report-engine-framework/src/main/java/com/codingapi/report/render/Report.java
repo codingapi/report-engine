@@ -85,16 +85,19 @@ public class Report {
      * 报表级参数列表。
      * <p>其中 {@code ParamSource.External} 类型的参数合起来就是这张报表的运行时输入契约
      * （调用方 {@code render(reportId, {deptId:5})} 时传入的键值对）。
-     * <p>循环块的迭代值不是参数，通过 {@link com.codingapi.report.param.ValueRef.LoopField} 直接引用。
+     * <p>循环块的迭代值不是参数，通过 {@link com.codingapi.report.expression.Value.LoopFieldValue} 直接引用。
      */
     private List<Parameter> parameters;
 
     /**
      * 格子绑定列表：覆盖在模板格子上的动态语义。
-     * <p>密封接口 {@link CellBinding} 的两个实现：
+     * <p>每个 {@link CellBinding} 包含值层（{@link com.codingapi.report.expression.Value} 表达式树）
+     * 和控制层（扩展方向、分组模式、合并、父格链、过滤条件）。
      * <ul>
-     *   <li>{@link com.codingapi.report.render.grid.TextCell} — 文本 + 参数占位（如"${year}年度报表"）</li>
-     *   <li>{@link com.codingapi.report.render.grid.FieldCell} — 数据字段绑定 + 扩展 + 分组 + 条件</li>
+     *   <li>值层 — 纯文本用 {@code Value.Template}，字段读取用 {@code Value.FieldValue}，
+     *       聚合用 {@code Value.Aggregate}，格式化用 {@code Value.FunctionCall}</li>
+     *   <li>控制层 — 由 expansion / expandMode / mergeRepeated / parentCell / conditions 控制
+     *       值如何在格子上铺开</li>
      * </ul>
      * 没有任何动态行为的纯静态格子（如表头"员工姓名"）不需要绑定，直接写在模板里。
      */
@@ -104,7 +107,7 @@ public class Report {
      * 循环块列表：带迭代上下文的扩展容器。
      * <p>典型场景：薪资条——每个人的薪资信息按模板循环呈现。
      * 每个循环块绑定一个 {@link com.codingapi.report.data.dataset.Query}（数据集 + 过滤 + 分组），
-     * 决定迭代的范围和顺序。块内格子可通过 {@link com.codingapi.report.param.ValueRef.LoopField}
+     * 决定迭代的范围和顺序。块内格子可通过 {@link com.codingapi.report.expression.Value.LoopFieldValue}
      * 引用当前迭代行的字段。
      */
     private List<LoopBlock> loopBlocks;

@@ -67,7 +67,7 @@ import java.util.Set;
  *         d. 文本格子（${placeholder} 替换）和单值格子（聚合/首值）
  *     3. renderLoop   — 渲染每个循环块：
  *         a. 提取驱动数据集并过滤/去重
- *         b. 逐次迭代：更新 ParamContext → 渲染块内格子（TextCell 替换、CellBinding 取数）
+ *         b. 逐次迭代：更新 ParamContext → 渲染块内格子（CellBinding 的 Value 表达式求值）
  *     4. buildWorkbook — 把画布转为 Workbook 输出
  * </pre>
  *
@@ -148,8 +148,8 @@ public class ReportRenderer {
      *
      * <h3>处理步骤</h3>
      * <ol>
-     *   <li>分类：将 cellBindings 分为 TextCell（文本占位）和 CellBinding（数据绑定），
-     *       跳过属于循环块范围内的格子（那些由 {@link #renderLoop} 处理）</li>
+     *   <li>分类：收集 cellBindings（跳过属于循环块范围内的格子，那些由 {@link #renderLoop} 处理），
+     *       按 expansion 分为纵向带和单值格</li>
      *   <li>提取 + JOIN：收集所有 CellBinding 引用的数据集，按 Relationship 链式 join 成组合表</li>
      *   <li>过滤：收集所有格子的条件，AND 求解后过滤组合表</li>
      *   <li>分组：CellBinding 按 expansion 分为纵向带（VERTICAL）和单值格（NONE/HORIZONTAL）</li>
@@ -372,16 +372,16 @@ public class ReportRenderer {
      *   <li>逐次迭代：
      *       <ul>
      *         <li>更新 ParamContext 的循环作用域（当前行的字段值）</li>
-     *         <li>TextCell：占位符替换（循环字段优先于报表参数）</li>
-     *         <li>CellBinding 绑定驱动数据集的字段：直接从当前迭代行取值</li>
-     *         <li>CellBinding 绑定其他数据集的字段：独立提取 + 按条件过滤（条件里可引用循环字段）+ 取首值或聚合</li>
+     *         <li>CellBinding 的 Value 表达式求值（循环字段优先于报表参数）</li>
+     *         <li>绑定驱动数据集的字段：直接从当前迭代行取值</li>
+     *         <li>绑定其他数据集的字段：独立提取 + 按条件过滤（条件里可引用循环字段）+ 取首值或聚合</li>
      *       </ul></li>
      * </ol>
      *
      * <h3>跨数据集取数（子查询模式）</h3>
      * <p>当循环块内的 CellBinding 绑定的是非驱动数据集时（如循环员工，但格子显示的是该员工的学历），
      * 引擎独立提取该数据集并按格子的 conditions 过滤。条件右值可以引用循环字段
-     * （{@link com.codingapi.report.param.ValueRef.LoopField}），
+     * （{@link com.codingapi.report.expression.Value.LoopFieldValue}），
      * 实现"父迭代传键 → 子查询"的效果。
      */
     private void renderLoop(Report report, LoopBlock loop, ParamContext ctx, Canvas canvas) {
@@ -911,7 +911,7 @@ public class ReportRenderer {
     /**
      * 去除限定名前缀：{@code {"employees.name": "张三"}} → {@code {"name": "张三"}}。
      * <p>循环作用域里的字段名不带 datasetId 前缀（循环只引用一个驱动数据集，字段名天然唯一），
-     * 这样 ValueRef.LoopField 可以直接用裸字段名引用。
+     * 这样 {@link com.codingapi.report.expression.Value.LoopFieldValue} 可以直接用裸字段名引用。
      */
     private Map<String, Object> unqualify(Map<String, Object> row, String datasetId) {
         String prefix = datasetId + ".";

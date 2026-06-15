@@ -27,7 +27,7 @@ package com.codingapi.report.render.grid;
  * <pre>
  *   单位(GROUP) → 部门(GROUP) → 姓名(LIST) → 工资(LIST)
  * </pre>
- * GROUP 列通常配合 {@link FieldCell#isMergeRepeated()} 把相邻相同值合并为跨行单元格。
+ * GROUP 列通常配合 {@link CellBinding#isMergeRepeated()} 把相邻相同值合并为跨行单元格。
  */
 public enum ExpandMode {
     /** 按值去重分组：相邻相同值只出一行/列，用于分组列表头 */

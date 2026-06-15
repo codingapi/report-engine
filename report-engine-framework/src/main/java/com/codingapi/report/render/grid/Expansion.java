@@ -12,7 +12,7 @@ package com.codingapi.report.render.grid;
  *   <li>{@link #VERTICAL}（纵向扩展 / 行关系）：一条记录占一行，数据向下铺开。
  *       最常见的模式——员工列表、销售明细等都是纵向扩展。
  *       <pre>
- *         姓名 │ 部门 │ 工资     ← 模板行（FieldCell × 3）
+ *         姓名 │ 部门 │ 工资     ← 模板行（CellBinding × 3）
  *         张三 │ 研发 │ 8000     ← 第 1 条记录
  *         李四 │ 测试 │ 7000     ← 第 2 条记录
  *       </pre></li>

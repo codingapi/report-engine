@@ -25,7 +25,7 @@ import java.util.List;
  *       <b>可下推</b>到源 SELECT 的 WHERE，减少入内存的行数
  *       （如 DB 类型可直接拼成 SQL WHERE 子句）</li>
  *   <li>跨数据集 / join 之后的条件 → 留在 Java 加工层（不在 Query 里，
- *       而是放在 {@link com.codingapi.report.render.grid.FieldCell#getConditions()} 里）</li>
+ *       而是放在 {@link com.codingapi.report.render.grid.CellBinding#getConditions()} 里）</li>
  * </ul>
  *
  * <h3>分组与迭代的关系</h3>
@@ -48,10 +48,9 @@ public class Query {
     private String datasetId;
     /**
      * 本数据集上的过滤条件。
-     * <p>条件右值可以是字面量（{@link com.codingapi.report.param.ValueRef.Literal}）、
-     * 报表参数（{@link com.codingapi.report.param.ValueRef.Param}）或
-     * 循环字段（{@link com.codingapi.report.param.ValueRef.LoopField}），
-     * 使过滤范围能被运行时动态控制。
+     * <p>条件的左右值都是 {@link com.codingapi.report.expression.Value} 表达式，
+     * 可以是字面量（{@code Value.Literal}）、报表参数（{@code Value.ParamValue}）、
+     * 循环字段（{@code Value.LoopFieldValue}）等，使过滤范围能被运行时动态控制。
      */
     private List<com.codingapi.report.operator.condition.Condition> filters;
     /**

@@ -12,8 +12,8 @@ import lombok.Data;
  * <pre>
  *   模板（一次定义）：
  *   ┌────────────────────────────┐
- *   │ 姓名: ${name}    部门: ${dept} │  ← TextCell 引用 LoopField
- *   │ 基本工资: ${base}  奖金: ${bonus}│  ← FieldCell 引用 LoopField
+ *   │ 姓名: ${name}    部门: ${dept} │  ← CellBinding(value=Template) 引用 LoopFieldValue
+ *   │ 基本工资: ${base}  奖金: ${bonus}│  ← CellBinding(value=FieldValue) 引用 LoopFieldValue
  *   │ 合计: ${total}                  │
  *   └────────────────────────────┘
  *

@@ -6,7 +6,7 @@ package com.codingapi.report.render.grid;
  * <h3>在模型中的使用场景</h3>
  * <ul>
  *   <li>{@link CellBinding#getCell()} — 每个格子绑定的目标坐标</li>
- *   <li>{@link FieldCell#getParentCell()} — 父格的坐标引用（串成父格链）</li>
+ *   <li>{@link CellBinding#getParentCell()} — 父格的坐标引用（串成父格链）</li>
  *   <li>{@link LoopBlock#getStart()} / {@link LoopBlock#getEnd()} — 循环区域的范围</li>
  *   <li>{@link com.codingapi.report.param.ParamSource.Cell} — 单元格联动的取值源</li>
  * </ul>

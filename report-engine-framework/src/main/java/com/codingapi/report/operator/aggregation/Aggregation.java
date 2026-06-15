@@ -5,10 +5,10 @@ package com.codingapi.report.operator.aggregation;
  *
  * <h3>使用场景</h3>
  * <ul>
- *   <li>{@link FieldCell} 的 {@link FieldCell#getAggregation()}：
- *       格子级别的聚合，常用于 expansion=NONE 取单值（如"员工总数"），
+ *   <li>{@link com.codingapi.report.expression.Value.Aggregate} 节点：
+ *       格子级别的聚合，常用于 {@code expansion=NONE} 取单值（如"员工总数"），
  *       或配合 GROUP 模式在分组级别汇总</li>
- *   <li>{@link SummaryCell} 的 {@link SummaryCell#getAggregation()}：
+ *   <li>{@link SummaryCell} 的 {@link SummaryCell#getValue()} 返回 {@code Value.Aggregate}：
  *       小计/总计行中的聚合计算（如"部门工资合计"）</li>
  * </ul>
  *
