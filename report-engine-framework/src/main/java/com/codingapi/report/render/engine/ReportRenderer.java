@@ -28,6 +28,7 @@ import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.param.ParamContext;
 import com.codingapi.report.expression.EvalContext;
 import com.codingapi.report.expression.ExpressionEngine;
+import com.codingapi.report.expression.Templates;
 import com.codingapi.report.expression.Value;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -204,9 +205,9 @@ public class ReportRenderer {
         }
     }
 
-    /** 单值/文本格子求值：聚合走行集合，其余走首行（无数据则空行，纯文本/参数照样可算）。 */
+    /** 单值/文本格子求值：含聚合走行集合，其余走首行（无数据则空行，纯文本/参数照样可算）。 */
     private Object evalSingle(CellBinding b, RawTable filtered, ParamContext ctx) {
-        if (b.getValue() instanceof Value.Aggregate) {
+        if (Templates.containsAggregate(b.getValue())) {
             List<Map<String, Object>> rows = filtered == null ? List.of() : filtered.getRows();
             return engine.eval(b.getValue(), EvalContext.aggregate(rows, ctx));
         }
