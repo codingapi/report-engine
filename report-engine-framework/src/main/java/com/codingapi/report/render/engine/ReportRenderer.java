@@ -6,18 +6,15 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
-import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.operator.aggregation.Aggregators;
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.FieldCell;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
-import com.codingapi.report.render.grid.TextCell;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;
@@ -30,6 +27,9 @@ import com.codingapi.report.data.dataset.UnionMember;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.param.ParamContext;
+import com.codingapi.report.expression.EvalContext;
+import com.codingapi.report.expression.ExpressionEngine;
+import com.codingapi.report.expression.Value;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
@@ -43,8 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 报表渲染器：引擎的核心类，把"报表配置 + 数据 + 运行时参数"算成一个 Univer/Excel {@link Workbook}。
@@ -70,7 +68,7 @@ import java.util.regex.Pattern;
  *         d. 文本格子（${placeholder} 替换）和单值格子（聚合/首值）
  *     3. renderLoop   — 渲染每个循环块：
  *         a. 提取驱动数据集并过滤/去重
- *         b. 逐次迭代：更新 ParamContext → 渲染块内格子（TextCell 替换、FieldCell 取数）
+ *         b. 逐次迭代：更新 ParamContext → 渲染块内格子（TextCell 替换、CellBinding 取数）
  *     4. buildWorkbook — 把画布转为 Workbook 输出
  * </pre>
  *
@@ -91,8 +89,6 @@ import java.util.regex.Pattern;
 public class ReportRenderer {
 
     private static final JsonNodeFactory NF = JsonNodeFactory.instance;
-    /** 匹配文本占位符的正则：${name} 格式，捕获 name 部分 */
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{(\\w+)}");
 
     /** 注册的提取器列表，每种 DataSourceType 一个实现 */
     private final List<DataExtractor> extractors;
@@ -101,6 +97,8 @@ public class ReportRenderer {
     private DataModel dm;
     /** 数据集提取缓存：同一数据集在一次渲染中只提取一次，后续直接复用 */
     private final Map<String, RawTable> cache = new HashMap<>();
+    /** 表达式引擎：所有格子的值（文本插值/字段/聚合/格式化）统一经它求值 */
+    private final ExpressionEngine engine = new ExpressionEngine();
 
     /**
      * @param extractors 已注册的提取器列表（如 [CsvDataExtractor, DbDataExtractor, ...]）
@@ -151,11 +149,11 @@ public class ReportRenderer {
      *
      * <h3>处理步骤</h3>
      * <ol>
-     *   <li>分类：将 cellBindings 分为 TextCell（文本占位）和 FieldCell（数据绑定），
+     *   <li>分类：将 cellBindings 分为 TextCell（文本占位）和 CellBinding（数据绑定），
      *       跳过属于循环块范围内的格子（那些由 {@link #renderLoop} 处理）</li>
-     *   <li>提取 + JOIN：收集所有 FieldCell 引用的数据集，按 Relationship 链式 join 成组合表</li>
+     *   <li>提取 + JOIN：收集所有 CellBinding 引用的数据集，按 Relationship 链式 join 成组合表</li>
      *   <li>过滤：收集所有格子的条件，AND 求解后过滤组合表</li>
-     *   <li>分组：FieldCell 按 expansion 分为纵向带（VERTICAL）和单值格（NONE/HORIZONTAL）</li>
+     *   <li>分组：CellBinding 按 expansion 分为纵向带（VERTICAL）和单值格（NONE/HORIZONTAL）</li>
      *   <li>纵向带渲染：先渲染带（产出 N 行），计算 shift = N - 1（模板里带占 1 行，实际展开 N 行）</li>
      *   <li>其他格子：带下方的格子（如总计行、标题等）坐标下移 shift 行，自适应数据量</li>
      * </ol>
@@ -166,57 +164,56 @@ public class ReportRenderer {
      * 这样无论数据量怎么变，下方的总计行、页脚等始终紧跟在数据之后。
      */
     private void renderFree(Report report, ParamContext ctx, Canvas canvas) {
-        // 1. 分类：文本格子 vs 数据格子，跳过循环块内的
-        List<TextCell> textCells = new ArrayList<>();
-        List<FieldCell> fieldCells = new ArrayList<>();
+        // 1. 收集非循环区格子：纵向扩展的进"带"，其余进"单值/文本"；引用字段的进"数据格子"
+        List<CellBinding> band = new ArrayList<>();
+        List<CellBinding> singles = new ArrayList<>();
+        List<CellBinding> dataCells = new ArrayList<>();
         for (CellBinding b : report.getCellBindings()) {
             if (inAnyLoop(report, b.getCell())) {
                 continue;
             }
-            if (b instanceof TextCell tc) {
-                textCells.add(tc);
-            } else if (b instanceof FieldCell fc) {
-                fieldCells.add(fc);
+            (b.getExpansion() == Expansion.VERTICAL ? band : singles).add(b);
+            if (referencesData(b)) {
+                dataCells.add(b);
             }
         }
 
-        // 2. 提取 + JOIN + 过滤 + 分组
+        // 2. 提取 + JOIN + 过滤（仅当有格子引用字段）
         RawTable filtered = null;
-        List<FieldCell> band = new ArrayList<>();     // 纵向扩展的格子（一行一条记录）
-        List<FieldCell> singles = new ArrayList<>();  // 不扩展的格子（聚合单值或首值）
-        if (!fieldCells.isEmpty()) {
-            RawTable combined = buildCombinedTable(fieldCells);
-            filtered = Operators.filter(combined, collectConditions(fieldCells), ctx);
-            for (FieldCell fc : fieldCells) {
-                (fc.getExpansion() == Expansion.VERTICAL ? band : singles).add(fc);
-            }
+        if (!dataCells.isEmpty()) {
+            RawTable combined = buildCombinedTable(dataCells);
+            filtered = Operators.filter(combined, collectConditions(dataCells), ctx);
         }
 
         // 3. 先渲染纵向带，拿到展开行数 N 与带的起始行
         int n = 0;
         int bandBase = Integer.MAX_VALUE;
         if (!band.isEmpty()) {
-            for (FieldCell fc : band) {
-                bandBase = Math.min(bandBase, fc.getCell().row());
+            for (CellBinding b : band) {
+                bandBase = Math.min(bandBase, b.getCell().row());
             }
-            n = renderBand(band, report.getSummaries(), filtered, bandBase, canvas);
+            n = renderBand(band, report.getSummaries(), filtered, bandBase, ctx, canvas);
         }
         final int shift = n > 0 ? n - 1 : 0;  // 纵向带多出来的行数
         final int base = bandBase;
 
-        // 4. 文本格子：占位符替换，带下方的行下移 shift
-        for (TextCell tc : textCells) {
-            int row = tc.getCell().row() > base ? tc.getCell().row() + shift : tc.getCell().row();
-            place(canvas, tc.getCell(), row, tc.getCell().column(), substitute(tc.getTemplate(), ctx));
+        // 4. 单值/文本格子：表达式求值，带下方的行下移 shift
+        for (CellBinding b : singles) {
+            Object v = evalSingle(b, filtered, ctx);
+            int row = b.getCell().row() > base ? b.getCell().row() + shift : b.getCell().row();
+            place(canvas, b.getCell(), row, b.getCell().column(), v);
         }
-        // 5. 单值格子：聚合或取首值，带下方的行下移 shift
-        for (FieldCell fc : singles) {
-            Object v = isAgg(fc)
-                    ? Aggregators.aggregate(fc.getAggregation(), filtered.getRows(), fc.getField())
-                    : firstValue(filtered, fc.getField());
-            int row = fc.getCell().row() > base ? fc.getCell().row() + shift : fc.getCell().row();
-            place(canvas, fc.getCell(), row, fc.getCell().column(), v);
+    }
+
+    /** 单值/文本格子求值：聚合走行集合，其余走首行（无数据则空行，纯文本/参数照样可算）。 */
+    private Object evalSingle(CellBinding b, RawTable filtered, ParamContext ctx) {
+        if (b.getValue() instanceof Value.Aggregate) {
+            List<Map<String, Object>> rows = filtered == null ? List.of() : filtered.getRows();
+            return engine.eval(b.getValue(), EvalContext.aggregate(rows, ctx));
         }
+        Map<String, Object> row = (filtered != null && !filtered.getRows().isEmpty())
+                ? filtered.getRows().get(0) : null;
+        return engine.eval(b.getValue(), EvalContext.scalar(row, ctx));
     }
 
     /**
@@ -227,23 +224,23 @@ public class ReportRenderer {
      * <p>聚合列（agg）按 parentCell 决定汇总层级：parent 指向粗粒度分组列 → 跨该组明细行合并
      * （如"总人数"按单位汇总、跨部门行合并）；不指定则按最细粒度逐行算。
      */
-    private int renderBand(List<FieldCell> band, List<SummaryRow> summaries, RawTable filtered,
-                           int bandBase, Canvas canvas) {
-        List<FieldCell> groupCols = new ArrayList<>();
-        List<FieldCell> listCols = new ArrayList<>();
-        List<FieldCell> aggCols = new ArrayList<>();
-        for (FieldCell fc : band) {
-            if (isAgg(fc)) {
-                aggCols.add(fc);
-            } else if (fc.getExpandMode() == ExpandMode.GROUP) {
-                groupCols.add(fc);
+    private int renderBand(List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
+                           int bandBase, ParamContext ctx, Canvas canvas) {
+        List<CellBinding> groupCols = new ArrayList<>();
+        List<CellBinding> listCols = new ArrayList<>();
+        List<CellBinding> aggCols = new ArrayList<>();
+        for (CellBinding b : band) {
+            if (isAgg(b)) {
+                aggCols.add(b);
+            } else if (b.getExpandMode() == ExpandMode.GROUP) {
+                groupCols.add(b);
             } else {
-                listCols.add(fc);
+                listCols.add(b);
             }
         }
 
-        Map<CellRef, FieldCell> groupByCell = new HashMap<>();
-        for (FieldCell gc : groupCols) {
+        Map<CellRef, CellBinding> groupByCell = new HashMap<>();
+        for (CellBinding gc : groupCols) {
             groupByCell.put(gc.getCell(), gc);
         }
         groupCols.sort(Comparator.comparingInt(gc -> depth(gc, groupByCell)));
@@ -261,7 +258,7 @@ public class ReportRenderer {
                 int level = -1;
                 if (s.getGroupBy() != null) {
                     for (int d = 0; d < groupCols.size(); d++) {
-                        if (groupCols.get(d).getField().equals(s.getGroupBy())) {
+                        if (s.getGroupBy().equals(fieldOf(groupCols.get(d)))) {
                             level = d;
                             break;
                         }
@@ -275,7 +272,7 @@ public class ReportRenderer {
         List<Out> seq = new ArrayList<>();
         int[] groupStart = new int[Math.max(1, groupCols.size())];
         for (int i = 0; i < details.size(); i++) {
-            seq.add(detailOut(details.get(i), groupCols, listCols, aggCols, rows, groupByCell));
+            seq.add(detailOut(details.get(i), groupCols, listCols, aggCols, rows, groupByCell, ctx));
             boolean last = i == details.size() - 1;
             int breakLevel = last ? 0 : firstDiffLevel(details.get(i).tuple, details.get(i + 1).tuple, groupCols.size());
             if (last || breakLevel >= 0) {
@@ -313,13 +310,13 @@ public class ReportRenderer {
 
         // 分组列合并：相同前缀(0..d)的连续明细行
         for (int d = 0; d < groupCols.size(); d++) {
-            FieldCell gc = groupCols.get(d);
+            CellBinding gc = groupCols.get(d);
             if (gc.isMergeRepeated()) {
                 mergeColumn(canvas, seq, bandBase, gc.getCell().column(), d + 1);
             }
         }
         // 粗粒度聚合列合并（如总人数按单位跨行合并）
-        for (FieldCell ac : aggCols) {
+        for (CellBinding ac : aggCols) {
             int p = aggPrefixLen(ac, groupCols, groupByCell);
             if (ac.isMergeRepeated() && p < groupCols.size()) {
                 mergeColumn(canvas, seq, bandBase, ac.getCell().column(), p);
@@ -328,23 +325,23 @@ public class ReportRenderer {
         return seq.size();
     }
 
-    private Out detailOut(Unit unit, List<FieldCell> groupCols, List<FieldCell> listCols,
-                          List<FieldCell> aggCols, List<Map<String, Object>> rows,
-                          Map<CellRef, FieldCell> groupByCell) {
+    private Out detailOut(Unit unit, List<CellBinding> groupCols, List<CellBinding> listCols,
+                          List<CellBinding> aggCols, List<Map<String, Object>> rows,
+                          Map<CellRef, CellBinding> groupByCell, ParamContext ctx) {
         Out o = new Out(true, unit.tuple);
         for (int d = 0; d < groupCols.size(); d++) {
-            FieldCell gc = groupCols.get(d);
+            CellBinding gc = groupCols.get(d);
             o.values.put(gc.getCell().column(), unit.tuple.get(d));
             o.sources.put(gc.getCell().column(), gc.getCell());
         }
-        for (FieldCell lc : listCols) {
-            o.values.put(lc.getCell().column(), unit.rows.get(0).get(lc.getField().qualified()));
+        for (CellBinding lc : listCols) {
+            o.values.put(lc.getCell().column(), engine.eval(lc.getValue(), EvalContext.scalar(unit.rows.get(0), ctx)));
             o.sources.put(lc.getCell().column(), lc.getCell());
         }
-        for (FieldCell ac : aggCols) {
+        for (CellBinding ac : aggCols) {
             int p = aggPrefixLen(ac, groupCols, groupByCell);
             List<Map<String, Object>> groupRows = rowsWithPrefix(rows, groupCols, unit.tuple, p);
-            o.values.put(ac.getCell().column(), Aggregators.aggregate(ac.getAggregation(), groupRows, ac.getField()));
+            o.values.put(ac.getCell().column(), engine.eval(ac.getValue(), EvalContext.aggregate(groupRows, ctx)));
             o.sources.put(ac.getCell().column(), ac.getCell());
         }
         return o;
@@ -378,13 +375,13 @@ public class ReportRenderer {
      *       <ul>
      *         <li>更新 ParamContext 的循环作用域（当前行的字段值）</li>
      *         <li>TextCell：占位符替换（循环字段优先于报表参数）</li>
-     *         <li>FieldCell 绑定驱动数据集的字段：直接从当前迭代行取值</li>
-     *         <li>FieldCell 绑定其他数据集的字段：独立提取 + 按条件过滤（条件里可引用循环字段）+ 取首值或聚合</li>
+     *         <li>CellBinding 绑定驱动数据集的字段：直接从当前迭代行取值</li>
+     *         <li>CellBinding 绑定其他数据集的字段：独立提取 + 按条件过滤（条件里可引用循环字段）+ 取首值或聚合</li>
      *       </ul></li>
      * </ol>
      *
      * <h3>跨数据集取数（子查询模式）</h3>
-     * <p>当循环块内的 FieldCell 绑定的是非驱动数据集时（如循环员工，但格子显示的是该员工的学历），
+     * <p>当循环块内的 CellBinding 绑定的是非驱动数据集时（如循环员工，但格子显示的是该员工的学历），
      * 引擎独立提取该数据集并按格子的 conditions 过滤。条件右值可以引用循环字段
      * （{@link com.codingapi.report.param.ValueRef.LoopField}），
      * 实现"父迭代传键 → 子查询"的效果。
@@ -419,25 +416,37 @@ public class ReportRenderer {
             for (CellBinding b : blockCells) {
                 int row = b.getCell().row() + rowOffset;
                 int col = b.getCell().column();
-                if (b instanceof TextCell tc) {
-                    // 文本占位替换：循环字段优先，报表参数兜底
-                    place(canvas, b.getCell(), row, col, substitute(tc.getTemplate(), ctx));
-                } else if (b instanceof FieldCell fc) {
-                    Object v;
-                    if (fc.getField().datasetId().equals(q.getDatasetId())) {
-                        // 驱动数据集字段：直接从当前迭代行取
-                        v = drow.get(fc.getField().qualified());
-                    } else {
-                        // 其他数据集：独立提取 + 条件过滤（条件可引用循环字段）
-                        RawTable f = Operators.filter(extract(fc.getField().datasetId()), fc.getConditions(), ctx);
-                        v = isAgg(fc)
-                                ? Aggregators.aggregate(fc.getAggregation(), f.getRows(), fc.getField())
-                                : firstValue(f, fc.getField());
-                    }
-                    place(canvas, b.getCell(), row, col, v);
-                }
+                place(canvas, b.getCell(), row, col, evalLoopCell(b, q.getDatasetId(), drow, ctx));
             }
         }
+    }
+
+    /**
+     * 循环块内格子求值：
+     * <ul>
+     *   <li>值只引用驱动数据集（或纯文本/参数/循环字段）→ 对当前迭代行求值</li>
+     *   <li>值引用了其他数据集 → 独立提取该数据集 + 按格子条件过滤（条件可引用循环字段）→ 子查询求值</li>
+     * </ul>
+     */
+    private Object evalLoopCell(CellBinding b, String drivingDatasetId, Map<String, Object> drow, ParamContext ctx) {
+        List<FieldRef> refs = new ArrayList<>();
+        collectFieldRefs(b.getValue(), refs);
+        String other = null;
+        for (FieldRef r : refs) {
+            if (!r.datasetId().equals(drivingDatasetId)) {
+                other = r.datasetId();
+                break;
+            }
+        }
+        if (other == null) {
+            return engine.eval(b.getValue(), EvalContext.scalar(drow, ctx));
+        }
+        RawTable f = Operators.filter(extract(other), b.getConditions(), ctx);
+        if (b.getValue() instanceof Value.Aggregate) {
+            return engine.eval(b.getValue(), EvalContext.aggregate(f.getRows(), ctx));
+        }
+        Map<String, Object> first = f.getRows().isEmpty() ? null : f.getRows().get(0);
+        return engine.eval(b.getValue(), EvalContext.scalar(first, ctx));
     }
 
     // ============================================================
@@ -551,11 +560,11 @@ public class ReportRenderer {
     // ============================================================
 
     /**
-     * 构建组合表：收集所有 FieldCell 引用的数据集，按 Relationship 链式 join。
+     * 构建组合表：收集所有 CellBinding 引用的数据集，按 Relationship 链式 join。
      *
      * <h3>算法：贪心 join</h3>
      * <ol>
-     *   <li>扫描所有 FieldCell 及其条件，收集用到的 datasetId 集合</li>
+     *   <li>扫描所有 CellBinding 及其条件，收集用到的 datasetId 集合</li>
      *   <li>取第一个数据集作为起点</li>
      *   <li>反复查找：剩余数据集中，哪个能通过 Relationship 连到已合并的集合</li>
      *   <li>找到就 join 进结果，加入已合并集合，继续查找</li>
@@ -565,15 +574,19 @@ public class ReportRenderer {
      * <p>这个贪心策略保证了：如果所有需要的数据集之间存在连通的关系路径，
      * 就能把它们全部 join 成一张组合表。
      *
-     * @param fieldCells 当前需要渲染的 FieldCell 列表
+     * @param fieldCells 当前需要渲染的 CellBinding 列表
      * @return 所有数据集 join 后的组合表
      */
-    private RawTable buildCombinedTable(List<FieldCell> fieldCells) {
+    private RawTable buildCombinedTable(List<CellBinding> dataCells) {
         LinkedHashSet<String> needed = new LinkedHashSet<>();
-        for (FieldCell fc : fieldCells) {
-            needed.add(fc.getField().datasetId());
-            if (fc.getConditions() != null) {
-                for (Condition c : fc.getConditions()) {
+        for (CellBinding b : dataCells) {
+            List<FieldRef> refs = new ArrayList<>();
+            collectFieldRefs(b.getValue(), refs);
+            for (FieldRef r : refs) {
+                needed.add(r.datasetId());
+            }
+            if (b.getConditions() != null) {
+                for (Condition c : b.getConditions()) {
                     needed.add(c.getLeft().datasetId());
                 }
             }
@@ -673,24 +686,66 @@ public class ReportRenderer {
     // 工具
     // ============================================================
 
-    /** 判断 FieldCell 是否为聚合格（aggregation 非空且非 NONE） */
-    private static boolean isAgg(FieldCell fc) {
-        return fc.getAggregation() != null && fc.getAggregation() != Aggregation.NONE;
+    /** 判断聚合格：值的根节点是 Aggregate */
+    private static boolean isAgg(CellBinding b) {
+        return b.getValue() instanceof Value.Aggregate;
     }
 
-    /** 收集所有 FieldCell 的条件，合并为一个列表（用于全局过滤） */
-    private List<Condition> collectConditions(List<FieldCell> fieldCells) {
+    /**
+     * 取格子值所绑定的字段（分组/明细/聚合的字段定位用）：
+     * 值是 {@code FieldValue} 或 {@code Aggregate(FieldValue)} 时返回其 FieldRef，否则 null。
+     */
+    private static FieldRef fieldOf(CellBinding b) {
+        Value v = b.getValue();
+        if (v instanceof Value.FieldValue fv) {
+            return fv.ref();
+        }
+        if (v instanceof Value.Aggregate a && a.operand() instanceof Value.FieldValue fv) {
+            return fv.ref();
+        }
+        return null;
+    }
+
+    /** 该格子是否需要数据表参与：值引用了字段，或带了过滤条件。 */
+    private boolean referencesData(CellBinding b) {
+        List<FieldRef> refs = new ArrayList<>();
+        collectFieldRefs(b.getValue(), refs);
+        return !refs.isEmpty() || (b.getConditions() != null && !b.getConditions().isEmpty());
+    }
+
+    /** 递归收集表达式里引用到的所有字段。 */
+    private void collectFieldRefs(Value v, List<FieldRef> out) {
+        if (v instanceof Value.FieldValue fv) {
+            out.add(fv.ref());
+        } else if (v instanceof Value.Aggregate a) {
+            collectFieldRefs(a.operand(), out);
+        } else if (v instanceof Value.Template t) {
+            for (Value.Template.Part p : t.parts()) {
+                if (p instanceof Value.Template.Hole h) {
+                    collectFieldRefs(h.value(), out);
+                }
+            }
+        } else if (v instanceof Value.FunctionCall fc) {
+            for (Value a : fc.args()) {
+                collectFieldRefs(a, out);
+            }
+        }
+        // Literal / ParamValue / LoopFieldValue / NameRef → 无字段引用
+    }
+
+    /** 收集所有格子的条件，合并为一个列表（用于全局过滤） */
+    private List<Condition> collectConditions(List<CellBinding> cells) {
         List<Condition> filters = new ArrayList<>();
-        for (FieldCell fc : fieldCells) {
-            if (fc.getConditions() != null) {
-                filters.addAll(fc.getConditions());
+        for (CellBinding b : cells) {
+            if (b.getConditions() != null) {
+                filters.addAll(b.getConditions());
             }
         }
         return filters;
     }
 
     /** 计算分组列在父格链中的深度（0 = 顶层，1 = 子级，2 = 孙级...），用于排序分组列 */
-    private int depth(FieldCell gc, Map<CellRef, FieldCell> groupByCell) {
+    private int depth(CellBinding gc, Map<CellRef, CellBinding> groupByCell) {
         int d = 0;
         CellRef p = gc.getParentCell();
         while (p != null && groupByCell.containsKey(p)) {
@@ -701,25 +756,25 @@ public class ReportRenderer {
     }
 
     /** 生成分组排序 key：把一行在各分组列上的值拼接为字符串，用于 Comparator */
-    private String tupleKey(Map<String, Object> row, List<FieldCell> groupCols) {
+    private String tupleKey(Map<String, Object> row, List<CellBinding> groupCols) {
         StringBuilder sb = new StringBuilder();
-        for (FieldCell gc : groupCols) {
-            sb.append(row.get(gc.getField().qualified())).append('');
+        for (CellBinding gc : groupCols) {
+            sb.append(row.get(fieldOf(gc).qualified())).append('');
         }
         return sb.toString();
     }
 
     /** 提取一行在各分组列上的值元组，用于分组比较和合并判断 */
-    private List<Object> tuple(Map<String, Object> row, List<FieldCell> groupCols) {
+    private List<Object> tuple(Map<String, Object> row, List<CellBinding> groupCols) {
         List<Object> t = new ArrayList<>();
-        for (FieldCell gc : groupCols) {
-            t.add(row.get(gc.getField().qualified()));
+        for (CellBinding gc : groupCols) {
+            t.add(row.get(fieldOf(gc).qualified()));
         }
         return t;
     }
 
     /** 每行一个 Unit（有明细列时）：保留全部明细行，不做分组聚合 */
-    private List<Unit> oneUnitPerRow(List<Map<String, Object>> rows, List<FieldCell> groupCols) {
+    private List<Unit> oneUnitPerRow(List<Map<String, Object>> rows, List<CellBinding> groupCols) {
         List<Unit> units = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             units.add(new Unit(tuple(r, groupCols), List.of(r)));
@@ -728,7 +783,7 @@ public class ReportRenderer {
     }
 
     /** 按分组元组聚合（无明细列时）：相邻相同分组值的行归入同一 Unit */
-    private List<Unit> groupByTuple(List<Map<String, Object>> rows, List<FieldCell> groupCols) {
+    private List<Unit> groupByTuple(List<Map<String, Object>> rows, List<CellBinding> groupCols) {
         List<Unit> units = new ArrayList<>();
         List<Object> curTuple = null;
         List<Map<String, Object>> curRows = null;
@@ -774,7 +829,7 @@ public class ReportRenderer {
      * （如"总人数"按单位汇总，parentCell 指向单位列 → prefixLen = 1）。
      * 未指定 parentCell 则按最细粒度（全部行）。
      */
-    private int aggPrefixLen(FieldCell ac, List<FieldCell> groupCols, Map<CellRef, FieldCell> groupByCell) {
+    private int aggPrefixLen(CellBinding ac, List<CellBinding> groupCols, Map<CellRef, CellBinding> groupByCell) {
         CellRef p = ac.getParentCell();
         if (p != null && groupByCell.containsKey(p)) {
             return depth(groupByCell.get(p), groupByCell) + 1;
@@ -783,7 +838,7 @@ public class ReportRenderer {
     }
 
     /** 取出与 target 前 p 个分组分量相同的所有行（用于粗粒度聚合列的数据范围筛选） */
-    private List<Map<String, Object>> rowsWithPrefix(List<Map<String, Object>> rows, List<FieldCell> groupCols,
+    private List<Map<String, Object>> rowsWithPrefix(List<Map<String, Object>> rows, List<CellBinding> groupCols,
                                                      List<Object> target, int p) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
@@ -889,30 +944,6 @@ public class ReportRenderer {
                 && cell.column() >= s.column() && cell.column() <= e.column();
     }
 
-    /** 取首行的字段值（非聚合单值格的兜底取法：数据集只有一行或只需要第一行时） */
-    private Object firstValue(RawTable rows, FieldRef field) {
-        if (rows.getRows().isEmpty()) {
-            return null;
-        }
-        return rows.getRows().get(0).get(field.qualified());
-    }
-
-    /**
-     * 文本占位替换：将模板中的 ${name} 替换为 ParamContext 中的值。
-     * <p>例：{@code "${year}年度报表"} → {@code "2026年度报表"}
-     * 找不到值的占位替换为空字符串。整数值的 double 去掉小数点（如 2026.0 → "2026"）。
-     */
-    private String substitute(String template, ParamContext ctx) {
-        Matcher m = PLACEHOLDER.matcher(template);
-        StringBuilder sb = new StringBuilder();
-        while (m.find()) {
-            Object v = ctx.lookup(m.group(1));
-            m.appendReplacement(sb, Matcher.quoteReplacement(v == null ? "" : formatScalar(v)));
-        }
-        m.appendTail(sb);
-        return sb.toString();
-    }
-
     /** 将 Java 值转为 JsonNode 存储到 Cell.value（Number→numberNode, Boolean→booleanNode, 其余→textNode） */
     private JsonNode toNode(Object v) {
         if (v == null) {
@@ -925,14 +956,6 @@ public class ReportRenderer {
             return NF.booleanNode(b);
         }
         return NF.textNode(String.valueOf(v));
-    }
-
-    /** 格式化标量为字符串（用于占位替换）：整数值的 double 去掉小数点（2026.0 → "2026"） */
-    private String formatScalar(Object v) {
-        if (v instanceof Number n && n.doubleValue() == Math.rint(n.doubleValue())) {
-            return String.valueOf((long) n.doubleValue());
-        }
-        return String.valueOf(v);
     }
 
     /**

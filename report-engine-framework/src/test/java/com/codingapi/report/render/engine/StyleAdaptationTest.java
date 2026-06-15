@@ -17,10 +17,11 @@ import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
 import com.codingapi.report.render.grid.CellBinding;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.expression.Templates;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.FieldCell;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
@@ -117,9 +118,9 @@ class StyleAdaptationTest {
 
     /** 列表报表：数据从第 2 行起，列 工号/姓名/部门（只绑数据，样式由模板提供） */
     private static Report staffListReport() {
-        FieldCell idCol = listCol(2, 0, "id");
-        FieldCell nameCol = listCol(2, 1, "name");
-        FieldCell deptCol = listCol(2, 2, "dept");
+        CellBinding idCol = listCol(2, 0, "id");
+        CellBinding nameCol = listCol(2, 1, "name");
+        CellBinding deptCol = listCol(2, 2, "dept");
         return Report.builder().id("r").name("员工名单").dataModelId("dm").templateId("tpl")
                 .parameters(List.of())
                 .cellBindings(List.<CellBinding>of(idCol, nameCol, deptCol))
@@ -127,8 +128,8 @@ class StyleAdaptationTest {
                 .build();
     }
 
-    private static FieldCell listCol(int row, int col, String field) {
-        return FieldCell.builder().cell(new CellRef("sheet1", row, col)).field(new FieldRef("d_staff", field))
+    private static CellBinding listCol(int row, int col, String field) {
+        return CellBinding.builder().cell(new CellRef("sheet1", row, col)).value(new Value.FieldValue(new FieldRef("d_staff", field)))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).build();
     }
 

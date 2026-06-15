@@ -22,12 +22,20 @@ com.codingapi.report
 │   ├── aggregation  Aggregation + Aggregator(SPI) + 各实现 + Aggregators 注册表
 │   └── condition    Condition / CompareOperator + ConditionPredicate(SPI) + 各实现 + 注册表
 │
+├── expression                   表达式域：统一的"怎么算出一个值"机制
+│   ├── Value(sealed) 值表达式树：Literal / FieldValue / ParamValue / LoopFieldValue
+│   │                 / NameRef / Template(Text|Hole) / Aggregate / FunctionCall
+│   ├── EvalContext / ValueEvaluator(SPI) / ExpressionEngine（注册表分发 + 递归求值）
+│   ├── Templates    ${name} 文本 → Template 的解析糖
+│   ├── eval/        各节点求值策略（每种节点一个实现）
+│   └── function/    ValueFunction(SPI) + Functions 注册表 + FormatFunction / DateFunction
+│
 ├── param                        参数域：运行时值解析
 │   └── Parameter / ParamSource(sealed) / ValueRef(sealed) / ParamContext
 │
 └── render                       渲染域：数据如何映射到单元格
     ├── Report       报表定义（dataModelId + cellBindings + loopBlocks + summaries + parameters）
-    ├── grid         CellBinding(sealed) → TextCell / FieldCell
+    ├── grid         CellBinding（单类：value 值层 + expansion/expandMode/mergeRepeated/parentCell/conditions 控制层）
     │                CellRef / Expansion / ExpandMode / LoopBlock / SummaryRow / SummaryCell
     └── engine       ReportRenderer（核心引擎）/ Operators（filter + join）
 ```
@@ -50,13 +58,23 @@ com.codingapi.report
 | **新数据源类型**（DB/API/…） | 实现 `DataExtractor`（`supports(type)` + `extract()`），注册到 `ReportRenderer` 的 extractors 列表 |
 | **新比较算子**（LIKE/IN/BETWEEN…） | 实现 `ConditionPredicate`，在 `ConditionPredicates` 注册表登记一行 |
 | **新聚合方式**（COUNT_TRUE…） | 实现 `Aggregator`，在 `Aggregators` 注册表登记一行 |
+| **新表达式函数**（round/concat/if…） | 实现 `ValueFunction`，在 `Functions` 注册表登记一行 |
 
-三者同一套范式，新增能力无需改动 `Operators` 或任何调用方。未注册的算子/聚合会**显式抛异常**，不会静默放行。
+四者同一套范式，新增能力无需改动 `Operators`/`ExpressionEngine` 或任何调用方。未注册的算子/聚合/函数会**显式抛异常**，不会静默放行。
+
+## 单元格的值层 / 控制层分离
+
+`CellBinding` 不再用 `TextCell`/`FieldCell` 子类型区分（那是"用类型当值的开关"），而是收成单类，把"算什么值"和"怎么铺开"拆开：
+
+- **值层** `value: Value`：纯文本、字段、聚合、格式化…统一为一棵表达式树，由 `ExpressionEngine` 求值。
+- **控制层** `expansion / expandMode / mergeRepeated / parentCell / conditions`：值怎么扩展、分组、合并、过滤。
+
+渲染两层处理：① 值层 `ExpressionEngine.eval(value, ctx)` 算出数据 → ② 控制层按 expansion/merge 决定落格，样式从模板继承。旧的 `${}` 文本插值、`FieldCell.aggregation`、单值取数全部归一到表达式求值。
 
 ## 密封类型（编译期穷尽，switch/instanceof 全覆盖）
 
 - `Dataset` → `TableDataset`（物理表）/ `UnionDataset`（UNION 派生）
-- `CellBinding` → `TextCell`（文本插值）/ `FieldCell`（字段绑定）
+- `Value` → `Literal` / `FieldValue` / `ParamValue` / `LoopFieldValue` / `NameRef` / `Template` / `Aggregate` / `FunctionCall`
 - `ParamSource` → `External` / `Cell` / `Constant`
 - `ValueRef` → `Literal` / `Param` / `LoopField`
 

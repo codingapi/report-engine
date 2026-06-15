@@ -12,13 +12,13 @@ import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
 import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.render.grid.CellBinding;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.expression.Templates;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.ExpandMode;
-import com.codingapi.report.render.grid.FieldCell;
-import com.codingapi.report.render.grid.TextCell;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
 import com.codingapi.report.param.ValueRef;
@@ -135,19 +135,19 @@ class FullChainTest {
         Parameter classId = Parameter.builder().name("classId").dataType(DataType.NUMBER)
                 .source(new ParamSource.External(true, null)).build();
 
-        TextCell title = TextCell.builder()
-                .cell(new CellRef("sheet1", 0, 0)).template("${year}年度成绩单").build();
+        CellBinding title = CellBinding.builder()
+                .cell(new CellRef("sheet1", 0, 0)).value(Templates.parse("${year}年度成绩单")).build();
 
-        FieldCell avg = FieldCell.builder()
+        CellBinding avg = CellBinding.builder()
                 .cell(new CellRef("sheet1", 1, 1))
-                .field(new FieldRef("d_score", "score"))
-                .expansion(Expansion.NONE).aggregation(Aggregation.AVG)
+                .value(new Value.Aggregate(Aggregation.AVG, new Value.FieldValue(new FieldRef("d_score", "score"))))
+                .expansion(Expansion.NONE)
                 .build();
 
         // 姓名列：纵向列表，带班级过滤条件
-        FieldCell nameCol = FieldCell.builder()
+        CellBinding nameCol = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 0))
-                .field(new FieldRef("d_student", "name"))
+                .value(new Value.FieldValue(new FieldRef("d_student", "name")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
                 .conditions(List.of(Condition.builder()
                         .left(new FieldRef("d_student", "class_id"))
@@ -157,9 +157,9 @@ class FullChainTest {
                 .build();
 
         // 分数列：纵向列表（与姓名列对齐同一过滤后的行集）
-        FieldCell scoreCol = FieldCell.builder()
+        CellBinding scoreCol = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 1))
-                .field(new FieldRef("d_score", "score"))
+                .value(new Value.FieldValue(new FieldRef("d_score", "score")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
                 .build();
 

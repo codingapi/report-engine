@@ -117,9 +117,19 @@ public class ParamContext {
             return external.get(p.name());
         }
         if (ref instanceof ValueRef.LoopField lf) {
-            Map<String, Object> row = loopRows.get(lf.loopBlockId());
-            return row == null ? null : row.get(lf.field());
+            return loopField(lf.loopBlockId(), lf.field());
         }
         return null;
+    }
+
+    /**
+     * 取某循环块当前迭代行的字段值（不带 datasetId 前缀）。
+     * <p>供表达式求值（{@code expression.Value.LoopFieldValue}）和 {@link #resolve} 复用。
+     *
+     * @return 该字段当前迭代值，循环未激活或字段不存在时返回 null
+     */
+    public Object loopField(String loopBlockId, String field) {
+        Map<String, Object> row = loopRows.get(loopBlockId);
+        return row == null ? null : row.get(field);
     }
 }

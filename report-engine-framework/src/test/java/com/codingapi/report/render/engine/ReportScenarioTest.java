@@ -12,16 +12,16 @@ import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
 import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.render.grid.CellBinding;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.expression.Templates;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.FieldCell;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
-import com.codingapi.report.render.grid.TextCell;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
 import com.codingapi.report.param.ValueRef;
@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 四类报表结构的全链路验证：配置 → 计算 → <b>导出到本地 xlsx 文件</b> → 回读断言。
- * 每张报表都带标题与表头（静态文本格 TextCell）。
+ * 每张报表都带标题与表头（静态文本格 CellBinding）。
  *
  * <ol>
  *   <li>{@link #simpleList()} 简单列表</li>
@@ -83,11 +83,11 @@ class ReportScenarioTest {
         DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
                 .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
 
-        TextCell title = label(0, 0, "商品清单");
-        TextCell h1 = label(1, 0, "商品名");
-        TextCell h2 = label(1, 1, "价格");
-        FieldCell nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
-        FieldCell priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
+        CellBinding title = label(0, 0, "商品清单");
+        CellBinding h1 = label(1, 0, "商品名");
+        CellBinding h2 = label(1, 1, "价格");
+        CellBinding nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
+        CellBinding priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
         // 总计行：合计 + 总价（groupBy=null）
         SummaryRow total = SummaryRow.builder().groupBy(null).cells(List.of(
                 SummaryCell.label(0, "合计"),
@@ -126,15 +126,15 @@ class ReportScenarioTest {
         DataModel dm = DataModel.builder().id("dm_sales").name("销售模型")
                 .datasources(List.of(src)).datasets(List.of(sales)).relationships(List.of()).build();
 
-        TextCell title = label(0, 0, "销售明细");
-        TextCell h1 = label(1, 0, "分类");
-        TextCell h2 = label(1, 1, "商品");
-        TextCell h3 = label(1, 2, "数量");
-        FieldCell catCol = FieldCell.builder()
-                .cell(new CellRef("sheet1", 2, 0)).field(new FieldRef("d_sales", "category"))
+        CellBinding title = label(0, 0, "销售明细");
+        CellBinding h1 = label(1, 0, "分类");
+        CellBinding h2 = label(1, 1, "商品");
+        CellBinding h3 = label(1, 2, "数量");
+        CellBinding catCol = CellBinding.builder()
+                .cell(new CellRef("sheet1", 2, 0)).value(new Value.FieldValue(new FieldRef("d_sales", "category")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true).build();
-        FieldCell prodCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_sales", "product"));
-        FieldCell qtyCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_sales", "qty"));
+        CellBinding prodCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_sales", "product"));
+        CellBinding qtyCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_sales", "qty"));
         Report report = report("r_sales", dm,
                 List.of(title, h1, h2, h3, catCol, prodCol, qtyCol), List.of(), List.of());
 
@@ -168,26 +168,26 @@ class ReportScenarioTest {
         DataModel dm = DataModel.builder().id("dm_staff").name("人员模型")
                 .datasources(List.of(src)).datasets(List.of(staff)).relationships(List.of()).build();
 
-        TextCell title = label(0, 0, "人员统计");
-        TextCell h1 = label(1, 0, "单位");
-        TextCell h2 = label(1, 1, "部门");
-        TextCell h3 = label(1, 2, "人数");
-        TextCell h4 = label(1, 3, "总人数");
+        CellBinding title = label(0, 0, "人员统计");
+        CellBinding h1 = label(1, 0, "单位");
+        CellBinding h2 = label(1, 1, "部门");
+        CellBinding h3 = label(1, 2, "人数");
+        CellBinding h4 = label(1, 3, "总人数");
         CellRef unitRef = new CellRef("sheet1", 2, 0);
         CellRef deptRef = new CellRef("sheet1", 2, 1);
-        FieldCell unitCol = FieldCell.builder().cell(unitRef).field(new FieldRef("d_staff", "unit"))
+        CellBinding unitCol = CellBinding.builder().cell(unitRef).value(new Value.FieldValue(new FieldRef("d_staff", "unit")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true).build();
-        FieldCell deptCol = FieldCell.builder().cell(deptRef).field(new FieldRef("d_staff", "dept"))
+        CellBinding deptCol = CellBinding.builder().cell(deptRef).value(new Value.FieldValue(new FieldRef("d_staff", "dept")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
                 .parentCell(unitRef).build();
         // 人数：按 部门 粒度 COUNT（parent=部门）
-        FieldCell countCol = FieldCell.builder().cell(new CellRef("sheet1", 2, 2))
-                .field(new FieldRef("d_staff", "name"))
-                .expansion(Expansion.VERTICAL).aggregation(Aggregation.COUNT).parentCell(deptRef).build();
+        CellBinding countCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 2))
+                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .expansion(Expansion.VERTICAL).parentCell(deptRef).build();
         // 总人数：按 单位 粒度 COUNT（parent=单位），跨该单位的部门行合并
-        FieldCell unitTotalCol = FieldCell.builder().cell(new CellRef("sheet1", 2, 3))
-                .field(new FieldRef("d_staff", "name"))
-                .expansion(Expansion.VERTICAL).aggregation(Aggregation.COUNT).parentCell(unitRef)
+        CellBinding unitTotalCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 3))
+                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .expansion(Expansion.VERTICAL).parentCell(unitRef)
                 .mergeRepeated(true).build();
         Report report = report("r_staff", dm,
                 List.of(title, h1, h2, h3, h4, unitCol, deptCol, countCol, unitTotalCol), List.of(), List.of());
@@ -251,16 +251,16 @@ class ReportScenarioTest {
                 .build();
 
         // 块内行0：动态标题 "${name}的薪资"（name 取循环当前员工）
-        TextCell title = TextCell.builder().cell(new CellRef("sheet1", 0, 0))
-                .template("${name}的薪资").build();
+        CellBinding title = CellBinding.builder().cell(new CellRef("sheet1", 0, 0))
+                .value(Templates.parse("${name}的薪资")).build();
         // 块内行1：横向表头
-        TextCell ht = label(1, 0, "总薪资");
-        TextCell hb = label(1, 1, "岗位薪资");
-        TextCell hp = label(1, 2, "绩效工资");
+        CellBinding ht = label(1, 0, "总薪资");
+        CellBinding hb = label(1, 1, "岗位薪资");
+        CellBinding hp = label(1, 2, "绩效工资");
         // 块内行2：横向数据（跨源，按 LoopField 查）
-        FieldCell total = salaryCell(2, 0, "total");
-        FieldCell base = salaryCell(2, 1, "base");
-        FieldCell bonus = salaryCell(2, 2, "bonus");
+        CellBinding total = salaryCell(2, 0, "total");
+        CellBinding base = salaryCell(2, 1, "base");
+        CellBinding bonus = salaryCell(2, 2, "bonus");
 
         Report report = report("r_pay", dm,
                 List.of(title, ht, hb, hp, total, base, bonus), List.of(), List.of(loop));
@@ -319,24 +319,24 @@ class ReportScenarioTest {
                 .relationships(List.of(rel)).build();
 
         // 标题 + 表头
-        TextCell title = label(0, 0, "员工学历信息表");
-        TextCell h0 = label(1, 0, "姓名");
-        TextCell h1 = label(1, 1, "性别");
-        TextCell h2 = label(1, 2, "年龄");
-        TextCell h3 = label(1, 3, "学校名称");
-        TextCell h4 = label(1, 4, "专业名称");
-        TextCell h5 = label(1, 5, "毕业时间");
+        CellBinding title = label(0, 0, "员工学历信息表");
+        CellBinding h0 = label(1, 0, "姓名");
+        CellBinding h1 = label(1, 1, "性别");
+        CellBinding h2 = label(1, 2, "年龄");
+        CellBinding h3 = label(1, 3, "学校名称");
+        CellBinding h4 = label(1, 4, "专业名称");
+        CellBinding h5 = label(1, 5, "毕业时间");
 
         // 主表列：姓名/性别/年龄 = GROUP + 合并，父格链 姓名→性别→年龄（同一员工共变）
         CellRef nameRef = new CellRef("sheet1", 2, 0);
         CellRef genderRef = new CellRef("sheet1", 2, 1);
-        FieldCell nameCol = groupMerge(nameRef, new FieldRef("d_emp2", "name"), null);
-        FieldCell genderCol = groupMerge(genderRef, new FieldRef("d_emp2", "gender"), nameRef);
-        FieldCell ageCol = groupMerge(new CellRef("sheet1", 2, 2), new FieldRef("d_emp2", "age"), genderRef);
+        CellBinding nameCol = groupMerge(nameRef, new FieldRef("d_emp2", "name"), null);
+        CellBinding genderCol = groupMerge(genderRef, new FieldRef("d_emp2", "gender"), nameRef);
+        CellBinding ageCol = groupMerge(new CellRef("sheet1", 2, 2), new FieldRef("d_emp2", "age"), genderRef);
         // 从表列：学校/专业/毕业 = LIST 明细
-        FieldCell schoolCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_edu", "school"));
-        FieldCell majorCol = listCol(new CellRef("sheet1", 2, 4), new FieldRef("d_edu", "major"));
-        FieldCell gradCol = listCol(new CellRef("sheet1", 2, 5), new FieldRef("d_edu", "graduate_time"));
+        CellBinding schoolCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_edu", "school"));
+        CellBinding majorCol = listCol(new CellRef("sheet1", 2, 4), new FieldRef("d_edu", "major"));
+        CellBinding gradCol = listCol(new CellRef("sheet1", 2, 5), new FieldRef("d_edu", "graduate_time"));
 
         Report report = report("r_edu", dm,
                 List.of(title, h0, h1, h2, h3, h4, h5, nameCol, genderCol, ageCol, schoolCol, majorCol, gradCol),
@@ -381,17 +381,17 @@ class ReportScenarioTest {
         DataModel dm = DataModel.builder().id("dm_sd").name("薪资明细模型")
                 .datasources(List.of(src)).datasets(List.of(sal)).relationships(List.of()).build();
 
-        TextCell title = label(0, 0, "单位部门薪资统计表");
-        TextCell h0 = label(1, 0, "单位");
-        TextCell h1 = label(1, 1, "部门");
-        TextCell h2 = label(1, 2, "姓名");
-        TextCell h3 = label(1, 3, "薪资");
+        CellBinding title = label(0, 0, "单位部门薪资统计表");
+        CellBinding h0 = label(1, 0, "单位");
+        CellBinding h1 = label(1, 1, "部门");
+        CellBinding h2 = label(1, 2, "姓名");
+        CellBinding h3 = label(1, 3, "薪资");
 
         CellRef unitRef = new CellRef("sheet1", 2, 0);
-        FieldCell unitCol = groupMerge(unitRef, new FieldRef("d_sd", "unit"), null);
-        FieldCell deptCol = groupMerge(new CellRef("sheet1", 2, 1), new FieldRef("d_sd", "dept"), unitRef);
-        FieldCell nameCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_sd", "name"));
-        FieldCell salaryCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_sd", "salary"));
+        CellBinding unitCol = groupMerge(unitRef, new FieldRef("d_sd", "unit"), null);
+        CellBinding deptCol = groupMerge(new CellRef("sheet1", 2, 1), new FieldRef("d_sd", "dept"), unitRef);
+        CellBinding nameCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_sd", "name"));
+        CellBinding salaryCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_sd", "salary"));
 
         // 单位小计：每个单位结束后，部门列放"${单位}小计"标签，薪资列放 SUM
         SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit")).cells(List.of(
@@ -474,13 +474,13 @@ class ReportScenarioTest {
                 .datasources(List.of(aSrc, bSrc)).datasets(List.of(a, b, people))
                 .relationships(List.of()).build();
 
-        TextCell title = label(0, 0, "全部人员名单");
-        TextCell h0 = label(1, 0, "姓名");
-        TextCell h1 = label(1, 1, "性别");
-        TextCell h2 = label(1, 2, "年龄");
-        FieldCell nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_people", "姓名"));
-        FieldCell genderCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_people", "性别"));
-        FieldCell ageCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_people", "年龄"));
+        CellBinding title = label(0, 0, "全部人员名单");
+        CellBinding h0 = label(1, 0, "姓名");
+        CellBinding h1 = label(1, 1, "性别");
+        CellBinding h2 = label(1, 2, "年龄");
+        CellBinding nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_people", "姓名"));
+        CellBinding genderCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_people", "性别"));
+        CellBinding ageCol = listCol(new CellRef("sheet1", 2, 2), new FieldRef("d_people", "年龄"));
         Report report = report("r_people", dm,
                 List.of(title, h0, h1, h2, nameCol, genderCol, ageCol), List.of(), List.of());
 
@@ -509,26 +509,26 @@ class ReportScenarioTest {
     }
 
     /** 静态文本格（标题/表头） */
-    private static TextCell label(int row, int col, String text) {
-        return TextCell.builder().cell(new CellRef("sheet1", row, col)).template(text).build();
+    private static CellBinding label(int row, int col, String text) {
+        return CellBinding.builder().cell(new CellRef("sheet1", row, col)).value(Templates.parse(text)).build();
     }
 
-    private static FieldCell listCol(CellRef cell, FieldRef field) {
-        return FieldCell.builder().cell(cell).field(field)
+    private static CellBinding listCol(CellRef cell, FieldRef field) {
+        return CellBinding.builder().cell(cell).value(new Value.FieldValue(field))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).build();
     }
 
     /** 分组列（去重 + 合并），可指定父格构成层级 */
-    private static FieldCell groupMerge(CellRef cell, FieldRef field, CellRef parent) {
-        return FieldCell.builder().cell(cell).field(field)
+    private static CellBinding groupMerge(CellRef cell, FieldRef field, CellRef parent) {
+        return CellBinding.builder().cell(cell).value(new Value.FieldValue(field))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
                 .parentCell(parent).build();
     }
 
     /** 薪资条块内数据格：取 d_sal 的某字段，按 emp_id = 循环当前员工 id 过滤 */
-    private static FieldCell salaryCell(int row, int col, String field) {
-        return FieldCell.builder().cell(new CellRef("sheet1", row, col))
-                .field(new FieldRef("d_sal", field)).expansion(Expansion.NONE)
+    private static CellBinding salaryCell(int row, int col, String field) {
+        return CellBinding.builder().cell(new CellRef("sheet1", row, col))
+                .value(new Value.FieldValue(new FieldRef("d_sal", field))).expansion(Expansion.NONE)
                 .conditions(List.of(cond(new FieldRef("d_sal", "emp_id"), CompareOperator.EQ,
                         new ValueRef.LoopField("loop_emp", "id")))).build();
     }

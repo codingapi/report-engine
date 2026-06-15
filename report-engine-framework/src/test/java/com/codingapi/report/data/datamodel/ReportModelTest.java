@@ -4,14 +4,14 @@ import com.codingapi.report.render.Report;
 
 import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.render.grid.CellBinding;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.expression.Templates;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.FieldCell;
 import com.codingapi.report.render.grid.LoopBlock;
-import com.codingapi.report.render.grid.TextCell;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
 import com.codingapi.report.param.ValueRef;
@@ -32,8 +32,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -108,7 +106,7 @@ class ReportModelTest {
         assertTrue(ext.required(), "deptId 必填");
         assertEquals(Set.of("deptId"), externalParamNames(report));
 
-        FieldCell nameCell = findFieldCell(report, new FieldRef("d_emp", "name"));
+        CellBinding nameCell = findFieldCell(report, new FieldRef("d_emp", "name"));
         assertEquals(Expansion.VERTICAL, nameCell.getExpansion());
         ValueRef.Param ref = assertInstanceOf(ValueRef.Param.class,
                 nameCell.getConditions().get(0).getValue());
@@ -137,7 +135,7 @@ class ReportModelTest {
         Report report = payslipReport(hrDataModel());
         LoopBlock loop = report.getLoopBlocks().get(0);
 
-        FieldCell baseCell = findFieldCell(report, new FieldRef("d_salary", "base"));
+        CellBinding baseCell = findFieldCell(report, new FieldRef("d_salary", "base"));
         ValueRef.LoopField ref = assertInstanceOf(ValueRef.LoopField.class,
                 baseCell.getConditions().get(0).getValue(), "应为循环字段引用而非预登记参数");
         assertEquals(loop.getId(), ref.loopBlockId());
@@ -177,9 +175,10 @@ class ReportModelTest {
         assertEquals(Expansion.VERTICAL, findFieldCell(report, new FieldRef("d_score", "student")).getExpansion());
         assertEquals(Expansion.HORIZONTAL, findFieldCell(report, new FieldRef("d_score", "subject")).getExpansion());
 
-        FieldCell scoreCell = findFieldCell(report, new FieldRef("d_score", "score"));
+        CellBinding scoreCell = findFieldCell(report, new FieldRef("d_score", "score"));
         assertEquals(Expansion.NONE, scoreCell.getExpansion());
-        assertEquals(Aggregation.AVG, scoreCell.getAggregation());
+        Value.Aggregate agg = assertInstanceOf(Value.Aggregate.class, scoreCell.getValue());
+        assertEquals(Aggregation.AVG, agg.aggregation());
     }
 
     @Test
@@ -187,14 +186,17 @@ class ReportModelTest {
     void textCell_titleWithParameter() {
         Report report = scoreCrossTab(eduDataModel());
 
-        // 标题是 TextCell（密封类型的另一支），不是 FieldCell
-        TextCell title = report.getCellBindings().stream()
-                .filter(b -> b instanceof TextCell).map(b -> (TextCell) b)
+        // 标题是文本格：值为 Template（文本插值），而非字段/聚合
+        CellBinding title = report.getCellBindings().stream()
+                .filter(b -> b.getValue() instanceof Value.Template)
                 .findFirst().orElseThrow();
-        assertEquals("${year}年度成绩交叉表", title.getTemplate());
+        Value.Template tpl = (Value.Template) title.getValue();
+        // 模板含静态文本片段「年度成绩交叉表」
+        assertTrue(tpl.parts().stream().anyMatch(
+                p -> p instanceof Value.Template.Text t && t.text().equals("年度成绩交叉表")));
 
         // 文本里的参数占位符都能在报表参数里找到（与条件共用同一套参数系统）
-        Set<String> placeholders = textPlaceholders(title.getTemplate());
+        Set<String> placeholders = templatePlaceholders(tpl);
         assertEquals(Set.of("year"), placeholders);
         assertTrue(externalParamNames(report).containsAll(placeholders));
     }
@@ -208,9 +210,9 @@ class ReportModelTest {
     void multiLevelGrouping_parentChainGroupMerge() {
         Report report = orgStatReport(statDataModel());
 
-        FieldCell unit = findFieldCell(report, new FieldRef("d_stat", "unit"));
-        FieldCell dept = findFieldCell(report, new FieldRef("d_stat", "dept"));
-        FieldCell detail = findFieldCell(report, new FieldRef("d_stat", "amount"));
+        CellBinding unit = findFieldCell(report, new FieldRef("d_stat", "unit"));
+        CellBinding dept = findFieldCell(report, new FieldRef("d_stat", "dept"));
+        CellBinding detail = findFieldCell(report, new FieldRef("d_stat", "amount"));
 
         assertEquals(ExpandMode.GROUP, unit.getExpandMode());
         assertTrue(unit.isMergeRepeated());
@@ -315,11 +317,11 @@ class ReportModelTest {
                 .source(new ParamSource.External(true, null))
                 .build();
 
-        FieldCell nameCell = FieldCell.builder()
+        CellBinding nameCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 1, 0))
-                .field(new FieldRef("d_emp", "name"))
+                .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
-                .aggregation(Aggregation.NONE)
+                
                 .conditions(List.of(Condition.builder()
                         .left(new FieldRef("d_emp", "dept_id"))
                         .operator(CompareOperator.EQ)
@@ -356,16 +358,16 @@ class ReportModelTest {
                 .source(new ParamSource.External(false, null))
                 .build();
 
-        FieldCell nameCell = FieldCell.builder()
+        CellBinding nameCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 0, 1))
-                .field(new FieldRef("d_emp", "name"))
+                .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
                 .expansion(Expansion.NONE)
                 .build();
 
-        FieldCell baseCell = FieldCell.builder()
+        CellBinding baseCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 1, 1))
-                .field(new FieldRef("d_salary", "base"))
-                .expansion(Expansion.NONE).aggregation(Aggregation.NONE)
+                .value(new Value.FieldValue(new FieldRef("d_salary", "base")))
+                .expansion(Expansion.NONE)
                 .conditions(List.of(Condition.builder()
                         .left(new FieldRef("d_salary", "emp_id"))
                         .operator(CompareOperator.EQ)
@@ -388,25 +390,25 @@ class ReportModelTest {
                 .source(new ParamSource.External(true, null))
                 .build();
 
-        TextCell title = TextCell.builder()
+        CellBinding title = CellBinding.builder()
                 .cell(new CellRef("sheet1", 0, 0))
-                .template("${year}年度成绩交叉表")
+                .value(Templates.parse("${year}年度成绩交叉表"))
                 .build();
 
-        FieldCell studentCell = FieldCell.builder()
+        CellBinding studentCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 0))
-                .field(new FieldRef("d_score", "student"))
+                .value(new Value.FieldValue(new FieldRef("d_score", "student")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP)
                 .build();
-        FieldCell subjectCell = FieldCell.builder()
+        CellBinding subjectCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 1, 1))
-                .field(new FieldRef("d_score", "subject"))
+                .value(new Value.FieldValue(new FieldRef("d_score", "subject")))
                 .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.GROUP)
                 .build();
-        FieldCell scoreCell = FieldCell.builder()
+        CellBinding scoreCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 1))
-                .field(new FieldRef("d_score", "score"))
-                .expansion(Expansion.NONE).aggregation(Aggregation.AVG)
+                .value(new Value.Aggregate(Aggregation.AVG, new Value.FieldValue(new FieldRef("d_score", "score"))))
+                .expansion(Expansion.NONE)
                 .parentCell(new CellRef("sheet1", 2, 0))
                 .build();
 
@@ -423,17 +425,17 @@ class ReportModelTest {
         CellRef unitRef = new CellRef("sheet1", 1, 0);
         CellRef deptRef = new CellRef("sheet1", 1, 1);
 
-        FieldCell unit = FieldCell.builder()
-                .cell(unitRef).field(new FieldRef("d_stat", "unit"))
+        CellBinding unit = CellBinding.builder()
+                .cell(unitRef).value(new Value.FieldValue(new FieldRef("d_stat", "unit")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
                 .build();
-        FieldCell dept = FieldCell.builder()
-                .cell(deptRef).field(new FieldRef("d_stat", "dept"))
+        CellBinding dept = CellBinding.builder()
+                .cell(deptRef).value(new Value.FieldValue(new FieldRef("d_stat", "dept")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
                 .parentCell(unitRef)
                 .build();
-        FieldCell detail = FieldCell.builder()
-                .cell(new CellRef("sheet1", 1, 2)).field(new FieldRef("d_stat", "amount"))
+        CellBinding detail = CellBinding.builder()
+                .cell(new CellRef("sheet1", 1, 2)).value(new Value.FieldValue(new FieldRef("d_stat", "amount")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).mergeRepeated(false)
                 .parentCell(deptRef)
                 .build();
@@ -450,7 +452,6 @@ class ReportModelTest {
     // ---- 辅助方法 ----
     // ============================================================
 
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{(\\w+)}");
 
     private static Parameter findParam(Report report, String name) {
         return report.getParameters().stream()
@@ -467,12 +468,23 @@ class ReportModelTest {
                 .filter(d -> d.getId().equals(id)).findFirst().orElseThrow();
     }
 
-    /** 在报表里找绑定了指定字段的 FieldCell（跳过 TextCell） */
-    private static FieldCell findFieldCell(Report report, FieldRef field) {
+    /** 在报表里找值绑定了指定字段的 CellBinding（FieldValue 或 Aggregate(FieldValue)） */
+    private static CellBinding findFieldCell(Report report, FieldRef field) {
         return report.getCellBindings().stream()
-                .filter(b -> b instanceof FieldCell fc && fc.getField().equals(field))
-                .map(b -> (FieldCell) b)
+                .filter(b -> field.equals(fieldOf(b)))
                 .findFirst().orElseThrow();
+    }
+
+    /** 取格子值绑定的字段：FieldValue 或 Aggregate(FieldValue) 时返回 FieldRef，否则 null。 */
+    private static FieldRef fieldOf(CellBinding b) {
+        Value v = b.getValue();
+        if (v instanceof Value.FieldValue fv) {
+            return fv.ref();
+        }
+        if (v instanceof Value.Aggregate a && a.operand() instanceof Value.FieldValue fv) {
+            return fv.ref();
+        }
+        return null;
     }
 
     /** 报表的输入契约 = 所有 External 参数名 */
@@ -486,12 +498,13 @@ class ReportModelTest {
         return names;
     }
 
-    /** 提取文本模板里的 ${name} 占位符 */
-    private static Set<String> textPlaceholders(String template) {
+    /** 提取文本模板里的占位符名（Hole 里的 NameRef 名字） */
+    private static Set<String> templatePlaceholders(Value.Template tpl) {
         Set<String> names = new HashSet<>();
-        Matcher m = PLACEHOLDER.matcher(template);
-        while (m.find()) {
-            names.add(m.group(1));
+        for (Value.Template.Part p : tpl.parts()) {
+            if (p instanceof Value.Template.Hole h && h.value() instanceof Value.NameRef n) {
+                names.add(n.name());
+            }
         }
         return names;
     }
