@@ -1,8 +1,6 @@
-import { HomeOutlined, TableOutlined, ExperimentOutlined, ApiOutlined } from '@ant-design/icons';
+import { HomeOutlined, TableOutlined } from '@ant-design/icons';
 import HomePage from '@/pages/home';
 import EnginePage from '@/pages/engine';
-import TestPage from '@/pages/test';
-import UniverTestPage from '@/pages/univer-test';
 import React from "react";
 
 export interface RouteConfig {
@@ -21,21 +19,9 @@ const routes: RouteConfig[] = [
   },
   {
     path: '/engine',
-    name: '引擎界面',
+    name: '报表设计器',
     icon: <TableOutlined />,
     element: <EnginePage />,
-  },
-  {
-    path: '/test',
-    name: '测试界面',
-    icon: <ExperimentOutlined />,
-    element: <TestPage />,
-  },
-  {
-    path: '/univer-test',
-    name: 'Univer 验证',
-    icon: <ApiOutlined />,
-    element: <UniverTestPage />,
   },
 ];
 
