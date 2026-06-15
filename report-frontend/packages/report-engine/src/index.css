@@ -1,150 +1,63 @@
-body{
-    margin: 0;
-    padding: 0;
+/* ─── 根容器 ─── */
+.re { display: flex; flex-direction: column; height: 100vh; }
+
+/* ─── 顶栏 ─── */
+.re-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; height: 48px; min-height: 48px;
+  background: #fff; border-bottom: 1px solid #e8e8e8; box-sizing: border-box;
+}
+.re-header__title { font-size: 16px; font-weight: 600; color: #1f1f1f; }
+.re-header__actions { display: flex; align-items: center; gap: 8px; }
+
+/* ─── 主体三栏 ─── */
+.re-body { flex: 1; overflow: hidden; }
+
+/* ─── 面板通用 ─── */
+.re-panel { height: 100%; display: flex; flex-direction: column; }
+.re-panel__title {
+  padding: 10px 12px; font-size: 13px; font-weight: 600; color: #333;
+  border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+}
+.re-panel__content { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+/* ─── 数据集树 ─── */
+.re-dataset-tree { padding: 0 4px; }
+.re-dataset-tree .ant-tree-node-content-wrapper { display: flex; align-items: center; gap: 4px; }
+.re-field-drag { cursor: grab; user-select: none; }
+.re-field-drag:active { cursor: grabbing; }
+.re-field-type {
+  font-size: 10px; color: #999; background: #f5f5f5;
+  padding: 0 4px; border-radius: 2px; line-height: 18px;
+}
+.re-field-pk { font-size: 10px; color: #faad14; }
+
+/* ─── 右面板属性 ─── */
+.re-prop-panel { padding: 12px; }
+.re-prop-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; min-height: 200px; color: #999; font-size: 13px;
+}
+.re-prop-cell-info {
+  padding: 8px 10px; background: #f5f5f5; border-radius: 4px;
+  margin-bottom: 12px; font-size: 13px;
+}
+.re-prop-section { margin-bottom: 16px; }
+.re-prop-section__title {
+  font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;
+}
+.re-prop-value-display {
+  padding: 6px 8px; background: #fafafa; border: 1px solid #f0f0f0;
+  border-radius: 4px; font-size: 12px; color: #666; word-break: break-all;
 }
 
-/* Report Engine 容器 */
-.report-engine {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-}
-
-/* Header */
-.report-engine__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    height: 48px;
-    min-height: 48px;
-    background: #fff;
-    border-bottom: 1px solid #e8e8e8;
-    box-sizing: border-box;
-}
-
-.report-engine__header-left {
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-}
-
-.report-engine__header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1f1f1f;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.report-engine__header-right {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-/* 主体区域 */
-.report-engine__body {
-    flex: 1;
-    overflow: hidden;
-}
-
-/* ========== 属性面板 ========== */
-.report-engine__property-panel {
-    padding: 12px;
-    height: 100%;
-    overflow-y: auto;
-}
-
-.report-engine__property-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 200px;
-}
-
-.report-engine__property-cell-info {
-    padding: 8px 10px;
-    background: #f5f5f5;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    font-size: 13px;
-}
-
-.report-engine__property-cell-ref {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.report-engine__property-cell-value {
-    color: #666;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 120px;
-}
-
-.report-engine__property-merge-hint {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-    font-size: 12px;
-    color: #999;
-}
-
-.report-engine__property-section {
-    margin-bottom: 16px;
-}
-
-.report-engine__property-section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.report-engine__property-section-empty {
-    margin: 4px 0;
-}
-
-.report-engine__property-section-hint {
-    font-size: 12px;
-    color: #999;
-    margin-top: 4px;
-}
-
-.report-engine__property-condition-row {
-    display: flex;
-    gap: 4px;
-    align-items: flex-start;
-    margin-bottom: 8px;
-}
-
-/* 隐藏公式相关 UI */
+/* ─── 隐藏 Univer 公式 UI ─── */
 [data-u-comp="sheets-formula-editor"],
 [data-menu-id*="insert-function"],
 [data-menu-id*="more-functions"],
-.univer-ribbon-tab-formulas {
-    display: none !important;
-}
+.univer-ribbon-tab-formulas { display: none !important; }
 
-/* 面板内滚动条 */
-.report-engine__property-panel::-webkit-scrollbar {
-    width: 4px;
-}
-
-.report-engine__property-panel::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.report-engine__property-panel::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-}
+/* ─── 滚动条 ─── */
+.re-panel__content::-webkit-scrollbar { width: 4px; }
+.re-panel__content::-webkit-scrollbar-track { background: transparent; }
+.re-panel__content::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }

@@ -1,200 +1,198 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Group } from 'react-resizable-panels';
-import Header from './components/layout/header';
-import Panel from './components/layout/panel';
-import DataSourcePanel from './components/datasource';
-import SheetPanel from './components/engine';
-import LoopBlockDrawer from './components/engine/loop-block-drawer';
-import PropertyPanel from './components/properties';
-import type { SheetPanelHandle } from './components/engine';
-import type { ReportEngineProps } from './types';
-import type {
-    SelectedCellInfo,
-    CellPropertyMap,
-    CellPropertyConfig,
-    CellKey,
-    LoopBlockConfig,
-} from './components/properties/types';
-import type { CellRange, FieldDropInfo } from '@coding-report/report-univer';
-import { generateId } from './components/properties/types';
+import { Button, Upload, message } from 'antd';
+import {
+  ExportOutlined,
+  ImportOutlined,
+} from '@ant-design/icons';
+import { Group, Panel as ResizablePanel } from 'react-resizable-panels';
+import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig } from '@coding-report/report-univer';
+import DatasetTree from './components/dataset-tree';
+import SheetPanel from './components/sheet-panel';
+import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
+import PropertyPanel from './components/property-panel';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset } from './types';
 import './index.css';
 
+/**
+ * 报表设计器：三栏布局（数据集树 + 电子表格 + 属性面板）。
+ */
 export const ReportEngine: React.FC<ReportEngineProps> = ({
-    dataConfig,
-    title,
-    onSave,
-    onImport,
-    onExport,
-    onFontRequest,
+  datasets,
+  title = '报表设计器',
+  onExport,
+  onImport,
+  onFontRequest,
 }) => {
-    // ========== Sheet 句柄 ==========
-    const sheetPanelRef = useRef<SheetPanelHandle>(null);
+  const sheetRef = useRef<SheetPanelHandle>(null);
+  const [messageApi, messageContextHolder] = message.useMessage();
 
-    // ========== 模式状态 ==========
-    const [mode, setMode] = useState<'design' | 'preview'>('design');
-    const [importing, setImporting] = useState(false);
-    const [exporting, setExporting] = useState(false);
+  // ─── 状态 ───
+  const [selectedCell, setSelectedCell] = useState<SheetCellSelectInfo | null>(null);
+  const [cellBindings, setCellBindings] = useState<CellBinding[]>([]);
+  const [loopBlocks] = useState<Record<string, LoopBlockConfig>>({});
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
-    // ========== 属性面板状态 ==========
-    const [selectedCell, setSelectedCell] = useState<SelectedCellInfo | null>(null);
-    const [cellProperties, setCellProperties] = useState<CellPropertyMap>({});
+  // ─── cellProps：CellBinding → Univer CellProp 映射 ───
+  const cellProps: Record<string, CellProp[]> = {};
+  for (const b of cellBindings) {
+    cellProps[b.cellKey] = [{
+      kind: 'cellBinding',
+      field: b.value.payload,
+      data: {
+        valueType: b.value.type,
+        expansion: b.expansion,
+        expandMode: b.expandMode,
+        mergeRepeated: b.mergeRepeated,
+        parentCell: b.parentCell,
+        conditionsCount: b.conditions.length,
+      },
+    }];
+  }
 
-    // ========== 循环块状态 ==========
-    const [loopBlocks, setLoopBlocks] = useState<Record<string, LoopBlockConfig>>({});
-    const [loopBlockDrawerOpen, setLoopBlockDrawerOpen] = useState(false);
-    const [activeLoopBlockId, setActiveLoopBlockId] = useState<string | undefined>(undefined);
+  // ─── 单元格选中 ───
+  const handleCellSelect = useCallback((info: SheetCellSelectInfo) => {
+    setSelectedCell(info);
+  }, []);
 
-    // ========== 导入导出 ==========
-    const handleImportFile = useCallback(async (file: File) => {
-        if (!onImport) return;
-        setImporting(true);
-        try {
-            const snapshot = await onImport(file);
-            sheetPanelRef.current?.loadSnapshot(snapshot);
-        } finally {
-            setImporting(false);
+  // ─── 字段拖入 → 创建 CellBinding ───
+  const handleFieldDrop = useCallback(
+    (info: FieldDropInfo, handle: CellHandle) => {
+      try {
+        const data = JSON.parse(info.data);
+        if (data.datasetId && data.field) {
+          const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
+          const fieldRef = `${data.datasetId}.${data.field}`;
+
+          // 设置单元格显示文本
+          handle.setValue(data.alias || data.field);
+
+          // 创建绑定
+          const binding: CellBinding = {
+            cellKey,
+            value: { type: 'FieldValue', payload: fieldRef },
+            expansion: 'VERTICAL',
+            expandMode: 'LIST',
+            mergeRepeated: false,
+            parentCell: null,
+            conditions: [],
+          };
+
+          setCellBindings((prev) => {
+            const filtered = prev.filter((b) => b.cellKey !== cellKey);
+            return [...filtered, binding];
+          });
+
+          messageApi.success(`已绑定 ${data.alias || data.field}`);
         }
-    }, [onImport]);
+      } catch {
+        // 非 JSON 拖拽数据，忽略
+      }
+    },
+    [messageApi],
+  );
 
-    const handleExport = useCallback(async () => {
-        if (!onExport) return;
-        const snapshot = sheetPanelRef.current?.getSnapshot();
-        if (!snapshot) return;
-        setExporting(true);
-        try {
-            await onExport(snapshot);
-        } finally {
-            setExporting(false);
-        }
-    }, [onExport]);
+  // ─── 导出 ───
+  const handleExport = useCallback(async () => {
+    if (!onExport) return;
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) {
+      messageApi.warning('表格为空，无法导出');
+      return;
+    }
+    setExporting(true);
+    try {
+      const loops: LoopBlock[] = [];
+      const summaries: SummaryRow[] = [];
+      await onExport(cellBindings, loops, summaries, snapshot);
+      messageApi.success('导出成功');
+    } catch (e) {
+      messageApi.error(`导出失败: ${e}`);
+    } finally {
+      setExporting(false);
+    }
+  }, [onExport, cellBindings, messageApi]);
 
-    // ========== 模式切换 ==========
-    const handleModeToggle = useCallback(() => {
-        setMode((prev) => (prev === 'design' ? 'preview' : 'design'));
-    }, []);
+  // ─── 导入 ───
+  const handleImport = useCallback(
+    async (file: File) => {
+      if (!onImport) return;
+      setImporting(true);
+      try {
+        const snapshot = await onImport(file);
+        sheetRef.current?.loadSnapshot(snapshot);
+        messageApi.success('导入成功');
+      } catch (e) {
+        messageApi.error(`导入失败: ${e}`);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [onImport, messageApi],
+  );
 
-    // ========== 属性面板回调 ==========
-    const handleCellSelect = useCallback((info: SelectedCellInfo) => {
-        setSelectedCell(info);
-    }, []);
+  return (
+    <div className="re">
+      {messageContextHolder}
 
-    const handleCellPropertyChange = useCallback(
-        (cellKey: CellKey, config: CellPropertyConfig) => {
-            setCellProperties((prev) => ({ ...prev, [cellKey]: config }));
-        },
-        [],
-    );
-
-    // ========== 循环块回调 ==========
-    const handleCreateLoopBlock = useCallback((range: CellRange) => {
-        const id = generateId();
-        const newBlock: LoopBlockConfig = { id, ...range, label: '循环块' };
-        setLoopBlocks((prev) => ({ ...prev, [id]: newBlock }));
-        setActiveLoopBlockId(id);
-        setLoopBlockDrawerOpen(true);
-    }, []);
-
-    const handleEditLoopBlock = useCallback((id: string) => {
-        setActiveLoopBlockId(id);
-        setLoopBlockDrawerOpen(true);
-    }, []);
-
-    const handleLoopBlockLabelChange = useCallback((id: string, label: string) => {
-        setLoopBlocks((prev) => {
-            const block = prev[id];
-            if (!block) return prev;
-            return { ...prev, [id]: { ...block, label } };
-        });
-    }, []);
-
-    const handleRemoveLoopBlock = useCallback((id: string) => {
-        setLoopBlocks((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            // 切换到剩余的第一个 tab，无则关闭抽屉
-            const remaining = Object.keys(next);
-            setActiveLoopBlockId(remaining[0]);
-            if (remaining.length === 0) setLoopBlockDrawerOpen(false);
-            return next;
-        });
-    }, []);
-
-    // ========== 字段拖入回调 ==========
-    const handleFieldDrop = useCallback((info: FieldDropInfo): string | undefined => {
-        try {
-            const parsed = JSON.parse(info.data);
-            if (parsed.table && parsed.field) return `${parsed.table}.${parsed.field}`;
-        } catch {
-            // 非 JSON 格式，直接使用原始数据
-        }
-        return info.data;
-    }, []);
-
-    // ========== SheetPanel ==========
-    const sheetPanel = (
-        <SheetPanel
-            ref={sheetPanelRef}
-            onCellSelect={mode === 'design' ? handleCellSelect : undefined}
-            onCreateLoopBlock={mode === 'design' ? handleCreateLoopBlock : undefined}
-            onEditLoopBlock={mode === 'design' ? handleEditLoopBlock : undefined}
-            onRemoveLoopBlock={mode === 'design' ? handleRemoveLoopBlock : undefined}
-            loopBlocks={loopBlocks}
-            onFieldDrop={mode === 'design' ? handleFieldDrop : undefined}
-            onFontRequest={onFontRequest}
-        />
-    );
-
-    const loopBlockCount = Object.keys(loopBlocks).length;
-
-    return (
-        <div className="report-engine">
-            <Header
-                title={title}
-                onSave={onSave}
-                onImport={onImport ? handleImportFile : undefined}
-                onExport={onExport ? handleExport : undefined}
-                mode={mode}
-                onModeToggle={handleModeToggle}
-                loopBlockCount={loopBlockCount}
-                onManageLoopBlocks={() => setLoopBlockDrawerOpen(true)}
-                importing={importing}
-                exporting={exporting}
-            />
-
-            <div className="report-engine__body">
-                {mode === 'preview' ? (
-                    <div style={{ height: '100%' }}>{sheetPanel}</div>
-                ) : (
-                    <Group orientation="horizontal">
-                        <Panel title="数据预览" position="left" defaultSize="15%" minSize="200px" collapsible>
-                            {dataConfig && <DataSourcePanel dataConfig={dataConfig} />}
-                        </Panel>
-
-                        <Panel position="center" defaultSize="70%" withSeparator>
-                            {sheetPanel}
-                        </Panel>
-
-                        <Panel title="属性设置" position="right" defaultSize="15%" minSize="200px" withSeparator collapsible>
-                            <PropertyPanel
-                                selectedCell={selectedCell}
-                                dataConfig={dataConfig}
-                                cellProperties={cellProperties}
-                                onCellPropertyChange={handleCellPropertyChange}
-                            />
-                        </Panel>
-                    </Group>
-                )}
-            </div>
-
-            <LoopBlockDrawer
-                open={loopBlockDrawerOpen}
-                onClose={() => setLoopBlockDrawerOpen(false)}
-                loopBlocks={loopBlocks}
-                activeId={activeLoopBlockId}
-                onActiveChange={setActiveLoopBlockId}
-                onLabelChange={handleLoopBlockLabelChange}
-                onRemove={handleRemoveLoopBlock}
-            />
+      {/* 顶栏 */}
+      <div className="re-header">
+        <div className="re-header__title">{title}</div>
+        <div className="re-header__actions">
+          {onImport && (
+            <Upload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleImport(file);
+                return false;
+              }}
+            >
+              <Button icon={<ImportOutlined />} loading={importing}>
+                导入
+              </Button>
+            </Upload>
+          )}
+          {onExport && (
+            <Button
+              type="primary"
+              icon={<ExportOutlined />}
+              loading={exporting}
+              onClick={handleExport}
+            >
+              导出
+            </Button>
+          )}
         </div>
-    );
+      </div>
+
+      {/* 三栏主体 */}
+      <div className="re-body">
+        <Group orientation="horizontal">
+          <ResizablePanel defaultSize="15%" minSize="200px" maxSize="25%">
+            <DatasetTree datasets={datasets} />
+          </ResizablePanel>
+
+          <ResizablePanel defaultSize="70%">
+            <SheetPanel
+              ref={sheetRef}
+              cellProps={cellProps}
+              loopBlocks={loopBlocks}
+              onCellSelect={handleCellSelect}
+              onFieldDrop={handleFieldDrop}
+              onFontRequest={onFontRequest}
+            />
+          </ResizablePanel>
+
+          <ResizablePanel defaultSize="15%" minSize="200px" maxSize="25%">
+            <PropertyPanel
+              selectedCell={selectedCell}
+              cellBindings={cellBindings}
+              datasets={datasets}
+            />
+          </ResizablePanel>
+        </Group>
+      </div>
+    </div>
+  );
 };

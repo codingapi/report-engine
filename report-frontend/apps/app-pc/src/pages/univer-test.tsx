@@ -41,12 +41,25 @@ import { MOCK_SNAPSHOT, STYLE_TEST_SNAPSHOT } from './univer-test-utils';
 
 // API
 import { exportExcel, importExcel, fetchFonts } from '@coding-report/report-api';
-import { mockDataConfig } from '../data/mock-data';
+// ─── 字段选项构建（内联 mock，技术验证页专用） ─────────────
 
-// ─── 字段选项构建 ──────────────────────────────────────
+const _mockTables = [
+  { name: 'sys_user', alias: '用户表', fields: [
+    { name: 'id', alias: '用户ID' }, { name: 'username', alias: '用户名' },
+    { name: 'email', alias: '邮箱' }, { name: 'department_id', alias: '部门ID' },
+  ]},
+  { name: 'sys_department', alias: '部门表', fields: [
+    { name: 'id', alias: '部门ID' }, { name: 'name', alias: '部门名称' },
+    { name: 'parent_id', alias: '上级部门' },
+  ]},
+  { name: 'biz_order', alias: '订单表', fields: [
+    { name: 'id', alias: '订单ID' }, { name: 'order_no', alias: '订单号' },
+    { name: 'amount', alias: '金额' }, { name: 'order_date', alias: '下单日期' },
+  ]},
+];
 
-const fieldOptions = mockDataConfig.tables.flatMap((table) =>
-  table.fields.map((f) => ({
+const fieldOptions = _mockTables.flatMap((table: any) =>
+  table.fields.map((f: any) => ({
     label: `${table.alias || table.name}.${f.alias || f.name}`,
     value: `${table.name}.${f.name}`,
   })),
@@ -478,7 +491,7 @@ const UniverTestPage: React.FC = () => {
         {/* 可拖拽字段 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
           <span style={{ fontSize: 12, color: '#999' }}>拖入字段:</span>
-          {mockDataConfig.tables.slice(0, 2).flatMap((table) =>
+          {_mockTables.slice(0, 2).flatMap((table: any) =>
             table.fields.slice(0, 3).map((f) => {
               const fieldCode = `${table.name}.${f.name}`;
               const displayName = f.alias || f.name;
