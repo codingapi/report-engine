@@ -41,6 +41,28 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const lastAppliedRef = useRef<TemplatePreset | null>(null);
+
+  // ─── 清空旧模板单元格 ───
+  const clearPreviousTemplate = useCallback((sheetId: string) => {
+    const prev = lastAppliedRef.current;
+    if (!prev) return;
+    // 清空旧模板设置过的单元格（标题 + 表头 + 数据区域）
+    const maxRow = Math.max(...prev.bindings.map((b) => {
+      const parts = b.cellKey.split(':');
+      return parseInt(parts[1], 10);
+    }), ...prev.cellValues.map((cv) => cv.row));
+    const maxCol = Math.max(...prev.bindings.map((b) => {
+      const parts = b.cellKey.split(':');
+      return parseInt(parts[2], 10);
+    }), ...prev.cellValues.map((cv) => cv.col));
+    // 清空 0..maxRow × 0..maxCol 区域
+    for (let r = 0; r <= maxRow; r++) {
+      for (let c = 0; c <= maxCol; c++) {
+        sheetRef.current?.setCellValue(sheetId, r, c, '');
+      }
+    }
+  }, []);
 
   // ─── 应用模板 ───
   const applyTemplate = useCallback((tpl: TemplatePreset) => {
@@ -50,9 +72,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
     console.log('[ReportEngine] applyTemplate:', tpl.id, 'sheetId:', sheetId);
 
+    // 清空旧模板的单元格内容
+    clearPreviousTemplate(sheetId);
+
     // 设置单元格显示文本
     for (const cv of tpl.cellValues) {
-      console.log('[ReportEngine] setCellValue:', sheetId, cv.row, cv.col, cv.text);
       sheetRef.current?.setCellValue(sheetId, cv.row, cv.col, cv.text);
     }
 
@@ -82,9 +106,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     setCellBindings(remappedBindings);
     setLoopBlocks(remappedLoops);
     setSummaries(tpl.summaries || []);
+    lastAppliedRef.current = tpl;
 
     messageApi.success(`已加载模板：${tpl.label}`);
-  }, [messageApi]);
+  }, [messageApi, clearPreviousTemplate]);
 
   // 暴露 ref
   React.useImperativeHandle(engineRef, () => ({ applyTemplate }), [applyTemplate]);
