@@ -16,6 +16,8 @@ export interface SheetPanelHandle {
   getSnapshot: () => ExcelWorkbook | null;
   loadSnapshot: (snapshot: ExcelWorkbook) => void;
   setCellValue: (sheetId: string, row: number, column: number, value: string) => void;
+  /** 获取当前活动工作表的实际 ID */
+  getActiveSheetId: () => string;
 }
 
 export interface SheetCellSelectInfo {
@@ -29,13 +31,14 @@ interface SheetPanelProps {
   onCellSelect?: (info: SheetCellSelectInfo) => void;
   onFieldDrop?: (info: FieldDropInfo, handle: CellHandle) => void;
   onFontRequest?: () => Promise<FontItem[]>;
+  onReady?: () => void;
 }
 
 /**
  * Univer 电子表格封装：转发 ref 句柄，简化 props 传递。
  */
 const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
-  ({ cellProps, loopBlocks, onCellSelect, onFieldDrop, onFontRequest }, ref) => {
+  ({ cellProps, loopBlocks, onCellSelect, onFieldDrop, onFontRequest, onReady }, ref) => {
     const univerRef = useRef<UniverSheetHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -45,6 +48,11 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
       },
       setCellValue: (sheetId, row, column, value) => {
         univerRef.current?.setCellValue(sheetId, row, column, value);
+      },
+      getActiveSheetId: () => {
+        const snap = univerRef.current?.getSnapshot();
+        if (snap?.sheets?.length) return snap.sheets[0].id || 'sheet1';
+        return 'sheet1';
       },
     }));
 
@@ -61,6 +69,7 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
         onCellSelect={handleCellSelect}
         onFieldDrop={onFieldDrop}
         onFontRequest={onFontRequest}
+        onReady={onReady}
       />
     );
   },

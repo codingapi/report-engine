@@ -46,13 +46,41 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const applyTemplate = useCallback((tpl: TemplatePreset) => {
     setActiveTemplate(tpl.id);
 
+    // 获取实际 sheet ID（Univer 默认 ID 可能不是 'sheet1'）
+    const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
+    console.log('[ReportEngine] applyTemplate:', tpl.id, 'sheetId:', sheetId);
+
     // 设置单元格显示文本
     for (const cv of tpl.cellValues) {
-      sheetRef.current?.setCellValue('sheet1', cv.row, cv.col, cv.text);
+      console.log('[ReportEngine] setCellValue:', sheetId, cv.row, cv.col, cv.text);
+      sheetRef.current?.setCellValue(sheetId, cv.row, cv.col, cv.text);
     }
 
-    setCellBindings(tpl.bindings);
-    setLoopBlocks(tpl.loopBlocks || []);
+    // 将模板中的 cellKey/parentCell 替换为实际 sheet ID
+    const remapKey = (key: string | null) => {
+      if (!key) return null;
+      const parts = key.split(':');
+      return `${sheetId}:${parts[1]}:${parts[2]}`;
+    };
+
+    const remappedBindings = tpl.bindings.map((b) => ({
+      ...b,
+      cellKey: remapKey(b.cellKey)!,
+      parentCell: remapKey(b.parentCell),
+      conditions: b.conditions.map((c) => ({
+        ...c,
+        left: c.left,
+        right: c.right,
+      })),
+    }));
+
+    const remappedLoops = (tpl.loopBlocks || []).map((lb) => ({
+      ...lb,
+      sheetId,
+    }));
+
+    setCellBindings(remappedBindings);
+    setLoopBlocks(remappedLoops);
     setSummaries(tpl.summaries || []);
 
     messageApi.success(`已加载模板：${tpl.label}`);
@@ -242,6 +270,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
               onFontRequest={onFontRequest}
+              onReady={() => console.log('[ReportEngine] Univer ready, sheetId:', sheetRef.current?.getActiveSheetId())}
             />
           </ResizablePanel>
 
