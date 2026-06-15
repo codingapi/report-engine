@@ -53,15 +53,6 @@ public class DatasetConfig {
         List<DataSource> datasources = new ArrayList<>();
         List<Dataset> datasets = new ArrayList<>();
 
-        // 统一 CSV 数据源
-        DataSource csvSource = DataSource.builder()
-                .id("csv")
-                .name("CSV 数据集")
-                .type(DataSourceType.CSV)
-                .config(Map.of())
-                .build();
-        datasources.add(csvSource);
-
         for (Resource resource : resources) {
             String filename = resource.getFilename();
             if (filename == null) continue;
@@ -82,15 +73,25 @@ public class DatasetConfig {
                             .build());
                 }
 
+                // 每个数据集一个 DataSource（CsvDataExtractor 从 config.path 读 CSV）
+                String csvPath = "/" + datasetsDir + id + ".csv";
+                DataSource source = DataSource.builder()
+                        .id("csv_" + id)
+                        .name(alias)
+                        .type(DataSourceType.CSV)
+                        .config(Map.of("path", csvPath))
+                        .build();
+                datasources.add(source);
+
                 TableDataset ds = TableDataset.builder()
                         .id(id)
-                        .datasourceId("csv")
+                        .datasourceId(source.getId())
                         .sourceTable(id + ".csv")
                         .alias(alias)
                         .fields(fields)
                         .build();
                 datasets.add(ds);
-                log.info("加载数据集: {} ({}) - {} 个字段", id, alias, fields.size());
+                log.info("加载数据集: {} ({}) - {} 个字段, path={}", id, alias, fields.size(), csvPath);
             }
         }
 

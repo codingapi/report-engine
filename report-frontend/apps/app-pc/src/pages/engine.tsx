@@ -2,8 +2,57 @@ import { useEffect, useState } from 'react';
 import { Spin } from 'antd';
 import { ReportEngine } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow } from '@coding-report/report-engine';
-import { exportExcel, importExcel, fetchFonts, fetchDatasets } from '@coding-report/report-api';
+import { importExcel, fetchFonts, fetchDatasets, renderReport } from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
+
+// ─── 转换函数 ──────────────────────────────────
+
+function toValueDTO(value: any): RenderValueDTO {
+  return {
+    type: value.type,
+    payload: value.payload,
+    aggregation: value.aggregation,
+    operand: value.operand ? toValueDTO(value.operand) : undefined,
+    funcName: value.funcName,
+    args: value.args?.map(toValueDTO),
+    parts: value.parts?.map((p: any) => ({
+      kind: p.kind,
+      text: p.text,
+      value: p.value ? toValueDTO(p.value) : undefined,
+    })),
+  };
+}
+
+function toBindingDTO(binding: CellBinding): RenderBindingDTO {
+  return {
+    cellKey: binding.cellKey,
+    value: toValueDTO(binding.value),
+    expansion: binding.expansion,
+    expandMode: binding.expandMode,
+    mergeRepeated: binding.mergeRepeated,
+    parentCell: binding.parentCell,
+    conditions: binding.conditions.map((c) => ({
+      id: c.id,
+      left: toValueDTO(c.left),
+      operator: c.operator,
+      right: c.right ? toValueDTO(c.right) : null,
+    })),
+  };
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── 页面组件 ──────────────────────────────────
 
 const EnginePage = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
@@ -12,7 +61,6 @@ const EnginePage = () => {
   useEffect(() => {
     fetchDatasets()
       .then((list) => {
-        // DatasetInfo → Dataset: alias fallback to id
         setDatasets(
           list.map((d) => ({
             id: d.id,
@@ -40,17 +88,13 @@ const EnginePage = () => {
     summaries: SummaryRow[],
     workbook: ExcelWorkbook,
   ): Promise<void> => {
-    // 当前阶段：直接导出表格快照（后续阶段：拼装 Report JSON → render API）
-    console.log('导出配置:', { bindings, loops, summaries });
-    const blob = await exportExcel(workbook);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const blob = await renderReport({
+      cellBindings: bindings.map(toBindingDTO),
+      loopBlocks: loops,
+      summaries: summaries,
+      template: workbook,
+    });
+    downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (loading) {
