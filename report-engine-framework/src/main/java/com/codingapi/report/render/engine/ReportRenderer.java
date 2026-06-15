@@ -405,6 +405,16 @@ public class ReportRenderer {
             }
         }
 
+        // 4b. 收集块范围内的模板合并区域（用于后续迭代时复制）
+        int loopStartRow = loop.getStart().row();
+        int loopEndRow = loop.getEnd().row();
+        List<Merge> blockMerges = new ArrayList<>();
+        for (Merge m : canvas.merges) {
+            if (m.getStartRow() >= loopStartRow && m.getStartRow() + m.getRowSpan() - 1 <= loopEndRow) {
+                blockMerges.add(m);
+            }
+        }
+
         // 5. 逐次迭代
         for (int i = 0; i < driving.getRows().size(); i++) {
             Map<String, Object> drow = driving.getRows().get(i);
@@ -416,6 +426,18 @@ public class ReportRenderer {
                 int row = b.getCell().row() + rowOffset;
                 int col = b.getCell().column();
                 place(canvas, b.getCell(), row, col, evalLoopCell(b, q.getDatasetId(), drow, ctx));
+            }
+
+            // 为后续迭代复制合并区域（第一次迭代的合并已由 seedTemplate 载入）
+            if (i > 0) {
+                for (Merge orig : blockMerges) {
+                    Merge copy = new Merge();
+                    copy.setStartRow(orig.getStartRow() + rowOffset);
+                    copy.setStartCol(orig.getStartCol());
+                    copy.setRowSpan(orig.getRowSpan());
+                    copy.setColSpan(orig.getColSpan());
+                    canvas.merges.add(copy);
+                }
             }
         }
     }
