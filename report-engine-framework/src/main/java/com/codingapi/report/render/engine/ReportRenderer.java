@@ -6,7 +6,6 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
-import com.codingapi.report.operator.aggregation.Aggregators;
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.Condition;
@@ -182,7 +181,7 @@ public class ReportRenderer {
         RawTable filtered = null;
         if (!dataCells.isEmpty()) {
             RawTable combined = buildCombinedTable(dataCells);
-            filtered = Operators.filter(combined, collectConditions(dataCells), ctx);
+            filtered = Operators.filter(combined, collectConditions(dataCells), ctx, engine);
         }
 
         // 3. 先渲染纵向带，拿到展开行数 N 与带的起始行
@@ -283,7 +282,7 @@ public class ReportRenderer {
                         List<Map<String, Object>> groupRows = flatten(details, groupStart[d], i);
                         Object groupVal = details.get(i).tuple.get(d);
                         for (SummaryRow s : ss) {
-                            seq.add(summaryOut(s, groupRows, groupVal));
+                            seq.add(summaryOut(s, groupRows, groupVal, ctx));
                         }
                     }
                 }
@@ -295,7 +294,7 @@ public class ReportRenderer {
         List<SummaryRow> grand = byLevel.get(-1);
         if (grand != null) {
             for (SummaryRow s : grand) {
-                seq.add(summaryOut(s, rows, null));
+                seq.add(summaryOut(s, rows, null, ctx));
             }
         }
 
@@ -347,13 +346,12 @@ public class ReportRenderer {
         return o;
     }
 
-    private Out summaryOut(SummaryRow s, List<Map<String, Object>> groupRows, Object groupVal) {
+    private Out summaryOut(SummaryRow s, List<Map<String, Object>> groupRows, Object groupVal, ParamContext ctx) {
         Out o = new Out(false, null);
+        // 注入 group = 当前分组值，供标签里的 ${group} 解析
+        EvalContext ec = EvalContext.aggregate(groupRows, ctx).withLocal("group", groupVal);
         for (SummaryCell sc : s.getCells()) {
-            Object v = sc.getLabel() != null
-                    ? sc.getLabel().replace("${group}", groupVal == null ? "" : String.valueOf(groupVal))
-                    : Aggregators.aggregate(sc.getAggregation(), groupRows, sc.getField());
-            o.values.put(sc.getColumn(), v);
+            o.values.put(sc.getColumn(), engine.eval(sc.getValue(), ec));
         }
         return o;
     }
@@ -389,7 +387,7 @@ public class ReportRenderer {
     private void renderLoop(Report report, LoopBlock loop, ParamContext ctx, Canvas canvas) {
         Query q = loop.getSource();
         // 1. 提取驱动数据集 + 过滤
-        RawTable driving = Operators.filter(extract(q.getDatasetId()), q.getFilters(), ctx);
+        RawTable driving = Operators.filter(extract(q.getDatasetId()), q.getFilters(), ctx, engine);
         // 2. groupBy 去重（按分组迭代而非逐行）
         if (q.getGroupBy() != null && !q.getGroupBy().isEmpty()) {
             driving = distinctBy(driving, q.getDatasetId(), q.getGroupBy());
@@ -441,7 +439,7 @@ public class ReportRenderer {
         if (other == null) {
             return engine.eval(b.getValue(), EvalContext.scalar(drow, ctx));
         }
-        RawTable f = Operators.filter(extract(other), b.getConditions(), ctx);
+        RawTable f = Operators.filter(extract(other), b.getConditions(), ctx, engine);
         if (b.getValue() instanceof Value.Aggregate) {
             return engine.eval(b.getValue(), EvalContext.aggregate(f.getRows(), ctx));
         }
@@ -587,7 +585,11 @@ public class ReportRenderer {
             }
             if (b.getConditions() != null) {
                 for (Condition c : b.getConditions()) {
-                    needed.add(c.getLeft().datasetId());
+                    collectFieldRefs(c.getLeft(), refs);
+                    collectFieldRefs(c.getRight(), refs);
+                    for (FieldRef r : refs) {
+                        needed.add(r.datasetId());
+                    }
                 }
             }
         }

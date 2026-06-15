@@ -2,6 +2,8 @@ package com.codingapi.report.render.engine;
 
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.relation.Relationship;
+import com.codingapi.report.expression.EvalContext;
+import com.codingapi.report.expression.ExpressionEngine;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.operator.condition.ConditionPredicates;
 import com.codingapi.report.param.ParamContext;
@@ -42,24 +44,26 @@ public final class Operators {
 
     /**
      * 过滤：从 RawTable 中筛选满足<b>全部</b>条件的行（AND 语义）。
-     * <p>每个条件的右值由 {@link ParamContext#resolve} 求解（支持字面量/报表参数/循环字段），
-     * 左右值的比较判断交给 {@link ConditionPredicates}。
+     * <p>每个条件的左右值都由 {@code engine} 对当前行求值（支持字段/字面量/报表参数/循环字段），
+     * 比较判断交给 {@link ConditionPredicates}。
      *
-     * @param t     输入表
-     * @param conds 条件列表（全部 AND），null 或空则不过滤
-     * @param ctx   参数上下文，用于求解条件右值
+     * @param t      输入表
+     * @param conds  条件列表（全部 AND），null 或空则不过滤
+     * @param ctx    参数上下文（报表参数 + 循环作用域）
+     * @param engine 表达式引擎，用于对左右值求值
      * @return 过滤后的新 RawTable（不修改原表）
      */
-    public static RawTable filter(RawTable t, List<Condition> conds, ParamContext ctx) {
+    public static RawTable filter(RawTable t, List<Condition> conds, ParamContext ctx, ExpressionEngine engine) {
         if (conds == null || conds.isEmpty()) {
             return t;
         }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> row : t.getRows()) {
+            EvalContext ec = EvalContext.scalar(row, ctx);
             boolean ok = true;
             for (Condition c : conds) {
-                Object left = row.get(c.getLeft().qualified());
-                Object right = ctx.resolve(c.getValue());
+                Object left = engine.eval(c.getLeft(), ec);
+                Object right = engine.eval(c.getRight(), ec);
                 if (!ConditionPredicates.test(c.getOperator(), left, right)) {
                     ok = false;
                     break;

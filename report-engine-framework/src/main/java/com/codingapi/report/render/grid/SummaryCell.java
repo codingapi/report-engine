@@ -1,69 +1,46 @@
 package com.codingapi.report.render.grid;
 
 import com.codingapi.report.data.dataset.FieldRef;
+import com.codingapi.report.expression.Templates;
+import com.codingapi.report.expression.Value;
 import com.codingapi.report.operator.aggregation.Aggregation;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
- * 小计/合计行里的一个单元格：要么是<b>标签文本</b>，要么是<b>对某字段的聚合</b>。
+ * 小计/合计行里的一个单元格：落在某列上的一个<b>值表达式</b>。
  *
- * <h3>两种角色（互斥）</h3>
+ * <h3>值统一为表达式</h3>
+ * <p>标签和聚合不再是两个互斥字段，而是同一个 {@link #value}（{@link Value}）的不同形态：
  * <ul>
- *   <li><b>标签</b>（{@link #label} 非空）：显示文本，可含占位符 {@code ${group}}，
- *       渲染时替换为当前分组的值。例：{@code "${group}小计"} → "研发中心小计"</li>
- *   <li><b>聚合值</b>（{@link #field} 非空）：对某字段在当前分组范围内做聚合计算。
- *       例：{@code SUM(工资)} → 当前单位所有员工的工资总和</li>
+ *   <li><b>标签</b>：{@link Value.Template}，可含占位 {@code ${group}}（当前分组值，渲染期注入）。
+ *       例：{@code "${group}小计"} → "研发中心小计"</li>
+ *   <li><b>聚合</b>：{@link Value.Aggregate}，在当前分组行集合上汇总某字段。
+ *       例：{@code SUM(工资)}</li>
  * </ul>
- *
- * <h3>示例组合</h3>
- * <pre>
- *   "总部小计"行 = [
- *     SummaryCell.label(0, ""),              // A 列：空
- *     SummaryCell.label(1, "${group}小计"),   // B 列：显示"总部小计"
- *     SummaryCell.label(2, ""),              // C 列：空
- *     SummaryCell.agg(3, "工资", SUM),        // D 列：SUM(工资) = 24500
- *   ]
- * </pre>
+ * 工厂方法 {@link #label}/{@link #agg} 保持原有便捷写法不变，内部构造对应的 {@link Value} 节点。
  *
  * <h3>聚合范围</h3>
- * <p>聚合值的计算范围取决于所属 {@link SummaryRow#getGroupBy()}：
- * <ul>
- *   <li>groupBy 非 null（小计）：仅聚合当前分组内的行</li>
- *   <li>groupBy 为 null（总计）：聚合全表所有行</li>
- * </ul>
+ * <p>取决于所属 {@link SummaryRow#getGroupBy()}：非 null（小计）只聚合当前分组内的行，null（总计）聚合全表。
  */
 @Data
 @AllArgsConstructor
 public class SummaryCell {
-    /** 落在哪一列（0-based），对应模板中的列坐标 */
+
+    /** 落在哪一列（0-based）。 */
     private int column;
 
-    /**
-     * 文本标签（与 {@link #field} 二选一）。
-     * <p>可含占位符 {@code ${group}}，渲染时替换为当前分组的字段值。
-     * <p>使用 {@link #label(int, String)} 工厂方法创建。
-     */
-    private String label;
-
-    /**
-     * 聚合字段（与 {@link #label} 二选一）。
-     * <p>指定对哪个数据集的哪个字段做聚合计算。
-     * <p>使用 {@link #agg(int, FieldRef, Aggregation)} 工厂方法创建。
-     */
-    private FieldRef field;
-
-    /** 聚合方式（SUM/COUNT/AVG/MAX/MIN 等），仅当 field 非空时有意义 */
-    private Aggregation aggregation;
+    /** 值表达式：标签（Template）或聚合（Aggregate）。 */
+    private Value value;
 
     /**
      * 创建标签单元格。
      *
      * @param column 列坐标
-     * @param label  文本标签，可含 {@code ${group}} 占位符
+     * @param label  文本标签，可含 {@code ${group}} 占位符（编译为含 NameRef 的 Template）
      */
     public static SummaryCell label(int column, String label) {
-        return new SummaryCell(column, label, null, null);
+        return new SummaryCell(column, Templates.parse(label));
     }
 
     /**
@@ -74,6 +51,6 @@ public class SummaryCell {
      * @param aggregation 聚合方式
      */
     public static SummaryCell agg(int column, FieldRef field, Aggregation aggregation) {
-        return new SummaryCell(column, null, field, aggregation);
+        return new SummaryCell(column, new Value.Aggregate(aggregation, new Value.FieldValue(field)));
     }
 }

@@ -21,7 +21,6 @@ import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
-import com.codingapi.report.param.ValueRef;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
@@ -150,9 +149,9 @@ class FullChainTest {
                 .value(new Value.FieldValue(new FieldRef("d_student", "name")))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
                 .conditions(List.of(Condition.builder()
-                        .left(new FieldRef("d_student", "class_id"))
+                        .left(new Value.FieldValue(new FieldRef("d_student", "class_id")))
                         .operator(CompareOperator.EQ)
-                        .value(new ValueRef.Param("classId"))
+                        .right(new Value.ParamValue("classId"))
                         .build()))
                 .build();
 

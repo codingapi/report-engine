@@ -14,7 +14,6 @@ import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
-import com.codingapi.report.param.ValueRef;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
@@ -108,8 +107,8 @@ class ReportModelTest {
 
         CellBinding nameCell = findFieldCell(report, new FieldRef("d_emp", "name"));
         assertEquals(Expansion.VERTICAL, nameCell.getExpansion());
-        ValueRef.Param ref = assertInstanceOf(ValueRef.Param.class,
-                nameCell.getConditions().get(0).getValue());
+        Value.ParamValue ref = assertInstanceOf(Value.ParamValue.class,
+                nameCell.getConditions().get(0).getRight());
         assertEquals("deptId", ref.name());
     }
 
@@ -125,7 +124,7 @@ class ReportModelTest {
 
         assertEquals("d_emp", q.getDatasetId());
         assertEquals(1, q.getFilters().size());
-        assertEquals(new FieldRef("d_emp", "status"), q.getFilters().get(0).getLeft());
+        assertEquals(new Value.FieldValue(new FieldRef("d_emp", "status")), q.getFilters().get(0).getLeft());
         assertTrue(q.getGroupBy() == null || q.getGroupBy().isEmpty());
     }
 
@@ -136,8 +135,8 @@ class ReportModelTest {
         LoopBlock loop = report.getLoopBlocks().get(0);
 
         CellBinding baseCell = findFieldCell(report, new FieldRef("d_salary", "base"));
-        ValueRef.LoopField ref = assertInstanceOf(ValueRef.LoopField.class,
-                baseCell.getConditions().get(0).getValue(), "应为循环字段引用而非预登记参数");
+        Value.LoopFieldValue ref = assertInstanceOf(Value.LoopFieldValue.class,
+                baseCell.getConditions().get(0).getRight(), "应为循环字段引用而非预登记参数");
         assertEquals(loop.getId(), ref.loopBlockId());
         assertEquals("id", ref.field());
 
@@ -323,9 +322,9 @@ class ReportModelTest {
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
                 
                 .conditions(List.of(Condition.builder()
-                        .left(new FieldRef("d_emp", "dept_id"))
+                        .left(new Value.FieldValue(new FieldRef("d_emp", "dept_id")))
                         .operator(CompareOperator.EQ)
-                        .value(new ValueRef.Param("deptId"))
+                        .right(new Value.ParamValue("deptId"))
                         .build()))
                 .build();
 
@@ -345,9 +344,9 @@ class ReportModelTest {
                 .source(Query.builder()
                         .datasetId("d_emp")
                         .filters(List.of(Condition.builder()
-                                .left(new FieldRef("d_emp", "status"))
+                                .left(new Value.FieldValue(new FieldRef("d_emp", "status")))
                                 .operator(CompareOperator.EQ)
-                                .value(new ValueRef.Literal("在职"))
+                                .right(new Value.Literal("在职"))
                                 .build()))
                         .groupBy(List.of())
                         .build())
@@ -369,9 +368,9 @@ class ReportModelTest {
                 .value(new Value.FieldValue(new FieldRef("d_salary", "base")))
                 .expansion(Expansion.NONE)
                 .conditions(List.of(Condition.builder()
-                        .left(new FieldRef("d_salary", "emp_id"))
+                        .left(new Value.FieldValue(new FieldRef("d_salary", "emp_id")))
                         .operator(CompareOperator.EQ)
-                        .value(new ValueRef.LoopField("loop_emp", "id"))
+                        .right(new Value.LoopFieldValue("loop_emp", "id"))
                         .build()))
                 .build();
 

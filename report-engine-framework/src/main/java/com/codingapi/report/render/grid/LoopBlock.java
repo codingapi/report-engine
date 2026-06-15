@@ -1,6 +1,5 @@
 package com.codingapi.report.render.grid;
 
-import com.codingapi.report.param.ValueRef;
 import com.codingapi.report.data.dataset.Query;
 import lombok.Builder;
 import lombok.Data;
@@ -40,7 +39,7 @@ import lombok.Data;
  *
  * <h3>循环字段免登记</h3>
  * <p>循环把"当前迭代行"发布进作用域，块内格子通过
- * {@link ValueRef.LoopField}{@code (loopId, field)} 直接引用驱动数据集的字段，
+ * {@code Value.LoopFieldValue}{@code (loopId, field)} 直接引用驱动数据集的字段，
  * 无需预先在 {@link com.codingapi.report.render.Report#getParameters()} 里登记。
  * <p>属性面板枚举可选值时，沿作用域链向上收集：
  * <pre>
@@ -60,7 +59,7 @@ import lombok.Data;
 @Data
 @Builder
 public class LoopBlock {
-    /** 循环块唯一标识，被 {@link ValueRef.LoopField#loopBlockId()} 引用 */
+    /** 循环块唯一标识，被 {@code Value.LoopFieldValue.loopBlockId} 引用 */
     private String id;
     /** 显示标签，用于 UI 展示（如"员工薪资循环"） */
     private String label;

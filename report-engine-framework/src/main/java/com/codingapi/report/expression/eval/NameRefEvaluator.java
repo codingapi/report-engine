@@ -15,6 +15,10 @@ public class NameRefEvaluator implements ValueEvaluator {
 
     @Override
     public Object eval(Value value, EvalContext ctx, ExpressionEngine engine) {
-        return ctx.getParams().lookup(((Value.NameRef) value).name());
+        String name = ((Value.NameRef) value).name();
+        if (ctx.getLocals().containsKey(name)) {
+            return ctx.getLocals().get(name);
+        }
+        return ctx.getParams().lookup(name);
     }
 }

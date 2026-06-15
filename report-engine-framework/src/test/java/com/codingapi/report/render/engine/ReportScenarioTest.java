@@ -24,7 +24,6 @@ import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
-import com.codingapi.report.param.ValueRef;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
@@ -245,8 +244,8 @@ class ReportScenarioTest {
         LoopBlock loop = LoopBlock.builder().id("loop_emp").label("按员工")
                 .start(new CellRef("sheet1", 0, 0)).end(new CellRef("sheet1", 3, 2))
                 .source(Query.builder().datasetId("d_emp")
-                        .filters(List.of(cond(new FieldRef("d_emp", "status"), CompareOperator.EQ,
-                                new ValueRef.Literal("在职"))))
+                        .filters(List.of(cond(new Value.FieldValue(new FieldRef("d_emp", "status")), CompareOperator.EQ,
+                                new Value.Literal("在职"))))
                         .groupBy(List.of()).build())
                 .build();
 
@@ -529,12 +528,12 @@ class ReportScenarioTest {
     private static CellBinding salaryCell(int row, int col, String field) {
         return CellBinding.builder().cell(new CellRef("sheet1", row, col))
                 .value(new Value.FieldValue(new FieldRef("d_sal", field))).expansion(Expansion.NONE)
-                .conditions(List.of(cond(new FieldRef("d_sal", "emp_id"), CompareOperator.EQ,
-                        new ValueRef.LoopField("loop_emp", "id")))).build();
+                .conditions(List.of(cond(new Value.FieldValue(new FieldRef("d_sal", "emp_id")), CompareOperator.EQ,
+                        new Value.LoopFieldValue("loop_emp", "id")))).build();
     }
 
-    private static Condition cond(FieldRef left, CompareOperator op, ValueRef value) {
-        return Condition.builder().left(left).operator(op).value(value).build();
+    private static Condition cond(Value left, CompareOperator op, Value right) {
+        return Condition.builder().left(left).operator(op).right(right).build();
     }
 
     private static Report report(String id, DataModel dm, List<CellBinding> cells,

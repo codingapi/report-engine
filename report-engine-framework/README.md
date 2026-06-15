@@ -31,7 +31,7 @@ com.codingapi.report
 │   └── function/    ValueFunction(SPI) + Functions 注册表 + FormatFunction / DateFunction
 │
 ├── param                        参数域：运行时值解析
-│   └── Parameter / ParamSource(sealed) / ValueRef(sealed) / ParamContext
+│   └── Parameter / ParamSource(sealed) / ParamContext
 │
 └── render                       渲染域：数据如何映射到单元格
     ├── Report       报表定义（dataModelId + cellBindings + loopBlocks + summaries + parameters）
@@ -76,7 +76,8 @@ com.codingapi.report
 - `Dataset` → `TableDataset`（物理表）/ `UnionDataset`（UNION 派生）
 - `Value` → `Literal` / `FieldValue` / `ParamValue` / `LoopFieldValue` / `NameRef` / `Template` / `Aggregate` / `FunctionCall`
 - `ParamSource` → `External` / `Cell` / `Constant`
-- `ValueRef` → `Literal` / `Param` / `LoopField`
+
+> `Condition` 的左右值（`left`/`right`）与 `SummaryCell` 的值均已归一到 `Value`——条件比较、小计标签/聚合也统一走表达式引擎；原 `ValueRef` 被 `Value` 取代后已删除。
 
 ## 渲染流水线
 

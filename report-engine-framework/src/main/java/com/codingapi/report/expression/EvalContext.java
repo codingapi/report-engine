@@ -3,6 +3,7 @@ package com.codingapi.report.expression;
 import com.codingapi.report.param.ParamContext;
 import lombok.Getter;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,11 +28,22 @@ public class EvalContext {
     private final List<Map<String, Object>> rows;
     /** 参数上下文（报表参数 + 循环作用域）。 */
     private final ParamContext params;
+    /**
+     * 渲染期注入的局部名（如小计行的 {@code group} = 当前分组值），{@link Value.NameRef} 优先查这里。
+     * 始终非 null。
+     */
+    private final Map<String, Object> locals;
 
-    public EvalContext(Map<String, Object> row, List<Map<String, Object>> rows, ParamContext params) {
+    public EvalContext(Map<String, Object> row, List<Map<String, Object>> rows, ParamContext params,
+                       Map<String, Object> locals) {
         this.row = row;
         this.rows = rows;
         this.params = params;
+        this.locals = locals == null ? Map.of() : locals;
+    }
+
+    public EvalContext(Map<String, Object> row, List<Map<String, Object>> rows, ParamContext params) {
+        this(row, rows, params, Map.of());
     }
 
     /** 标量上下文：只有当前行。 */
@@ -46,6 +58,13 @@ public class EvalContext {
 
     /** 派生一个只换当前行、其余不变的上下文（聚合时逐行求子表达式用）。 */
     public EvalContext withRow(Map<String, Object> row) {
-        return new EvalContext(row, this.rows, this.params);
+        return new EvalContext(row, this.rows, this.params, this.locals);
+    }
+
+    /** 派生一个追加一个局部名的上下文（如小计行注入 {@code group}）。 */
+    public EvalContext withLocal(String name, Object value) {
+        Map<String, Object> merged = new HashMap<>(locals);
+        merged.put(name, value);
+        return new EvalContext(row, rows, params, merged);
     }
 }

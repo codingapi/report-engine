@@ -1,12 +1,10 @@
 package com.codingapi.report.param;
 
-import com.codingapi.report.param.ValueRef;
-
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 参数上下文：渲染时求解条件右值（{@link ValueRef}）和文本占位（{@code ${name}}）的运行时环境。
+ * 参数上下文：渲染时供表达式求值取"运行时值"的环境——报表参数（external）+ 循环作用域（loopRows）。
  *
  * <h3>两层作用域</h3>
  * <pre>
@@ -19,17 +17,15 @@ import java.util.Map;
  *       └── "loop_dept" → { deptId: 5, deptName: "研发中心" }
  * </pre>
  * <p>{@code external} 是运行时传入的报表参数值（调用方在 {@code render()} 时提供）。
- * {@code loopRows} 承载各循环块当前迭代行的字段值，
- * 由 {@link ReportRenderer} 在遍历循环时通过 {@link #setLoopRow} 动态更新。
+ * {@code loopRows} 承载各循环块当前迭代行的字段值，由 ReportRenderer 在遍历循环时通过
+ * {@link #setLoopRow} 动态更新。
  *
- * <h3>两个求解方法的区别</h3>
+ * <h3>取值方法</h3>
  * <ul>
- *   <li>{@link #resolve(ValueRef)} — 求解条件右值（{@link ValueRef} 的三种实现）。
- *       精确匹配 ValueRef 的类型分发：Literal 取字面量，Param 查 external，LoopField 查 loopRows</li>
- *   <li>{@link #lookup(String)} — 求解文本占位 {@code ${name}}。
- *       按名字模糊查找：先遍历所有循环作用域（内层优先），再查 external。
- *       这样 {@code "${name}的薪资"} 在循环块内取当前员工的 name，
- *       在块外则查报表参数里有没有叫 name 的参数</li>
+ *   <li>{@link #external(String)} — 取报表参数（{@code Value.ParamValue} 用）</li>
+ *   <li>{@link #loopField(String, String)} — 取某循环块当前行的字段（{@code Value.LoopFieldValue} 用）</li>
+ *   <li>{@link #lookup(String)} — 按名字就近查找：循环作用域优先、再报表参数（{@code Value.NameRef} 用，
+ *       即文本插值 {@code ${name}}）</li>
  * </ul>
  *
  * <h3>线程安全</h3>
@@ -95,31 +91,6 @@ public class ParamContext {
      */
     public void setLoopRow(String loopBlockId, Map<String, Object> row) {
         loopRows.put(loopBlockId, row);
-    }
-
-    /**
-     * 求解条件右值（{@link ValueRef} 的三种实现分发）。
-     *
-     * <ul>
-     *   <li>{@link ValueRef.Literal} → 直接返回字面量值</li>
-     *   <li>{@link ValueRef.Param} → 从 external 报表参数中按名字查找</li>
-     *   <li>{@link ValueRef.LoopField} → 从指定循环块的当前迭代行中取字段值</li>
-     * </ul>
-     *
-     * @param ref 条件右值引用
-     * @return 求解后的实际值，找不到返回 null
-     */
-    public Object resolve(ValueRef ref) {
-        if (ref instanceof ValueRef.Literal l) {
-            return l.value();
-        }
-        if (ref instanceof ValueRef.Param p) {
-            return external.get(p.name());
-        }
-        if (ref instanceof ValueRef.LoopField lf) {
-            return loopField(lf.loopBlockId(), lf.field());
-        }
-        return null;
     }
 
     /**
