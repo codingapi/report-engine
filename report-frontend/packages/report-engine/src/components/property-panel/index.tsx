@@ -1,17 +1,19 @@
 import React from 'react';
 import { Tabs, Button, Popconfirm, Badge, Space } from 'antd';
 import { PlusOutlined, DeleteOutlined, TableOutlined } from '@ant-design/icons';
-import type { CellBinding, SummaryRow, Dataset } from '../../types';
+import type { CellBinding, SummaryRow, LoopBlock, Dataset } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
 import ValueEditor from './value-editor';
 import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
+import { valueDisplayText, summaryCellText } from '../../value-text';
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;
   cellBindings: CellBinding[];
   summaries: SummaryRow[];
+  loopBlocks: LoopBlock[];
   datasets: Dataset[];
   onBindingChange: (cellKey: string, binding: CellBinding) => void;
   onBindingCreate: (cellKey: string) => void;
@@ -25,6 +27,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   selectedCell,
   cellBindings,
   summaries,
+  loopBlocks,
   datasets,
   onBindingChange,
   onBindingCreate,
@@ -55,28 +58,37 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     onBindingChange(cellKey, { ...binding, ...patch });
   };
 
+  // 顶部统一预览：当前格配置编译成的表达式（与单元格呈现一致）
+  const previewText = summaryRow
+    ? (() => {
+        const c = summaryRow.cells.find((sc) => sc.column === info.column);
+        return c ? summaryCellText(c, datasets) : '';
+      })()
+    : binding
+      ? valueDisplayText(binding.value, datasets, loopBlocks)
+      : '';
+
   return (
     <div className="re-panel">
       <div className="re-panel__title" style={{ paddingLeft: 32 }}>属性面板</div>
       <div className="re-panel__content">
-        {/* 单元格信息 */}
-        <div className="re-prop-cell-info">
-          <div>
-            <span style={{ color: '#999' }}>位置：</span>
-            {info.a1Notation || `${info.row},${info.column}`}
-            {summaryRow && (
-              <Badge
-                color="gold"
-                text="汇总行"
-                style={{ marginLeft: 8, fontSize: 12 }}
-              />
-            )}
-          </div>
-          {info.value != null && (
-            <div style={{ marginTop: 4, color: '#666', fontSize: 12 }}>
-              值：{String(info.value).slice(0, 50)}
+        {/* 单元格信息：位置 + 预览（统一格式） */}
+        <div className="re-prop-meta">
+          <div className="re-prop-meta__item">
+            <div className="re-prop-meta__label">位置</div>
+            <div className="re-prop-meta__value">
+              {info.a1Notation || `${info.row},${info.column}`}
+              {summaryRow && (
+                <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />
+              )}
             </div>
-          )}
+          </div>
+          <div className="re-prop-meta__item">
+            <div className="re-prop-meta__label">预览</div>
+            <div className="re-prop-meta__value">
+              <code>{previewText || '（未配置）'}</code>
+            </div>
+          </div>
         </div>
 
         {summaryRow ? (
@@ -102,6 +114,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     <ValueEditor
                       value={binding.value}
                       datasets={datasets}
+                      loopBlocks={loopBlocks}
                       onChange={(value) => updateBinding({ value })}
                     />
                   ),
@@ -139,6 +152,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     <ConditionEditor
                       conditions={binding.conditions}
                       datasets={datasets}
+                      loopBlocks={loopBlocks}
                       onChange={(conditions) => updateBinding({ conditions })}
                     />
                   ),

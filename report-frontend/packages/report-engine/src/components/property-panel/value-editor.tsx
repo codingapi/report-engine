@@ -6,17 +6,20 @@ import type {
   ValueType,
   Aggregation,
   Dataset,
+  LoopBlock,
 } from '../../types';
 import {
   VALUE_TYPE_LABELS,
   AGG_LABELS,
   findDataset,
 } from '../../types';
-import { templateToString, parseTemplate, valueDisplayText } from '../../value-text';
+import { templateToString, parseTemplate } from '../../value-text';
 
 interface ValueEditorProps {
   value: ReportValue;
   datasets: Dataset[];
+  /** 当前 sheet 的循环块（用于循环字段级联：选循环块 → 选其数据集字段） */
+  loopBlocks?: LoopBlock[];
   onChange: (newValue: ReportValue) => void;
   compact?: boolean;
 }
@@ -76,6 +79,7 @@ function parseFieldRef(payload: string | undefined): { datasetId: string; field:
 const ValueEditor: React.FC<ValueEditorProps> = ({
   value,
   datasets,
+  loopBlocks = [],
   onChange,
   compact = false,
 }) => {
@@ -170,13 +174,34 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
       }
 
       case 'LoopFieldValue': {
+        // loopId.field —— 选循环块 → 选其驱动数据集的字段
+        const { datasetId: loopId } = parseFieldRef(value.payload);
+        const loop = loopBlocks.find((l) => l.id === loopId);
+        const loopDs = loop ? findDataset(datasets, loop.source.datasetId) : null;
         const input = (
-          <Input
-            size={size}
-            value={value.payload || ''}
-            onChange={(e) => update({ payload: e.target.value })}
-            placeholder="loopId.field"
-          />
+          <div className="re-prop-field-cascade">
+            <Select
+              size={size}
+              value={loopId || undefined}
+              onChange={(id) => update({ payload: `${id}.` })}
+              placeholder="循环块"
+              options={loopBlocks.map((l) => ({ value: l.id, label: l.label || l.id }))}
+              showSearch
+              notFoundContent="无循环块（请在表格选区右键创建）"
+            />
+            <Select
+              size={size}
+              value={value.payload || undefined}
+              onChange={(ref) => update({ payload: ref })}
+              placeholder="字段"
+              disabled={!loopId}
+              options={(loopDs?.fields || []).map((f) => ({
+                value: `${loopId}.${f.name}`,
+                label: f.alias || f.name,
+              }))}
+              showSearch
+            />
+          </div>
         );
         if (compact) return input;
         return <div className="re-prop-value-form"><label>循环字段</label>{input}</div>;
@@ -231,6 +256,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
             <ValueEditor
               value={value.operand || { type: 'FieldValue', payload: '' }}
               datasets={datasets}
+              loopBlocks={loopBlocks}
               onChange={(operand) => update({ operand })}
               compact
             />
@@ -290,6 +316,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                   <ValueEditor
                     value={arg}
                     datasets={datasets}
+                    loopBlocks={loopBlocks}
                     onChange={(newArg) => {
                       const newArgs = [...args];
                       newArgs[i] = newArg;
@@ -323,12 +350,6 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
     <div>
       {typeSelector}
       {form}
-      {!compact && (
-        <div className="re-prop-expr-preview">
-          <span className="re-prop-expr-preview__label">表达式预览</span>
-          <code>{valueDisplayText(value, datasets) || '（空）'}</code>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,19 +1,21 @@
 import React from 'react';
 import { Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import type { Condition, Dataset } from '../../types';
+import type { Condition, Dataset, LoopBlock } from '../../types';
 import { genId } from '../../types';
 import ConditionRow from './condition-row';
 
 interface ConditionEditorProps {
   conditions: Condition[];
   datasets: Dataset[];
+  loopBlocks?: LoopBlock[];
   onChange: (conditions: Condition[]) => void;
 }
 
 const ConditionEditor: React.FC<ConditionEditorProps> = ({
   conditions,
   datasets,
+  loopBlocks = [],
   onChange,
 }) => {
   const handleAdd = () => {
@@ -45,6 +47,7 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
               key={cond.id}
               condition={cond}
               datasets={datasets}
+              loopBlocks={loopBlocks}
               onChange={(updated) => handleChange(i, updated)}
               onDelete={() => handleDelete(i)}
             />

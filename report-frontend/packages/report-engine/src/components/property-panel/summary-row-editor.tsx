@@ -3,7 +3,6 @@ import { Button, Input, Select, Radio, Popconfirm, Space } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { SummaryRow, SummaryCell, Dataset, Aggregation } from '../../types';
 import { findDataset, AGG_LABELS } from '../../types';
-import { summaryCellText } from '../../value-text';
 import SectionLabel from './section-label';
 
 interface SummaryRowEditorProps {
@@ -205,11 +204,6 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
                 />
               </div>
             )}
-
-            <div className="re-prop-expr-preview">
-              <span className="re-prop-expr-preview__label">单元格预览</span>
-              <code>{summaryCellText(cell, datasets) || '（空）'}</code>
-            </div>
 
             <Button
               type="link"

@@ -6,8 +6,8 @@
  * 2. Template 值的可逆编辑：parts 结构 ↔ `${...}` 文本字符串
  */
 
-import type { ReportValue, Dataset, SummaryCell } from './types';
-import { findField } from './types';
+import type { ReportValue, Dataset, SummaryCell, LoopBlock } from './types';
+import { findField, findDataset } from './types';
 
 // ─── 字段引用 → 别名 ───────────────────────────
 
@@ -20,30 +20,41 @@ function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
   return dot === -1 ? ref : ref.slice(dot + 1);
 }
 
+/** "loopId.field" → "循环块名称.字段别名"（如 员工循环.姓名） */
+function loopFieldLabel(ref: string | undefined, datasets: Dataset[], loopBlocks: LoopBlock[]): string {
+  if (!ref) return '';
+  const dot = ref.indexOf('.');
+  const loopId = dot === -1 ? ref : ref.slice(0, dot);
+  const field = dot === -1 ? '' : ref.slice(dot + 1);
+  const loop = loopBlocks.find((l) => l.id === loopId);
+  const loopLabel = loop?.label || loopId;
+  const ds = loop ? findDataset(datasets, loop.source.datasetId) : null;
+  const fieldAlias = ds?.fields.find((f) => f.name === field)?.alias || field;
+  return field ? `${loopLabel}.${fieldAlias}` : loopLabel;
+}
+
 // ─── 值 → 单元格显示文本（统一 ${} + 友好别名） ───
 
 /**
  * 表达式 → `${}` 内部的友好字符串（不含 ${} 包裹）。
  * 数据模型字段显示别名；运行时名字（NameRef/ParamValue）显示名字本身。
  */
-function exprToDisplay(v: ReportValue, datasets: Dataset[]): string {
+function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[]): string {
   switch (v.type) {
     case 'Literal':
       return v.payload || '';
     case 'FieldValue':
       return fieldLabel(v.payload, datasets);
-    case 'LoopFieldValue': {
-      const ref = v.payload || '';
-      const dot = ref.indexOf('.');
-      return dot === -1 ? ref : ref.slice(dot + 1);
-    }
+    case 'LoopFieldValue':
+      // 循环块名称 + 字段别名（如 员工循环.姓名）
+      return loopFieldLabel(v.payload, datasets, loopBlocks);
     case 'NameRef':
     case 'ParamValue':
       return v.payload || '';
     case 'Aggregate':
-      return `${v.aggregation || 'SUM'}(${v.operand ? exprToDisplay(v.operand, datasets) : ''})`;
+      return `${v.aggregation || 'SUM'}(${v.operand ? exprToDisplay(v.operand, datasets, loopBlocks) : ''})`;
     case 'FunctionCall':
-      return `${v.funcName || 'fn'}(${(v.args || []).map((a) => exprToDisplay(a, datasets)).join(', ')})`;
+      return `${v.funcName || 'fn'}(${(v.args || []).map((a) => exprToDisplay(a, datasets, loopBlocks)).join(', ')})`;
     default:
       return '';
   }
@@ -55,15 +66,15 @@ function exprToDisplay(v: ReportValue, datasets: Dataset[]): string {
  * - Template：文本段原样 + 每个洞包成 ${友好表达式}
  * - 其余取值/计算类（字段/聚合/函数/名称引用）：整体包成 ${友好表达式}
  */
-export function valueDisplayText(value: ReportValue, datasets: Dataset[]): string {
+export function valueDisplayText(value: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[] = []): string {
   if (value.type === 'Literal') return value.payload || '';
   if (value.type === 'Template') {
     if (!value.parts) return '';
     return value.parts
-      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets)}}`))
+      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets, loopBlocks)}}`))
       .join('');
   }
-  return `\${${exprToDisplay(value, datasets)}}`;
+  return `\${${exprToDisplay(value, datasets, loopBlocks)}}`;
 }
 
 /** 汇总单元格 → 显示文本：文本格显原文（含 ${group}），聚合格显 ${SUM(别名)} */

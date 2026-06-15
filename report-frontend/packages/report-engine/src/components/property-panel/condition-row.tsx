@@ -1,13 +1,14 @@
 import React from 'react';
 import { Select, Button } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import type { Condition, CompareOperator, Dataset } from '../../types';
+import type { Condition, CompareOperator, Dataset, LoopBlock } from '../../types';
 import { OPERATOR_LABELS } from '../../types';
 import ValueEditor from './value-editor';
 
 interface ConditionRowProps {
   condition: Condition;
   datasets: Dataset[];
+  loopBlocks?: LoopBlock[];
   onChange: (updated: Condition) => void;
   onDelete: () => void;
 }
@@ -18,6 +19,7 @@ const NO_RIGHT_OPS: CompareOperator[] = ['IS_NULL', 'IS_NOT_NULL'];
 const ConditionRow: React.FC<ConditionRowProps> = ({
   condition,
   datasets,
+  loopBlocks = [],
   onChange,
   onDelete,
 }) => {
@@ -29,6 +31,7 @@ const ConditionRow: React.FC<ConditionRowProps> = ({
         <ValueEditor
           value={condition.left}
           datasets={datasets}
+          loopBlocks={loopBlocks}
           onChange={(left) => onChange({ ...condition, left })}
           compact
         />
@@ -59,6 +62,7 @@ const ConditionRow: React.FC<ConditionRowProps> = ({
           <ValueEditor
             value={condition.right || { type: 'Literal', payload: '' }}
             datasets={datasets}
+            loopBlocks={loopBlocks}
             onChange={(right) => onChange({ ...condition, right })}
             compact
           />

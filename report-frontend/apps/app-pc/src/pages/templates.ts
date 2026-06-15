@@ -195,13 +195,13 @@ export const payslipLoopTemplate: TemplatePreset = {
   label: '薪资条循环',
   description: '每人一张薪资条（循环块）',
   cellValues: [
-    cellValue(0, 0, '${name}的薪资'),
+    cellValue(0, 0, '${loop_emp.name}的薪资'),
     cellValue(1, 0, '总薪资'),
     cellValue(1, 1, '岗位薪资'),
     cellValue(1, 2, '绩效工资'),
   ],
   bindings: [
-    { cellKey: cellKey(0, 0), value: { type: 'Template', parts: [{ kind: 'hole', value: { type: 'NameRef', payload: 'name' } }, { kind: 'text', text: '的薪资' }] }, expansion: 'NONE', expandMode: 'LIST', mergeRepeated: false, parentCell: null, conditions: [] },
+    { cellKey: cellKey(0, 0), value: { type: 'Template', parts: [{ kind: 'hole', value: { type: 'LoopFieldValue', payload: 'loop_emp.name' } }, { kind: 'text', text: '的薪资' }] }, expansion: 'NONE', expandMode: 'LIST', mergeRepeated: false, parentCell: null, conditions: [] },
     { cellKey: cellKey(1, 0), value: literal('总薪资'), expansion: 'NONE', expandMode: 'LIST', mergeRepeated: false, parentCell: null, conditions: [] },
     { cellKey: cellKey(1, 1), value: literal('岗位薪资'), expansion: 'NONE', expandMode: 'LIST', mergeRepeated: false, parentCell: null, conditions: [] },
     { cellKey: cellKey(1, 2), value: literal('绩效工资'), expansion: 'NONE', expandMode: 'LIST', mergeRepeated: false, parentCell: null, conditions: [] },

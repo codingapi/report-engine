@@ -6,7 +6,7 @@ import {
   BlockOutlined,
 } from '@ant-design/icons';
 import { Group, Panel as ResizablePanel, Separator, usePanelRef } from 'react-resizable-panels';
-import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig, CellRange } from '@coding-report/report-univer';
+import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig, CellRange, MenuGroupDef } from '@coding-report/report-univer';
 import DatasetTree from './components/dataset-tree';
 import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
@@ -126,7 +126,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         parseInt(r, 10),
         parseInt(c, 10),
-        valueDisplayText(b.value, datasets),
+        valueDisplayText(b.value, datasets, remappedLoops),
       );
     }
 
@@ -219,10 +219,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         parseInt(row, 10),
         parseInt(col, 10),
-        valueDisplayText(binding.value, datasets),
+        valueDisplayText(binding.value, datasets, loopBlocks),
       );
     },
-    [datasets],
+    [datasets, loopBlocks],
   );
 
   // ─── 属性面板回调 ───
@@ -297,6 +297,47 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     });
     setActiveTemplate(null);
   }, []);
+
+  // ─── 右键：将选中区域设为循环块 ───
+  const handleCreateLoopFromRange = useCallback(
+    (range: CellRange) => {
+      setLoopBlocks((prev) => [
+        ...prev,
+        {
+          id: genId(),
+          label: `循环块 ${prev.length + 1}`,
+          sheetId: range.sheetId,
+          startRow: range.startRow,
+          startColumn: range.startColumn,
+          endRow: range.endRow,
+          endColumn: range.endColumn,
+          source: { datasetId: datasets[0]?.id || '', filters: [], groupBy: [], orderBy: [] },
+        },
+      ]);
+      setLoopDrawerOpen(true);
+      setActiveTemplate(null);
+      messageApi.success('已创建循环块，请在抽屉中配置驱动数据集');
+    },
+    [datasets, messageApi],
+  );
+
+  const contextMenuGroups = useMemo<MenuGroupDef[]>(
+    () => [
+      {
+        id: 'report-engine-menu',
+        title: '报表',
+        items: [
+          {
+            id: 'set-loop-block',
+            title: '设为循环块',
+            tooltip: '将选中区域设为循环渲染块',
+            onClick: handleCreateLoopFromRange,
+          },
+        ],
+      },
+    ],
+    [handleCreateLoopFromRange],
+  );
 
   // ─── 字段拖入 → 创建 CellBinding ───
   const handleFieldDrop = useCallback(
@@ -461,6 +502,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               cellProps={cellProps}
               loopBlocks={loopBlockConfigs}
               highlightCells={highlightCells}
+              contextMenuGroups={contextMenuGroups}
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
               onFontRequest={onFontRequest}
@@ -508,6 +550,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                   selectedCell={selectedCell}
                   cellBindings={cellBindings}
                   summaries={summaries}
+                  loopBlocks={loopBlocks}
                   datasets={datasets}
                   onBindingChange={handleBindingChange}
                   onBindingCreate={handleBindingCreate}
