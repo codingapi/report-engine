@@ -1,6 +1,5 @@
-package com.codingapi.report.engine;
+package com.codingapi.report.render.engine;
 
-import com.codingapi.report.render.engine.ReportRenderer;
 import com.codingapi.report.param.ParamContext;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 
@@ -30,6 +29,8 @@ import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.dataset.UnionDataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.relation.JoinType;
@@ -74,7 +75,7 @@ class ReportScenarioTest {
     @DisplayName("简单列表：标题/表头 + 商品名/价格逐行 → xlsx")
     void simpleList() throws Exception {
         DataSource src = csv("ds_prod", "/data/products.csv");
-        Dataset prod = Dataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
                 .fields(List.of(
                         Field.builder().name("name").dataType(DataType.STRING).build(),
                         Field.builder().name("price").dataType(DataType.NUMBER).build()))
@@ -116,7 +117,7 @@ class ReportScenarioTest {
     @DisplayName("带合并列表：标题/表头 + 分类列 GROUP 合并 → xlsx")
     void mergedList() throws Exception {
         DataSource src = csv("ds_sales", "/data/sales.csv");
-        Dataset sales = Dataset.builder().id("d_sales").datasourceId("ds_sales").sourceTable("sales.csv")
+        Dataset sales = TableDataset.builder().id("d_sales").datasourceId("ds_sales").sourceTable("sales.csv")
                 .fields(List.of(
                         Field.builder().name("category").dataType(DataType.STRING).build(),
                         Field.builder().name("product").dataType(DataType.STRING).build(),
@@ -158,7 +159,7 @@ class ReportScenarioTest {
     @DisplayName("统计列表：标题/表头 + 单位/部门分组统计人数，单位合并 → xlsx")
     void statistics() throws Exception {
         DataSource src = csv("ds_staff", "/data/staff.csv");
-        Dataset staff = Dataset.builder().id("d_staff").datasourceId("ds_staff").sourceTable("staff.csv")
+        Dataset staff = TableDataset.builder().id("d_staff").datasourceId("ds_staff").sourceTable("staff.csv")
                 .fields(List.of(
                         Field.builder().name("unit").dataType(DataType.STRING).build(),
                         Field.builder().name("dept").dataType(DataType.STRING).build(),
@@ -220,13 +221,13 @@ class ReportScenarioTest {
     void payslipLoop() throws Exception {
         DataSource empSrc = csv("ds_emp", "/data/employees.csv");
         DataSource salSrc = csv("ds_sal", "/data/salaries.csv");
-        Dataset emp = Dataset.builder().id("d_emp").datasourceId("ds_emp").sourceTable("employees.csv")
+        Dataset emp = TableDataset.builder().id("d_emp").datasourceId("ds_emp").sourceTable("employees.csv")
                 .fields(List.of(
                         Field.builder().name("id").dataType(DataType.NUMBER).primaryKey(true).build(),
                         Field.builder().name("name").dataType(DataType.STRING).build(),
                         Field.builder().name("status").dataType(DataType.STRING).build()))
                 .build();
-        Dataset sal = Dataset.builder().id("d_sal").datasourceId("ds_sal").sourceTable("salaries.csv")
+        Dataset sal = TableDataset.builder().id("d_sal").datasourceId("ds_sal").sourceTable("salaries.csv")
                 .fields(List.of(
                         Field.builder().name("emp_id").dataType(DataType.NUMBER).build(),
                         Field.builder().name("base").dataType(DataType.NUMBER).build(),
@@ -295,14 +296,14 @@ class ReportScenarioTest {
     void masterDetailMergedList() throws Exception {
         DataSource empSrc = csv("ds_emp2", "/data/emp_basic.csv");
         DataSource eduSrc = csv("ds_edu", "/data/emp_education.csv");
-        Dataset emp = Dataset.builder().id("d_emp2").datasourceId("ds_emp2").sourceTable("emp_basic.csv")
+        Dataset emp = TableDataset.builder().id("d_emp2").datasourceId("ds_emp2").sourceTable("emp_basic.csv")
                 .fields(List.of(
                         Field.builder().name("id").dataType(DataType.NUMBER).primaryKey(true).build(),
                         Field.builder().name("name").dataType(DataType.STRING).build(),
                         Field.builder().name("gender").dataType(DataType.STRING).build(),
                         Field.builder().name("age").dataType(DataType.NUMBER).build()))
                 .build();
-        Dataset edu = Dataset.builder().id("d_edu").datasourceId("ds_edu").sourceTable("emp_education.csv")
+        Dataset edu = TableDataset.builder().id("d_edu").datasourceId("ds_edu").sourceTable("emp_education.csv")
                 .fields(List.of(
                         Field.builder().name("emp_id").dataType(DataType.NUMBER).build(),
                         Field.builder().name("school").dataType(DataType.STRING).build(),
@@ -370,7 +371,7 @@ class ReportScenarioTest {
     @DisplayName("分组小计+总计：每个单位的部门明细后插单位小计，全表末尾插总计 → xlsx")
     void salarySubtotalAndGrandTotal() throws Exception {
         DataSource src = csv("ds_sal_detail", "/data/salary_detail.csv");
-        Dataset sal = Dataset.builder().id("d_sd").datasourceId("ds_sal_detail").sourceTable("salary_detail.csv")
+        Dataset sal = TableDataset.builder().id("d_sd").datasourceId("ds_sal_detail").sourceTable("salary_detail.csv")
                 .fields(List.of(
                         Field.builder().name("unit").dataType(DataType.STRING).build(),
                         Field.builder().name("dept").dataType(DataType.STRING).build(),
@@ -446,26 +447,26 @@ class ReportScenarioTest {
         DataSource aSrc = csv("ds_a", "/data/dept_a.csv");
         DataSource bSrc = csv("ds_b", "/data/dept_b.csv");
         // A 列名 name/gender/age
-        Dataset a = Dataset.builder().id("d_a").datasourceId("ds_a").sourceTable("dept_a.csv")
+        Dataset a = TableDataset.builder().id("d_a").datasourceId("ds_a").sourceTable("dept_a.csv")
                 .fields(List.of(
                         Field.builder().name("name").dataType(DataType.STRING).build(),
                         Field.builder().name("gender").dataType(DataType.STRING).build(),
                         Field.builder().name("age").dataType(DataType.NUMBER).build()))
                 .build();
         // B 列名 xm/xb/nl（与 A 不同）
-        Dataset b = Dataset.builder().id("d_b").datasourceId("ds_b").sourceTable("dept_b.csv")
+        Dataset b = TableDataset.builder().id("d_b").datasourceId("ds_b").sourceTable("dept_b.csv")
                 .fields(List.of(
                         Field.builder().name("xm").dataType(DataType.STRING).build(),
                         Field.builder().name("xb").dataType(DataType.STRING).build(),
                         Field.builder().name("nl").dataType(DataType.NUMBER).build()))
                 .build();
         // UNION 派生数据集：统一列 姓名/性别/年龄，各成员按映射对齐
-        Dataset people = Dataset.builder().id("d_people").alias("全部人员")
+        Dataset people = UnionDataset.builder().id("d_people").alias("全部人员")
                 .fields(List.of(
                         Field.builder().name("姓名").dataType(DataType.STRING).build(),
                         Field.builder().name("性别").dataType(DataType.STRING).build(),
                         Field.builder().name("年龄").dataType(DataType.NUMBER).build()))
-                .union(List.of(
+                .members(List.of(
                         new UnionMember("d_a", Map.of("姓名", "name", "性别", "gender", "年龄", "age")),
                         new UnionMember("d_b", Map.of("姓名", "xm", "性别", "xb", "年龄", "nl"))))
                 .build();

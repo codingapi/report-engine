@@ -1,6 +1,5 @@
-package com.codingapi.report.engine;
+package com.codingapi.report.render.engine;
 
-import com.codingapi.report.render.engine.ReportRenderer;
 import com.codingapi.report.param.ParamContext;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 
@@ -26,6 +25,7 @@ import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -105,7 +105,7 @@ class StyleAdaptationTest {
     private static DataModel staffModel() {
         DataSource src = DataSource.builder().id("ds").name("员工CSV").type(DataSourceType.CSV)
                 .config(Map.of("path", "/data/styled_staff.csv")).build();
-        Dataset staff = Dataset.builder().id("d_staff").datasourceId("ds").sourceTable("styled_staff.csv")
+        Dataset staff = TableDataset.builder().id("d_staff").datasourceId("ds").sourceTable("styled_staff.csv")
                 .fields(List.of(
                         Field.builder().name("id").dataType(DataType.NUMBER).build(),
                         Field.builder().name("name").dataType(DataType.STRING).build(),

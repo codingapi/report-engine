@@ -20,6 +20,8 @@ import com.codingapi.report.render.grid.SummaryRow;
 import com.codingapi.report.render.grid.TextCell;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.dataset.UnionDataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
@@ -616,8 +618,8 @@ public class ReportRenderer {
      * 提取数据集（带缓存）：同一数据集在一次渲染中只提取一次。
      * <p>自动区分普通 Dataset 和 UNION 派生 Dataset：
      * <ul>
-     *   <li>普通 Dataset：找到 DataSource → 找到匹配的 DataExtractor → 调用 extract()</li>
-     *   <li>UNION Dataset：逐成员提取，按映射对齐列名，纵向追加</li>
+     *   <li>{@link TableDataset}：找到 DataSource → 找到匹配的 DataExtractor → 调用 extract()</li>
+     *   <li>{@link UnionDataset}：逐成员提取，按映射对齐列名，纵向追加</li>
      * </ul>
      */
     private RawTable extract(String datasetId) {
@@ -629,28 +631,30 @@ public class ReportRenderer {
                 .filter(d -> d.getId().equals(datasetId)).findFirst().orElseThrow();
 
         RawTable result;
-        if (ds.getUnion() != null && !ds.getUnion().isEmpty()) {
-            result = extractUnion(ds);
-        } else {
+        if (ds instanceof UnionDataset u) {
+            result = extractUnion(u);
+        } else if (ds instanceof TableDataset t) {
             DataSource src = dm.getDatasources().stream()
-                    .filter(s -> s.getId().equals(ds.getDatasourceId())).findFirst().orElseThrow();
+                    .filter(s -> s.getId().equals(t.getDatasourceId())).findFirst().orElseThrow();
             DataExtractor extractor = extractors.stream()
                     .filter(e -> e.supports(src.getType())).findFirst()
                     .orElseThrow(() -> new IllegalStateException("无提取器支持类型: " + src.getType()));
-            result = extractor.extract(src, ds);
+            result = extractor.extract(src, t);
+        } else {
+            throw new IllegalStateException("未知数据集类型: " + ds.getClass().getName());
         }
         cache.put(datasetId, result);
         return result;
     }
 
     /** UNION 派生数据集：逐成员提取，按映射把成员字段对齐到统一列，纵向追加 */
-    private RawTable extractUnion(Dataset ds) {
+    private RawTable extractUnion(UnionDataset ds) {
         List<String> columns = new ArrayList<>();
         for (Field f : ds.getFields()) {
             columns.add(ds.getId() + "." + f.getName());
         }
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (UnionMember member : ds.getUnion()) {
+        for (UnionMember member : ds.getMembers()) {
             RawTable memberTable = extract(member.datasetId());
             for (Map<String, Object> mr : memberTable.getRows()) {
                 Map<String, Object> row = new LinkedHashMap<>();

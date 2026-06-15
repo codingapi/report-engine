@@ -1,6 +1,5 @@
-package com.codingapi.report.model;
+package com.codingapi.report.data.datamodel;
 
-import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
 
 import com.codingapi.report.operator.aggregation.Aggregation;
@@ -20,6 +19,7 @@ import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.relation.JoinType;
@@ -86,8 +86,8 @@ class ReportModelTest {
         assertEquals(JoinType.INNER, rel.getJoinType());
         assertEquals(RelationOrigin.MANUAL, rel.getOrigin(), "跨库关系需手动连");
 
-        Dataset left = findDataset(hr, rel.getLeft().datasetId());
-        Dataset right = findDataset(hr, rel.getRight().datasetId());
+        TableDataset left = (TableDataset) findDataset(hr, rel.getLeft().datasetId());
+        TableDataset right = (TableDataset) findDataset(hr, rel.getRight().datasetId());
         assertNotEquals(left.getDatasourceId(), right.getDatasourceId(), "薪资库与人事库是两个不同连接");
         // 两个连接都是 DB 类型（JDBC），不区分厂商
         assertEquals(DataSourceType.DB, findDatasource(hr, left.getDatasourceId()).getType());
@@ -236,7 +236,7 @@ class ReportModelTest {
         DataSource payDb = DataSource.builder()
                 .id("ds_pay").name("薪资库").type(DataSourceType.DB).build();
 
-        Dataset emp = Dataset.builder()
+        Dataset emp = TableDataset.builder()
                 .id("d_emp").datasourceId("ds_hr").sourceTable("employee").alias("员工")
                 .fields(List.of(
                         Field.builder().name("id").alias("ID").dataType(DataType.NUMBER).primaryKey(true).build(),
@@ -245,7 +245,7 @@ class ReportModelTest {
                         Field.builder().name("status").alias("状态").dataType(DataType.STRING).build()))
                 .build();
 
-        Dataset salary = Dataset.builder()
+        Dataset salary = TableDataset.builder()
                 .id("d_salary").datasourceId("ds_pay").sourceTable("salary").alias("薪资")
                 .fields(List.of(
                         Field.builder().name("emp_id").alias("员工").dataType(DataType.NUMBER).build(),
@@ -273,7 +273,7 @@ class ReportModelTest {
     private static DataModel eduDataModel() {
         DataSource edu = DataSource.builder()
                 .id("ds_edu").name("教务库").type(DataSourceType.DB).build();
-        Dataset score = Dataset.builder()
+        Dataset score = TableDataset.builder()
                 .id("d_score").datasourceId("ds_edu").sourceTable("score_view").alias("成绩")
                 .fields(List.of(
                         Field.builder().name("student").alias("学生").dataType(DataType.STRING).build(),
@@ -290,7 +290,7 @@ class ReportModelTest {
     private static DataModel statDataModel() {
         DataSource db = DataSource.builder()
                 .id("ds_stat").name("统计库").type(DataSourceType.DB).build();
-        Dataset stat = Dataset.builder()
+        Dataset stat = TableDataset.builder()
                 .id("d_stat").datasourceId("ds_stat").sourceTable("stat_view").alias("统计")
                 .fields(List.of(
                         Field.builder().name("unit").alias("单位").dataType(DataType.STRING).build(),

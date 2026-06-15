@@ -1,6 +1,5 @@
-package com.codingapi.report.engine;
+package com.codingapi.report.render.engine;
 
-import com.codingapi.report.render.engine.ReportRenderer;
 import com.codingapi.report.param.ParamContext;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 
@@ -27,6 +26,7 @@ import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.relation.JoinType;
@@ -97,14 +97,14 @@ class FullChainTest {
                 .id("ds_score").name("成绩CSV").type(DataSourceType.CSV)
                 .config(Map.of("path", "/data/scores.csv")).build();
 
-        Dataset student = Dataset.builder()
+        Dataset student = TableDataset.builder()
                 .id("d_student").datasourceId("ds_student").sourceTable("students.csv").alias("学生")
                 .fields(List.of(
                         Field.builder().name("id").dataType(DataType.NUMBER).primaryKey(true).build(),
                         Field.builder().name("name").dataType(DataType.STRING).build(),
                         Field.builder().name("class_id").dataType(DataType.NUMBER).build()))
                 .build();
-        Dataset score = Dataset.builder()
+        Dataset score = TableDataset.builder()
                 .id("d_score").datasourceId("ds_score").sourceTable("scores.csv").alias("成绩")
                 .fields(List.of(
                         Field.builder().name("student_id").dataType(DataType.NUMBER).build(),
