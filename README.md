@@ -36,24 +36,34 @@
   - 前端：`onFontRequest` 回调机制、localStorage 缓存、@font-face 动态注入
 - [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry、FontController、ExcelController
 - [x] **API 响应标准化**：统一使用 `SingleResponse` / `MultiResponse` 包装，前端 axios 拦截器自动解包
-- [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据源 / 表格 / 属性），可拖拽调整宽度
-- [x] **循环块管理**：右键菜单创建/删除，蓝色虚线高亮，属性绑定
+- [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据模型 / 表格 / 属性），可拖拽调整宽度，面板可收缩
+- [x] **循环块管理**：右键菜单创建/删除，Tab 化多循环块管理，蓝色虚线高亮，循环字段级联选择
 - [x] **单元格操作句柄**（`CellHandle`）：样式读写、值设置、富文本支持
 - [x] **声明式数据模型**（`report-engine-framework`）：
-  - 源模型：DataSource / Dataset / Field / Relationship / Query / UnionMember
-  - 网格模型：CellBinding（TextCell / FieldCell）、Condition、Aggregation、LoopBlock、SummaryRow
-  - 参数模型：Parameter / ParamSource（External/Cell/Constant）/ ValueRef（Literal/Param/LoopField）
-- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）
+  - 数据域：DataSource（`DataSourceType` 枚举：CSV/JSON/DB/API/EXCEL）/ Dataset（sealed → TableDataset / UnionDataset）/ Field / Relationship
+  - 算子域：Aggregation（SUM/COUNT/AVG/MAX/MIN/COUNT_DISTINCT）/ Condition + 比较算子 SPI
+  - 表达式域：Value（sealed，8 种节点：Literal / FieldValue / ParamValue / LoopFieldValue / NameRef / Template / Aggregate / FunctionCall）/ ExpressionEngine 注册表分发 / ValueFunction SPI
+  - 参数域：ParamSource（External / Cell / Constant）
+  - 渲染域：CellBinding（值层 Value + 控制层 expansion/merge/conditions）/ LoopBlock / SummaryRow
+- [x] **表达式引擎**：统一 `${...}` 文本语法（`Templates.parse()`），支持字段引用、聚合函数、文本插值、函数调用
+- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染
 - [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联
+- [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
+- [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（CSV/JSON/DB/API/EXCEL）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
+- [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
+- [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
+- [x] **报表配置持久化**：`ReportConfigController` 保存/加载 API，数据模型随配置附带返回，7 个示例报表预存
+- [x] **报表渲染导出**：`POST /api/report/render` → 填充数据的 .xlsx 下载，DTO 层匹配前端 JSON 格式
+- [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发
 
-- [ ] **表达式抽象**：统一 ValueRef / ParamSource / 文本插值的表达式类型体系
-- [ ] **前端参数绑定**：ConditionRule 支持 Param/LoopField 值引用（目前仅支持字面量）
-- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源树
-- [ ] **报表配置持久化**：DataModel / Report 模型的存储与加载
-- [ ] **报表数据呈现**：前端实时预览填充数据后的报表效果
-- [ ] **报表数据导出**：报表模板 → 填充数据 → 生成 .xlsx 下载
+- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD
+- [ ] **报表数据预览**：前端实时预览填充数据后的报表效果（目前仅导出后可见）
+- [ ] **报表参数运行时输入**：报表渲染前提供参数输入表单（目前参数使用默认值）
+- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型
+- [ ] **报表权限与共享**：报表配置的权限控制、多人协作、版本管理
+- [ ] **打印与分页**：报表分页设置、打印预览、页眉页脚配置
 
 ## 快速开始
 
