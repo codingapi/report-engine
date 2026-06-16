@@ -1,0 +1,8 @@
+{
+  "alias": "销售记录",
+  "fields": [
+    { "name": "category", "alias": "类别", "dataType": "STRING" },
+    { "name": "product", "alias": "商品", "dataType": "STRING" },
+    { "name": "qty", "alias": "数量", "dataType": "NUMBER" }
+  ]
+}

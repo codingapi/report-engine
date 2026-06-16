@@ -1,150 +1,248 @@
-body{
-    margin: 0;
-    padding: 0;
+/* ─── 根容器 ─── */
+.re { display: flex; flex-direction: column; height: 100vh; }
+
+/* ─── 顶栏 ─── */
+.re-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; height: 48px; min-height: 48px;
+  background: #fff; border-bottom: 1px solid #e8e8e8; box-sizing: border-box;
+}
+.re-header__title {
+  font-size: 16px; font-weight: 600; color: #1f1f1f;
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+}
+.re-header__actions { display: flex; align-items: center; gap: 8px; }
+
+/* ─── 面板分割线 ─── */
+.re-separator {
+  width: 1px; background: #e8e8e8; flex-shrink: 0;
+}
+.re-separator:hover { background: #1677ff; }
+
+/* ─── 面板收缩 ─── */
+.re-panel-wrapper {
+  position: relative; height: 100%;
+}
+.re-panel-collapse-btn {
+  position: absolute; top: 6px; right: 6px; z-index: 10;
+  background: rgba(255, 255, 255, 0.85); border-radius: 4px;
+  pointer-events: auto;
+}
+.re-panel-collapse-btn--left {
+  right: auto; left: 6px;
+}
+.re-panel-collapsed {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; background: #fafafa;
+  cursor: pointer;
+}
+.re-panel-collapsed:hover { background: #f0f0f0; }
+
+/* ─── 主体三栏 ─── */
+.re-body { flex: 1; overflow: hidden; }
+
+/* ─── 面板通用 ─── */
+.re-panel { height: 100%; display: flex; flex-direction: column; }
+.re-panel__title {
+  padding: 10px 12px; font-size: 13px; font-weight: 600; color: #333;
+  border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+}
+.re-panel__content {
+  flex: 1; overflow-y: auto; padding: 8px 0;
+  scrollbar-gutter: stable;
 }
 
-/* Report Engine 容器 */
-.report-engine {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
+/* ─── 数据集树 ─── */
+.re-dataset-tree { padding: 0 4px; }
+.re-dataset-tree .ant-tree-node-content-wrapper { display: flex; align-items: center; gap: 4px; }
+.re-field-drag { cursor: grab; user-select: none; }
+.re-field-drag:active { cursor: grabbing; }
+.re-field-type {
+  font-size: 10px; color: #999; background: #f5f5f5;
+  padding: 0 4px; border-radius: 2px; line-height: 18px;
+}
+.re-field-pk { font-size: 10px; color: #faad14; }
+.re-field-relation {
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: 8px; font-size: 11px; color: #1677ff;
 }
 
-/* Header */
-.report-engine__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    height: 48px;
-    min-height: 48px;
-    background: #fff;
-    border-bottom: 1px solid #e8e8e8;
-    box-sizing: border-box;
+/* ─── 数据分组树 ─── */
+.re-ds-group-title { font-weight: 600; color: #333; }
+
+/* ─── 数据关系面板（上下分区） ─── */
+.re-rel-panel { padding-bottom: 8px; }
+.re-rel-group-header {
+  padding: 4px 12px; font-size: 12px; font-weight: 600; color: #666;
 }
 
-.report-engine__header-left {
-    display: flex;
-    align-items: center;
-    overflow: hidden;
+/* ─── 右面板属性 ─── */
+.re-prop-panel { padding: 12px; }
+.re-prop-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; min-height: 200px; color: #999; font-size: 13px;
+}
+.re-prop-cell-info {
+  padding: 8px 10px; background: #f5f5f5; border-radius: 4px;
+  margin-bottom: 8px; font-size: 13px;
+}
+.re-prop-section { margin-bottom: 16px; }
+.re-prop-section__title {
+  font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;
+}
+.re-prop-value-display {
+  padding: 6px 8px; background: #fafafa; border: 1px solid #f0f0f0;
+  border-radius: 4px; font-size: 12px; color: #666; word-break: break-all;
 }
 
-.report-engine__header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1f1f1f;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* ─── 属性面板 Tabs ─── */
+.re-prop-tabs { margin: 0 -8px; }
+.re-prop-tabs .ant-tabs-nav { padding: 0 8px; margin-bottom: 0; }
+.re-prop-tabs .ant-tabs-content-holder { padding: 8px; }
+
+/* ─── 未绑定状态 ─── */
+.re-prop-unbound { padding: 12px 0; }
+.re-prop-unbound__hint {
+  font-size: 12px; color: #999; margin-bottom: 8px; line-height: 1.6;
 }
 
-.report-engine__header-right {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
+/* ─── 底部操作栏 ─── */
+.re-prop-actions {
+  padding: 8px 0 0; border-top: 1px solid #f0f0f0; margin-top: 8px;
 }
 
-/* 主体区域 */
-.report-engine__body {
-    flex: 1;
-    overflow: hidden;
+/* ─── 值表达式编辑器 ─── */
+.re-prop-value-type { margin-bottom: 8px; }
+.re-prop-value-form { display: flex; flex-direction: column; gap: 6px; }
+.re-prop-value-form label {
+  font-size: 12px; color: #666; margin-bottom: 2px;
+}
+.re-prop-field-cascade { display: flex; gap: 4px; }
+.re-prop-field-cascade > * { flex: 1; min-width: 0; }
+.re-prop-agg-row { display: flex; gap: 4px; align-items: flex-start; }
+.re-prop-agg-row > :first-child { flex: 0 0 40%; }
+.re-prop-agg-row > :last-child { flex: 1; min-width: 0; }
+.re-prop-func-args { display: flex; flex-direction: column; gap: 4px; }
+.re-prop-func-arg-row { display: flex; gap: 4px; align-items: center; }
+.re-prop-func-arg-row > :first-child { flex: 1; min-width: 0; }
+
+/* ─── 单元格信息：位置 + 预览 ─── */
+.re-prop-meta {
+  padding: 10px 12px; border-bottom: 1px solid #f0f0f0; margin-bottom: 8px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.re-prop-meta__label { font-size: 11px; color: #999; margin-bottom: 3px; }
+.re-prop-meta__value { font-size: 13px; color: #333; display: flex; align-items: center; }
+.re-prop-meta__value code {
+  font-size: 12px; color: #1554ad; background: #f0f6ff;
+  padding: 2px 8px; border-radius: 3px; word-break: break-all;
 }
 
-/* ========== 属性面板 ========== */
-.report-engine__property-panel {
-    padding: 12px;
-    height: 100%;
-    overflow-y: auto;
+/* ─── 数据模型三 tab ─── */
+.re-dm-tabs { height: 100%; }
+.re-dm-tabs .ant-tabs-nav { margin-bottom: 8px; padding: 0 8px; }
+
+/* 数据关系列表 */
+.re-rel-list { display: flex; flex-direction: column; gap: 6px; padding: 0 8px; }
+.re-rel-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 10px; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 4px;
+  font-size: 12px;
+}
+.re-rel-endpoint { color: #333; word-break: break-all; }
+.re-rel-icon { color: #1677ff; flex-shrink: 0; }
+
+/* 报表参数管理 */
+.re-param-manager { padding: 0 8px; }
+.re-param-intro {
+  font-size: 12px; color: #888; line-height: 1.6; margin-bottom: 10px;
+}
+.re-param-intro code {
+  background: #f0f0f0; padding: 0 4px; border-radius: 2px; color: #d63384;
+}
+.re-param-list { display: flex; flex-direction: column; gap: 6px; }
+.re-param-item { display: flex; gap: 4px; align-items: center; }
+.re-param-item > .ant-input { min-width: 0; }
+
+/* ─── 表达式构建器 ─── */
+.re-expr-builder { display: flex; flex-direction: column; gap: 8px; }
+.re-expr-toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.re-expr-picker {
+  display: flex; gap: 6px; align-items: center;
+  padding: 8px; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 4px;
+}
+.re-expr-picker--wrap { flex-direction: column; align-items: stretch; gap: 6px; }
+.re-expr-group-label { font-size: 11px; color: #999; }
+
+/* ─── 分组小计 ${group} 提示 ─── */
+.re-prop-group-hint {
+  margin-top: 4px; font-size: 11px; color: #999; line-height: 1.6;
+}
+.re-prop-group-hint code {
+  background: #f0f0f0; padding: 0 4px; border-radius: 2px; color: #d63384;
 }
 
-.report-engine__property-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 200px;
+/* ─── 扩展设置编辑器 ─── */
+.re-prop-exp-section { margin-bottom: 12px; }
+.re-prop-exp-section__label {
+  font-size: 12px; color: #333; font-weight: 500; margin-bottom: 2px;
+}
+.re-prop-exp-section__hint {
+  font-size: 11px; color: #999; margin-bottom: 4px; line-height: 1.5;
 }
 
-.report-engine__property-cell-info {
-    padding: 8px 10px;
-    background: #f5f5f5;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    font-size: 13px;
+/* ─── 条件编辑器 ─── */
+.re-prop-cond-list { display: flex; flex-direction: column; gap: 6px; }
+.re-prop-cond-row { display: flex; gap: 4px; align-items: center; }
+.re-prop-cond-row .re-prop-cond-left { flex: 2; min-width: 0; }
+.re-prop-cond-row .re-prop-cond-op { flex: 0 0 80px; }
+.re-prop-cond-row .re-prop-cond-right { flex: 2; min-width: 0; }
+.re-prop-cond-row .re-prop-cond-del { flex: 0 0 auto; }
+.re-prop-cond-empty {
+  padding: 12px 0; text-align: center; font-size: 12px; color: #bbb;
 }
 
-.report-engine__property-cell-ref {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+/* ─── 循环块管理 ─── */
+.re-loop-intro {
+  padding: 10px 12px; background: #f6f8fa; border-radius: 6px;
+  margin-bottom: 12px; font-size: 13px; color: #555; line-height: 1.7;
 }
-
-.report-engine__property-cell-value {
-    color: #666;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 120px;
+.re-loop-intro p { margin: 0 0 4px; }
+.re-loop-intro p:last-child { margin-bottom: 0; }
+.re-loop-intro code {
+  background: #e8ecf0; padding: 1px 5px; border-radius: 3px;
+  font-size: 12px; color: #d63384;
 }
-
-.report-engine__property-merge-hint {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-    font-size: 12px;
-    color: #999;
+.re-loop-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 500;
 }
-
-.report-engine__property-section {
-    margin-bottom: 16px;
+.re-loop-label__hint {
+  font-size: 12px; color: #bbb; cursor: help;
 }
-
-.report-engine__property-section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.re-loop-label__hint:hover { color: #1677ff; }
+.re-prop-loop-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.re-prop-loop-item {
+  border: 1px solid #e8e8e8; border-radius: 6px; overflow: hidden;
 }
-
-.report-engine__property-section-empty {
-    margin: 4px 0;
+.re-prop-loop-item__header {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px; background: #fafafa; border-bottom: 1px solid #f0f0f0;
 }
+.re-prop-loop-item__body { padding: 10px 12px; }
 
-.report-engine__property-section-hint {
-    font-size: 12px;
-    color: #999;
-    margin-top: 4px;
-}
+/* ─── 小计 / 总计管理 ─── */
+.re-prop-summary-cells { display: flex; flex-direction: column; gap: 6px; }
+.re-prop-summary-cell-row { display: flex; gap: 4px; align-items: center; }
+.re-prop-summary-cell-row > .re-prop-field-cascade { gap: 4px; }
 
-.report-engine__property-condition-row {
-    display: flex;
-    gap: 4px;
-    align-items: flex-start;
-    margin-bottom: 8px;
-}
-
-/* 隐藏公式相关 UI */
+/* ─── 隐藏 Univer 公式 UI ─── */
 [data-u-comp="sheets-formula-editor"],
 [data-menu-id*="insert-function"],
 [data-menu-id*="more-functions"],
-.univer-ribbon-tab-formulas {
-    display: none !important;
-}
+.univer-ribbon-tab-formulas { display: none !important; }
 
-/* 面板内滚动条 */
-.report-engine__property-panel::-webkit-scrollbar {
-    width: 4px;
-}
-
-.report-engine__property-panel::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.report-engine__property-panel::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-}
+/* ─── 滚动条 ─── */
+.re-panel__content::-webkit-scrollbar { width: 4px; }
+.re-panel__content::-webkit-scrollbar-track { background: transparent; }
+.re-panel__content::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }

@@ -1,16 +1,17 @@
 /**
- * 循环块高亮管理
- * 使用 Univer highlightRanges API，支持 selection 变更后自动重应用
+ * 高亮管理
+ * 使用 Univer highlightRanges API（非持久装饰层，不写入 snapshot/导出），
+ * 支持两类高亮：循环块区域 + 配置单元格。selection 变更后自动重应用。
  */
 
-import type { LoopBlockConfig } from '@/types';
+import type { LoopBlockConfig, CellRange } from '@/types';
 import type { UniverAPI } from './setup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IDisposable = any;
 
-/** 高亮样式 */
-const HIGHLIGHT_STYLE = {
+/** 循环块区域高亮：淡蓝填充 + 蓝色虚线边框 */
+const LOOP_HIGHLIGHT_STYLE = {
     fill: 'rgba(22, 119, 255, 0.08)',
     stroke: '#1677ff',
     strokeWidth: 1,
@@ -21,8 +22,19 @@ const HIGHLIGHT_STYLE = {
     },
 };
 
+/** 配置单元格高亮：较明显的蓝底 + 实线细边框，区分"有配置 vs 纯文字" */
+const CELL_HIGHLIGHT_STYLE = {
+    fill: 'rgba(22, 119, 255, 0.16)',
+    stroke: 'rgba(22, 119, 255, 0.45)',
+    strokeWidth: 1,
+    strokeDash: 0,
+    widgets: {
+        top: false, bottom: false, left: false, right: false,
+        topLeft: false, topRight: false, bottomLeft: false, bottomRight: false,
+    },
+};
+
 interface HighlightRegion {
-    id: string;
     sheetId: string;
     row: number;
     col: number;
@@ -31,8 +43,10 @@ interface HighlightRegion {
 }
 
 export interface HighlightManager {
-    /** 用最新 loopBlocks 同步高亮区域 */
+    /** 用最新 loopBlocks 同步循环块高亮区域 */
     sync(blocks: Record<string, LoopBlockConfig>): void;
+    /** 用最新配置单元格同步高亮 */
+    syncCells(cells: CellRange[]): void;
     /** 重新应用所有高亮（selection 变更后调用） */
     reapply(): void;
     /** 是否有高亮区域 */
@@ -45,55 +59,61 @@ export interface HighlightManager {
  * 创建高亮管理器
  */
 export function createHighlightManager(univerAPI: UniverAPI): HighlightManager {
-    const regions: Map<string, HighlightRegion> = new Map();
+    const loopRegions: Map<string, HighlightRegion> = new Map();
+    let cellRegions: HighlightRegion[] = [];
     let disposables: IDisposable[] = [];
 
-    function doApply(): void {
-        // 释放旧的
-        disposables.forEach(d => { try { d.dispose(); } catch { /* ignore */ } });
-        disposables = [];
-
-        if (regions.size === 0) return;
-
-        const workbook = univerAPI.getActiveWorkbook();
-        if (!workbook) return;
-
-        // 按 sheetId 分组
+    /** 按 sheet 分组并对一批区域应用同一高亮样式 */
+    function applyGroup(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        workbook: any,
+        regions: HighlightRegion[],
+        style: typeof LOOP_HIGHLIGHT_STYLE,
+    ): void {
+        if (regions.length === 0) return;
         const sheetGroups = new Map<string, HighlightRegion[]>();
-        regions.forEach(region => {
+        regions.forEach((region) => {
             const group = sheetGroups.get(region.sheetId) || [];
             group.push(region);
             sheetGroups.set(region.sheetId, group);
         });
-
-        // 对每个 sheet 批量高亮
         sheetGroups.forEach((group, sheetId) => {
             try {
                 const sheet = workbook.getSheetBySheetId(sheetId);
                 if (!sheet) return;
-                const ranges = group.map(r =>
-                    sheet.getRange(r.row, r.col, r.height, r.width)
-                );
-                const disposable = sheet.highlightRanges(ranges, HIGHLIGHT_STYLE);
-                disposables.push(disposable);
+                const ranges = group.map((r) => sheet.getRange(r.row, r.col, r.height, r.width));
+                disposables.push(sheet.highlightRanges(ranges, style));
             } catch {
                 // sheet 可能已被删除
             }
         });
     }
 
+    function doApply(): void {
+        // 释放旧的
+        disposables.forEach((d) => { try { d.dispose(); } catch { /* ignore */ } });
+        disposables = [];
+
+        if (loopRegions.size === 0 && cellRegions.length === 0) return;
+
+        const workbook = univerAPI.getActiveWorkbook();
+        if (!workbook) return;
+
+        applyGroup(workbook, Array.from(loopRegions.values()), LOOP_HIGHLIGHT_STYLE);
+        applyGroup(workbook, cellRegions, CELL_HIGHLIGHT_STYLE);
+    }
+
     function sync(blocks: Record<string, LoopBlockConfig>): void {
         // 移除不再存在的
         const toRemove: string[] = [];
-        regions.forEach((_, id) => {
+        loopRegions.forEach((_, id) => {
             if (!blocks[id]) toRemove.push(id);
         });
-        toRemove.forEach(id => regions.delete(id));
+        toRemove.forEach((id) => loopRegions.delete(id));
 
         // 添加/更新存在的
         for (const [id, block] of Object.entries(blocks)) {
-            regions.set(id, {
-                id,
+            loopRegions.set(id, {
                 sheetId: block.sheetId,
                 row: block.startRow,
                 col: block.startColumn,
@@ -105,14 +125,27 @@ export function createHighlightManager(univerAPI: UniverAPI): HighlightManager {
         doApply();
     }
 
+    function syncCells(cells: CellRange[]): void {
+        cellRegions = cells.map((c) => ({
+            sheetId: c.sheetId,
+            row: c.startRow,
+            col: c.startColumn,
+            height: c.endRow - c.startRow + 1,
+            width: c.endColumn - c.startColumn + 1,
+        }));
+        doApply();
+    }
+
     return {
         sync,
+        syncCells,
         reapply: doApply,
-        hasRegions: () => regions.size > 0,
+        hasRegions: () => loopRegions.size > 0 || cellRegions.length > 0,
         dispose: () => {
-            disposables.forEach(d => { try { d.dispose(); } catch { /* ignore */ } });
+            disposables.forEach((d) => { try { d.dispose(); } catch { /* ignore */ } });
             disposables = [];
-            regions.clear();
+            loopRegions.clear();
+            cellRegions = [];
         },
     };
 }

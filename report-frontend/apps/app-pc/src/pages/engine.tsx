@@ -1,32 +1,184 @@
-import React from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Spin } from 'antd';
 import { ReportEngine } from '@coding-report/report-engine';
-import { exportExcel, importExcel, fetchFonts } from '@coding-report/report-api';
+import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
+import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship } from '@coding-report/report-engine';
+import {
+  importExcel, fetchFonts, renderReport, fetchFunctions,
+  saveReportConfig, loadReportConfig,
+} from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog } from '@coding-report/report-api';
+import type { DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
-import { mockDataConfig } from '@/data/mock-data';
+
+// ─── 转换函数 ──────────────────────────────────
+
+function toValueDTO(value: any): RenderValueDTO {
+  return {
+    type: value.type,
+    payload: value.payload,
+    aggregation: value.aggregation,
+    operand: value.operand ? toValueDTO(value.operand) : undefined,
+    funcName: value.funcName,
+    args: value.args?.map(toValueDTO),
+    parts: value.parts?.map((p: any) => ({
+      kind: p.kind,
+      text: p.text,
+      value: p.value ? toValueDTO(p.value) : undefined,
+    })),
+  };
+}
+
+function toBindingDTO(binding: CellBinding): RenderBindingDTO {
+  return {
+    cellKey: binding.cellKey,
+    value: toValueDTO(binding.value),
+    expansion: binding.expansion,
+    expandMode: binding.expandMode,
+    mergeRepeated: binding.mergeRepeated,
+    parentCell: binding.parentCell,
+    conditions: binding.conditions.map((c) => ({
+      id: c.id,
+      left: toValueDTO(c.left),
+      operator: c.operator,
+      right: c.right ? toValueDTO(c.right) : null,
+    })),
+    preview: binding.preview,
+  };
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── 页面组件 ──────────────────────────────────
 
 const EnginePage = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const reportIdFromUrl = searchParams.get('id');
+
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [dataModelId, setDataModelId] = useState<string>('default');
+  const [functions, setFunctions] = useState<ExpressionCatalog>();
+  const [loading, setLoading] = useState(true);
+  const engineRef = useRef<ReportEngineHandle>(null);
+
+  // 加载公式目录
+  useEffect(() => {
+    fetchFunctions()
+      .then(setFunctions)
+      .catch((e) => console.error('加载公式列表失败:', e));
+  }, []);
+
+  // 根据 URL 参数加载或创建报表
+  useEffect(() => {
+    const init = async () => {
+      if (reportIdFromUrl) {
+        try {
+          const config = await loadReportConfig(reportIdFromUrl);
+          const dm = config.dataModel as DataModelInfo | undefined;
+          if (dm) {
+            setDatasets(
+              dm.datasets.map((d) => ({
+                id: d.id,
+                alias: d.alias || d.id,
+                sourceType: (d.dataSourceType || 'CSV') as Dataset['sourceType'],
+                fields: d.fields.map((f) => ({
+                  name: f.name,
+                  alias: f.alias || f.name,
+                  dataType: f.dataType,
+                  primaryKey: f.primaryKey,
+                })),
+              })),
+            );
+            setRelationships(
+              dm.relationships.map((r) => ({
+                left: r.left,
+                right: r.right,
+                joinType: r.joinType as Relationship['joinType'],
+              })),
+            );
+          }
+          if (config.dataModelId) setDataModelId(config.dataModelId as string);
+          engineRef.current?.loadReportConfig(config as unknown as ReportConfig);
+        } catch (e) {
+          console.error('加载报表失败:', e);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // 无 id → 创建空白报表并跳转
+        try {
+          const newId = await saveReportConfig({
+            name: '未命名报表',
+            dataModelId: 'default',
+          });
+          navigate(`/engine?id=${newId}`, { replace: true });
+        } catch (e) {
+          console.error('创建报表失败:', e);
+          setLoading(false);
+        }
+      }
+    };
+    init();
+  }, [reportIdFromUrl, navigate]);
+
   const handleImport = async (file: File): Promise<ExcelWorkbook> => {
     return importExcel(file);
   };
 
-  const handleExport = async (workbook: ExcelWorkbook): Promise<void> => {
-    const blob = await exportExcel(workbook);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleExport = async (
+    bindings: CellBinding[],
+    loops: LoopBlock[],
+    summaries: SummaryRow[],
+    workbook: ExcelWorkbook,
+    params: ReportParam[],
+  ): Promise<void> => {
+    const paramValues = Object.fromEntries(
+      params.map((p) => [p.name, p.defaultValue ?? null]),
+    );
+    const blob = await renderReport({
+      cellBindings: bindings.map(toBindingDTO),
+      loopBlocks: loops,
+      summaries: summaries,
+      params: paramValues,
+      template: workbook,
+    });
+    downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
+
+  const handleSaveReport = async (config: ReportConfig): Promise<string> => {
+    return saveReportConfig({ ...config, dataModelId } as unknown as Record<string, unknown>);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <Spin size="large" tip="加载报表..." />
+      </div>
+    );
+  }
 
   return (
     <ReportEngine
-      dataConfig={mockDataConfig}
-      title="销售数据月报"
+      datasets={datasets}
+      relationships={relationships}
+      dataModelId={dataModelId}
+      functions={functions}
+      engineRef={engineRef}
       onImport={handleImport}
       onExport={handleExport}
+      onSaveReport={handleSaveReport}
       onFontRequest={fetchFonts}
     />
   );

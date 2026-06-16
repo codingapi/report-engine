@@ -1,0 +1,7 @@
+{
+  "alias": "商品目录",
+  "fields": [
+    { "name": "name", "alias": "商品名", "dataType": "STRING" },
+    { "name": "price", "alias": "单价", "dataType": "NUMBER" }
+  ]
+}

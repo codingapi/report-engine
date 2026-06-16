@@ -1,0 +1,12 @@
+[
+  {
+    "left": { "datasetId": "emp_basic", "field": "id" },
+    "right": { "datasetId": "emp_education", "field": "emp_id" },
+    "joinType": "INNER"
+  },
+  {
+    "left": { "datasetId": "employees", "field": "id" },
+    "right": { "datasetId": "salaries", "field": "emp_id" },
+    "joinType": "INNER"
+  }
+]

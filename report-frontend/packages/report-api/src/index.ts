@@ -1,3 +1,10 @@
 export type { ApiResponse, ApiSingleResponse, ApiMultiResponse, ApiMapResponse } from './http';
 export { exportExcel, importExcel } from './excel';
 export { fetchFonts } from './font';
+export { fetchDatasets, fetchDatasetPreview } from './dataset';
+export type { DataType, DatasetField, DatasetInfo, DatasetPreview } from './dataset';
+export { renderReport, saveReportConfig, loadReportConfig, listExampleReports, listReportConfigs } from './report';
+export type { RenderRequest, RenderBindingDTO, RenderValueDTO, RenderConditionDTO, ReportBrief } from './report';
+export { fetchFunctions } from './expression';
+export type { ExpressionCatalog, FunctionMeta } from './expression';
+export type { DataModelInfo, DataModelDataset, DataModelField, RelationshipInfo, FieldRefInfo } from './datamodel';

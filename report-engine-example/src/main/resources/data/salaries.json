@@ -1,0 +1,9 @@
+{
+  "alias": "薪资明细",
+  "fields": [
+    { "name": "emp_id", "alias": "工号", "dataType": "STRING" },
+    { "name": "base", "alias": "基本工资", "dataType": "NUMBER" },
+    { "name": "bonus", "alias": "奖金", "dataType": "NUMBER" },
+    { "name": "total", "alias": "合计", "dataType": "NUMBER" }
+  ]
+}

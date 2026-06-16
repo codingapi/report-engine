@@ -1,11 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Typography, Card } from 'antd';
-import {menuItems} from "@/config/menus.tsx";
+import { Menu, Typography, Card, List, Spin } from 'antd';
+import { FileTextOutlined } from '@ant-design/icons';
+import { listExampleReports } from '@coding-report/report-api';
+import type { ReportBrief } from '@coding-report/report-api';
+import { menuItems } from '@/config/menus.tsx';
 
 const { Title, Text } = Typography;
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const [examples, setExamples] = useState<ReportBrief[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listExampleReports()
+      .then(setExamples)
+      .catch((e) => console.error('加载示例报表失败:', e))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key);
@@ -28,6 +41,28 @@ const HomePage = () => {
           style={{ border: 'none' }}
         />
       </Card>
+
+      <Title level={4} style={{ marginTop: 32, marginBottom: 12 }}>
+        <FileTextOutlined /> 示例报表
+      </Title>
+      {loading ? (
+        <Spin />
+      ) : (
+        <Card>
+          <List
+            dataSource={examples}
+            renderItem={(item) => (
+              <List.Item
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/engine?id=${item.id}`)}
+              >
+                <List.Item.Meta title={item.name} />
+              </List.Item>
+            )}
+            locale={{ emptyText: '暂无示例报表' }}
+          />
+        </Card>
+      )}
     </div>
   );
 };

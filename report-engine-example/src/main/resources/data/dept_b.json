@@ -1,0 +1,8 @@
+{
+  "alias": "B部门人员",
+  "fields": [
+    { "name": "xm", "alias": "姓名", "dataType": "STRING" },
+    { "name": "xb", "alias": "性别", "dataType": "STRING" },
+    { "name": "nl", "alias": "年龄", "dataType": "NUMBER" }
+  ]
+}
