@@ -16,6 +16,7 @@ import LoopBlockManager from './components/property-panel/loop-block-manager';
 import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
+import { parseCellKey, makeCellKey } from './utils/excel-cell';
 import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
@@ -91,14 +92,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     if (!prev) return;
     // 清空旧模板设置过的单元格（标题 + 表头 + 数据区域 + 汇总行）
     const prevSummaries = prev.summaries || [];
-    const maxRow = Math.max(...prev.bindings.map((b) => {
-      const parts = b.cellKey.split(':');
-      return parseInt(parts[1], 10);
-    }), ...prev.cellValues.map((cv) => cv.row), ...prevSummaries.map((s) => s.row));
-    const maxCol = Math.max(...prev.bindings.map((b) => {
-      const parts = b.cellKey.split(':');
-      return parseInt(parts[2], 10);
-    }), ...prev.cellValues.map((cv) => cv.col),
+    const maxRow = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).row),
+      ...prev.cellValues.map((cv) => cv.row), ...prevSummaries.map((s) => s.row));
+    const maxCol = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).col),
+      ...prev.cellValues.map((cv) => cv.col),
       ...prevSummaries.flatMap((s) => s.cells.map((c) => c.column)));
     // 清空 0..maxRow × 0..maxCol 区域
     for (let r = 0; r <= maxRow; r++) {
@@ -127,8 +124,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 将模板中的 cellKey/parentCell 替换为实际 sheet ID
     const remapKey = (key: string | null) => {
       if (!key) return null;
-      const parts = key.split(':');
-      return `${sheetId}:${parts[1]}:${parts[2]}`;
+      const { row, col } = parseCellKey(key);
+      return makeCellKey(sheetId, row, col);
     };
 
     const remappedBindings = tpl.bindings.map((b) => ({
@@ -149,11 +146,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     // 回写所有绑定的显示文本，让数据区字段/聚合配置在表格中可见
     for (const b of remappedBindings) {
-      const [, r, c] = b.cellKey.split(':');
+      const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         sheetId,
-        parseInt(r, 10),
-        parseInt(c, 10),
+        row,
+        col,
         valueDisplayText(b.value, datasets, remappedLoops),
       );
     }
@@ -186,8 +183,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 将 cellKey/parentCell 中的 sheet ID 重映射为实际 ID
     const remapKey = (key: string | null) => {
       if (!key) return null;
-      const parts = key.split(':');
-      return `${actualSheetId}:${parts[1]}:${parts[2]}`;
+      const { row, col } = parseCellKey(key);
+      return makeCellKey(actualSheetId, row, col);
     };
 
     const configLoops = config.loopBlocks || [];
@@ -217,11 +214,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
     const ds = datasets;
     for (const b of remappedBindings) {
-      const [, r, c] = b.cellKey.split(':');
+      const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         actualSheetId,
-        parseInt(r, 10),
-        parseInt(c, 10),
+        row,
+        col,
         valueDisplayText(b.value, ds, remappedLoops),
       );
     }
@@ -306,13 +303,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     for (const b of cellBindings) {
       // 纯文本（Literal）就是普通文字，不高亮
       if (b.value.type === 'Literal') continue;
-      const [sheetId, r, c] = b.cellKey.split(':');
-      const row = parseInt(r, 10);
-      const col = parseInt(c, 10);
+      const { sheetId, row, col } = parseCellKey(b.cellKey);
       ranges.push({ sheetId, startRow: row, startColumn: col, endRow: row, endColumn: col });
     }
     // 汇总行：仅聚合格高亮（label 文本格视同普通文字）
-    const sumSheet = cellBindings[0]?.cellKey.split(':')[0]
+    const sumSheet = (cellBindings[0] ? parseCellKey(cellBindings[0].cellKey).sheetId : undefined)
       || sheetRef.current?.getActiveSheetId() || 'sheet1';
     for (const s of summaries) {
       for (const cell of s.cells) {
@@ -333,13 +328,12 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   // ─── 将绑定值回写为单元格显示文本（设计态占位） ───
   const writeBindingText = useCallback(
     (cellKey: string, binding: CellBinding) => {
-      const parts = cellKey.split(':');
-      if (parts.length !== 3) return;
-      const [sheetId, row, col] = parts;
+      if (cellKey.split(':').length !== 3) return;
+      const { sheetId, row, col } = parseCellKey(cellKey);
       sheetRef.current?.setCellValue(
         sheetId,
-        parseInt(row, 10),
-        parseInt(col, 10),
+        row,
+        col,
         valueDisplayText(binding.value, datasets, loopBlocks),
       );
     },

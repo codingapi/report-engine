@@ -2,6 +2,7 @@ import React from 'react';
 import { Radio, Select, Switch } from 'antd';
 import type { CellBinding, Expansion, ExpandMode } from '../../types';
 import { EXPANSION_LABELS } from '../../types';
+import { parseCellKey, cellA1 } from '../../utils/excel-cell';
 
 interface ExpansionEditorProps {
   expansion: Expansion;
@@ -15,18 +16,9 @@ interface ExpansionEditorProps {
 
 /** 将 cellKey "sheetId:row:col" 转为简短显示 */
 function cellKeyLabel(key: string): string {
-  const parts = key.split(':');
-  if (parts.length !== 3) return key;
-  const row = parseInt(parts[1], 10);
-  const col = parseInt(parts[2], 10);
-  // 简易列号 → 字母转换（0→A, 25→Z, 26→AA）
-  let colStr = '';
-  let c = col;
-  while (c >= 0) {
-    colStr = String.fromCharCode(65 + (c % 26)) + colStr;
-    c = Math.floor(c / 26) - 1;
-  }
-  return `${colStr}${row + 1}`;
+  if (key.split(':').length !== 3) return key;
+  const { row, col } = parseCellKey(key);
+  return cellA1(row, col);
 }
 
 const ExpansionEditor: React.FC<ExpansionEditorProps> = ({

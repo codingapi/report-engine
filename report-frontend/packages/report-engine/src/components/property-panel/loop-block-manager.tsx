@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Button, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { LoopBlock, Dataset } from '../../types';
-import { findDataset } from '../../types';
+import { describeRange } from '../../utils/excel-cell';
+import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 import SectionLabel from './section-label';
 import ConditionEditor from './condition-editor';
 
@@ -12,20 +13,9 @@ interface LoopBlockManagerProps {
   onChange: (loopBlocks: LoopBlock[]) => void;
 }
 
-/** 列号 → 字母（0→A, 25→Z, 26→AA） */
-function colToLetter(col: number): string {
-  let str = '';
-  let c = col;
-  while (c >= 0) {
-    str = String.fromCharCode(65 + (c % 26)) + str;
-    c = Math.floor(c / 26) - 1;
-  }
-  return str;
-}
-
 /** 区域描述：A1:C4 */
 function describeRegion(lb: LoopBlock): string {
-  return `${colToLetter(lb.startColumn)}${lb.startRow + 1}:${colToLetter(lb.endColumn)}${lb.endRow + 1}`;
+  return describeRange(lb.startRow, lb.startColumn, lb.endRow, lb.endColumn);
 }
 
 /** 单个循环块的配置表单 */
@@ -36,7 +26,6 @@ const LoopBlockForm: React.FC<{
   onUpdate: (patch: Partial<LoopBlock>) => void;
   onDelete: () => void;
 }> = ({ lb, datasets, allLoops, onUpdate, onDelete }) => {
-  const loopFields = findDataset(datasets, lb.source.datasetId)?.fields || [];
   return (
     <div className="re-prop-loop-item__body">
       {/* 名称 */}
@@ -72,7 +61,7 @@ const LoopBlockForm: React.FC<{
         onChange={(dsId) => onUpdate({ source: { ...lb.source, datasetId: dsId } })}
         placeholder="选择驱动数据集"
         style={{ width: '100%', marginBottom: 8 }}
-        options={datasets.map((ds) => ({ value: ds.id, label: ds.alias || ds.id }))}
+        options={datasetOptions(datasets)}
       />
 
       {/* 分组字段 */}
@@ -87,7 +76,7 @@ const LoopBlockForm: React.FC<{
         onChange={(groupBy) => onUpdate({ source: { ...lb.source, groupBy } })}
         placeholder="不分组（逐行迭代）"
         style={{ width: '100%', marginBottom: 8 }}
-        options={loopFields.map((f) => ({ value: f.name, label: f.alias || f.name }))}
+        options={fieldOptions(datasets, lb.source.datasetId)}
       />
 
       {/* 排序字段 */}
@@ -99,7 +88,7 @@ const LoopBlockForm: React.FC<{
         onChange={(orderBy) => onUpdate({ source: { ...lb.source, orderBy } })}
         placeholder="不排序（按原始顺序）"
         style={{ width: '100%', marginBottom: 8 }}
-        options={loopFields.map((f) => ({ value: f.name, label: f.alias || f.name }))}
+        options={fieldOptions(datasets, lb.source.datasetId)}
       />
 
       {/* 过滤条件 */}

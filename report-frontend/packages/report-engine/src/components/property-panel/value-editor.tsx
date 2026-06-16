@@ -14,6 +14,7 @@ import {
   findDataset,
 } from '../../types';
 import { templateToString, parseTemplate } from '../../value-text';
+import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 
 interface ValueEditorProps {
   value: ReportValue;
@@ -45,24 +46,6 @@ function emptyValue(type: ValueType): ReportValue {
     case 'FunctionCall':
       return { type: 'FunctionCall', funcName: '', args: [] };
   }
-}
-
-// ─── 数据集/字段选项构建 ─────────────────────
-
-function buildDatasetOptions(datasets: Dataset[]) {
-  return datasets.map((ds) => ({
-    value: ds.id,
-    label: ds.alias || ds.id,
-  }));
-}
-
-function buildFieldOptions(datasets: Dataset[], datasetId: string) {
-  const ds = findDataset(datasets, datasetId);
-  if (!ds) return [];
-  return ds.fields.map((f) => ({
-    value: `${ds.id}.${f.name}`,
-    label: f.alias || f.name,
-  }));
 }
 
 // ─── 解析 payload 中的 datasetId ─────────────
@@ -142,7 +125,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               value={datasetId || undefined}
               onChange={(dsId) => update({ payload: `${dsId}.` })}
               placeholder="数据集"
-              options={buildDatasetOptions(datasets)}
+              options={datasetOptions(datasets)}
               showSearch
             />
             <Select
@@ -150,7 +133,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               value={value.payload || undefined}
               onChange={(ref) => update({ payload: ref })}
               placeholder="字段"
-              options={buildFieldOptions(datasets, datasetId)}
+              options={fieldOptions(datasets, datasetId, true)}
               showSearch
               disabled={!datasetId}
             />

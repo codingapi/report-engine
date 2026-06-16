@@ -8,17 +8,7 @@ import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
 import { valueDisplayText } from '../../value-text';
-
-/** 列号 → 字母（0→A, 25→Z, 26→AA） */
-function colToLetter(col: number): string {
-  let str = '';
-  let c = col;
-  while (c >= 0) {
-    str = String.fromCharCode(65 + (c % 26)) + str;
-    c = Math.floor(c / 26) - 1;
-  }
-  return str;
-}
+import { cellA1 } from '../../utils/excel-cell';
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;
@@ -116,8 +106,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   // 汇总行：显示其作用列区间（A1 风格），如 A3:B3；单列时只显示一格
   const summaryRangeText = summaryRow
     ? summaryRow.fromColumn === summaryRow.toColumn
-      ? `${colToLetter(summaryRow.fromColumn)}${summaryRow.row + 1}`
-      : `${colToLetter(summaryRow.fromColumn)}${summaryRow.row + 1}:${colToLetter(summaryRow.toColumn)}${summaryRow.row + 1}`
+      ? cellA1(summaryRow.row, summaryRow.fromColumn)
+      : `${cellA1(summaryRow.row, summaryRow.fromColumn)}:${cellA1(summaryRow.row, summaryRow.toColumn)}`
     : '';
 
   // ─── 已绑定：Tab 内容 ───

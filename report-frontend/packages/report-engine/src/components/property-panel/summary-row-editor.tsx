@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Select, Radio } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
 import { findDataset } from '../../types';
+import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 import { valueDisplayText } from '../../value-text';
 import SectionLabel from './section-label';
 import ExpressionBuilder from './expression-builder';
@@ -103,7 +104,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
               value={summaryRow.groupBy!.datasetId || undefined}
               onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
               placeholder="数据集"
-              options={datasets.map((d) => ({ value: d.id, label: d.alias || d.id }))}
+              options={datasetOptions(datasets)}
               showSearch
             />
             <Select
@@ -112,12 +113,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
               onChange={(field) => onChange({ ...summaryRow, groupBy: { ...summaryRow.groupBy!, field } })}
               placeholder="分组字段"
               disabled={!summaryRow.groupBy!.datasetId}
-              options={
-                findDataset(datasets, summaryRow.groupBy!.datasetId)?.fields.map((f) => ({
-                  value: f.name,
-                  label: f.alias || f.name,
-                })) || []
-              }
+              options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
               showSearch
             />
           </div>
