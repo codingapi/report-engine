@@ -31,6 +31,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   engineRef?: React.Ref<ReportEngineHandle>;
 }> = ({
   datasets,
+  functions,
   title,
   engineRef,
   onExport,
@@ -385,14 +386,23 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }
     setExporting(true);
     try {
-      await onExport(cellBindings, loopBlocks, summaries, snapshot);
+      // 导出时附带表达式预览（友好文本），随配置一起存储到后端
+      const bindingsOut = cellBindings.map((b) => ({
+        ...b,
+        preview: valueDisplayText(b.value, datasets, loopBlocks),
+      }));
+      const summariesOut = summaries.map((s) => ({
+        ...s,
+        cells: s.cells.map((c) => ({ ...c, preview: summaryCellText(c, datasets) })),
+      }));
+      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot);
       messageApi.success('导出成功');
     } catch (e) {
       messageApi.error(`导出失败: ${e}`);
     } finally {
       setExporting(false);
     }
-  }, [onExport, cellBindings, loopBlocks, summaries, messageApi]);
+  }, [onExport, cellBindings, loopBlocks, summaries, datasets, messageApi]);
 
   // ─── 导入 ───
   const handleImport = useCallback(
@@ -552,6 +562,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                   summaries={summaries}
                   loopBlocks={loopBlocks}
                   datasets={datasets}
+                  functions={functions}
                   onBindingChange={handleBindingChange}
                   onBindingCreate={handleBindingCreate}
                   onBindingDelete={handleBindingDelete}

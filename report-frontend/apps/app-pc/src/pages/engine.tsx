@@ -5,8 +5,8 @@ import { ReportEngine } from '@coding-report/report-engine';
 import type { ReportEngineHandle, TemplatePreset } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow } from '@coding-report/report-engine';
 import { ALL_TEMPLATES } from './templates';
-import { importExcel, fetchFonts, fetchDatasets, renderReport } from '@coding-report/report-api';
-import type { RenderBindingDTO, RenderValueDTO } from '@coding-report/report-api';
+import { importExcel, fetchFonts, fetchDatasets, renderReport, fetchFunctions } from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 
 // ─── 转换函数 ──────────────────────────────────
@@ -41,6 +41,7 @@ function toBindingDTO(binding: CellBinding): RenderBindingDTO {
       operator: c.operator,
       right: c.right ? toValueDTO(c.right) : null,
     })),
+    preview: binding.preview,
   };
 }
 
@@ -95,9 +96,16 @@ function TitleBar({
 
 const EnginePage = () => {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const engineRef = useRef<ReportEngineHandle>(null);
+
+  useEffect(() => {
+    fetchFunctions()
+      .then(setFunctions)
+      .catch((e) => console.error('加载公式列表失败:', e));
+  }, []);
 
   useEffect(() => {
     fetchDatasets()
@@ -154,6 +162,7 @@ const EnginePage = () => {
   return (
     <ReportEngine
       datasets={datasets}
+      functions={functions}
       title={
         <TitleBar
           templates={ALL_TEMPLATES}

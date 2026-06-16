@@ -14,6 +14,9 @@ public interface ValueFunction {
     /** 是否支持该函数名。 */
     boolean supports(String name);
 
+    /** 函数元信息（名称/参数/说明），供前端构建器枚举与展示。 */
+    FunctionMeta meta();
+
     /**
      * 执行函数。
      *

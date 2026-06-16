@@ -99,6 +99,8 @@ export interface CellBinding {
   mergeRepeated: boolean;
   parentCell: string | null;
   conditions: Condition[];
+  /** 表达式预览（友好文本，导出时附带存储；派生自 value，不作为权威来源） */
+  preview?: string;
 }
 
 export interface LoopBlock {
@@ -122,6 +124,8 @@ export interface SummaryCell {
   kind: 'label' | 'agg';
   payload: string;
   aggregation?: Aggregation;
+  /** 表达式预览（友好文本，导出时附带存储） */
+  preview?: string;
 }
 
 export interface SummaryRow {
@@ -152,6 +156,22 @@ export const findField = (datasets: Dataset[], ref: string): DatasetField | null
   return ds?.fields.find((f) => f.name === ref.slice(dot + 1)) ?? null;
 };
 
+// ─── 公式目录（表达式构建器用） ────────────────
+
+/** 函数元信息（对齐后端 ExpressionController.FunctionMeta） */
+export interface FunctionMeta {
+  name: string;
+  label: string;
+  params: string[];
+  description: string;
+}
+
+/** 可用公式目录：聚合 + 函数 */
+export interface ExpressionCatalog {
+  aggregations: string[];
+  functions: FunctionMeta[];
+}
+
 // ─── 模板预设 ────────────────────────────────
 
 export interface TemplatePreset {
@@ -169,6 +189,8 @@ export interface TemplatePreset {
 export interface ReportEngineProps {
   /** 数据集列表（由父组件从 API 获取后传入） */
   datasets: Dataset[];
+  /** 可用公式目录（聚合 + 函数，由父组件从 API 获取后传入；缺省时构建器用内置聚合） */
+  functions?: ExpressionCatalog;
   /** 报表标题（支持 ReactNode，可在标题区域嵌入自定义内容） */
   title?: ReactNode;
   /** 导出回调：接收配置 + 表格快照 */

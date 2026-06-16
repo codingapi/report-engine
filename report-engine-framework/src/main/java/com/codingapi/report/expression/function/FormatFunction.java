@@ -18,6 +18,13 @@ public class FormatFunction implements ValueFunction {
     }
 
     @Override
+    public FunctionMeta meta() {
+        return new FunctionMeta("format", "数值格式化",
+                List.of("数值", "格式模式"),
+                "按模式格式化数值，例：format(value, \"#,##0.00\")");
+    }
+
+    @Override
     public Object apply(List<Object> args) {
         Object value = args.get(0);
         String pattern = String.valueOf(args.get(1));

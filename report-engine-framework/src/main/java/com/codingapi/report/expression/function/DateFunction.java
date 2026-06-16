@@ -18,6 +18,13 @@ public class DateFunction implements ValueFunction {
     }
 
     @Override
+    public FunctionMeta meta() {
+        return new FunctionMeta("date", "日期格式化",
+                List.of("日期值", "格式模式"),
+                "把日期按模式格式化，例：date(value, \"yyyy/MM/dd\")");
+    }
+
+    @Override
     public Object apply(List<Object> args) {
         Object value = args.get(0);
         if (value == null) {

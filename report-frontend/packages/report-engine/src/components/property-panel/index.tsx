@@ -1,9 +1,9 @@
 import React from 'react';
-import { Tabs, Button, Popconfirm, Badge, Space } from 'antd';
+import { Button, Popconfirm, Badge, Space } from 'antd';
 import { PlusOutlined, DeleteOutlined, TableOutlined } from '@ant-design/icons';
-import type { CellBinding, SummaryRow, LoopBlock, Dataset } from '../../types';
+import type { CellBinding, SummaryRow, LoopBlock, Dataset, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
-import ValueEditor from './value-editor';
+import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
@@ -15,6 +15,7 @@ interface PropertyPanelProps {
   summaries: SummaryRow[];
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
+  functions?: ExpressionCatalog;
   onBindingChange: (cellKey: string, binding: CellBinding) => void;
   onBindingCreate: (cellKey: string) => void;
   onBindingDelete: (cellKey: string) => void;
@@ -29,6 +30,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   summaries,
   loopBlocks,
   datasets,
+  functions,
   onBindingChange,
   onBindingCreate,
   onBindingDelete,
@@ -101,64 +103,47 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
             onDelete={() => onSummaryRowDelete(summaryRow.id)}
           />
         ) : binding ? (
-          /* ── 数据绑定单元格 ── */
+          /* ── 数据绑定单元格：纵向分区 ── */
           <>
-            <Tabs
-              className="re-prop-tabs"
-              size="small"
-              items={[
-                {
-                  key: 'value',
-                  label: '值表达式',
-                  children: (
-                    <ValueEditor
-                      value={binding.value}
-                      datasets={datasets}
-                      loopBlocks={loopBlocks}
-                      onChange={(value) => updateBinding({ value })}
-                    />
-                  ),
-                },
-                {
-                  key: 'expansion',
-                  label: '扩展设置',
-                  children: (
-                    <ExpansionEditor
-                      expansion={binding.expansion}
-                      expandMode={binding.expandMode}
-                      mergeRepeated={binding.mergeRepeated}
-                      parentCell={binding.parentCell}
-                      cellBindings={cellBindings}
-                      currentCellKey={cellKey}
-                      onChange={(patch) => updateBinding(patch)}
-                    />
-                  ),
-                },
-                {
-                  key: 'conditions',
-                  label: (
-                    <span>
-                      过滤条件
-                      {binding.conditions.length > 0 && (
-                        <Badge
-                          count={binding.conditions.length}
-                          size="small"
-                          style={{ marginLeft: 4 }}
-                        />
-                      )}
-                    </span>
-                  ),
-                  children: (
-                    <ConditionEditor
-                      conditions={binding.conditions}
-                      datasets={datasets}
-                      loopBlocks={loopBlocks}
-                      onChange={(conditions) => updateBinding({ conditions })}
-                    />
-                  ),
-                },
-              ]}
-            />
+            <div className="re-prop-section">
+              <div className="re-prop-section__title">内容设定</div>
+              <ExpressionBuilder
+                key={cellKey}
+                value={binding.value}
+                datasets={datasets}
+                loopBlocks={loopBlocks}
+                functions={functions}
+                onChange={(value) => updateBinding({ value })}
+              />
+            </div>
+
+            <div className="re-prop-section">
+              <div className="re-prop-section__title">扩展设置</div>
+              <ExpansionEditor
+                expansion={binding.expansion}
+                expandMode={binding.expandMode}
+                mergeRepeated={binding.mergeRepeated}
+                parentCell={binding.parentCell}
+                cellBindings={cellBindings}
+                currentCellKey={cellKey}
+                onChange={(patch) => updateBinding(patch)}
+              />
+            </div>
+
+            <div className="re-prop-section">
+              <div className="re-prop-section__title">
+                过滤条件
+                {binding.conditions.length > 0 && (
+                  <Badge count={binding.conditions.length} size="small" style={{ marginLeft: 6 }} />
+                )}
+              </div>
+              <ConditionEditor
+                conditions={binding.conditions}
+                datasets={datasets}
+                loopBlocks={loopBlocks}
+                onChange={(conditions) => updateBinding({ conditions })}
+              />
+            </div>
 
             <div className="re-prop-actions">
               <Popconfirm
@@ -167,12 +152,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 okText="删除"
                 cancelText="取消"
               >
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                >
+                <Button type="text" danger size="small" icon={<DeleteOutlined />}>
                   删除绑定
                 </Button>
               </Popconfirm>

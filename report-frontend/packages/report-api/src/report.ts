@@ -30,6 +30,8 @@ export interface RenderBindingDTO {
   mergeRepeated: boolean;
   parentCell: string | null;
   conditions: RenderConditionDTO[];
+  /** 表达式预览（友好文本，后端仅存储不渲染） */
+  preview?: string;
 }
 
 export interface RenderRequest {

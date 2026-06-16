@@ -20,6 +20,11 @@ public final class Functions {
     private Functions() {
     }
 
+    /** 列出所有已注册函数的元信息（供前端表达式构建器枚举）。 */
+    public static List<FunctionMeta> list() {
+        return REGISTRY.stream().map(ValueFunction::meta).toList();
+    }
+
     /**
      * 调用函数。
      *

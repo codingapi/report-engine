@@ -5,3 +5,5 @@ export { fetchDatasets, fetchDatasetPreview } from './dataset';
 export type { DataType, DatasetField, DatasetInfo, DatasetPreview } from './dataset';
 export { renderReport } from './report';
 export type { RenderRequest, RenderBindingDTO, RenderValueDTO, RenderConditionDTO } from './report';
+export { fetchFunctions } from './expression';
+export type { ExpressionCatalog, FunctionMeta } from './expression';

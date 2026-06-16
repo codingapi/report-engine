@@ -116,10 +116,12 @@ const HOLE_RE = /\$\{([^}]*)\}/g;
 const AGG_RE = /^(COUNT_DISTINCT|COUNT|SUM|AVG|MAX|MIN)\(([^)]*)\)$/;
 
 /**
- * `${...}` 文本 → Template 节点（对齐 Java `Templates.parse` 核心规则）：
- * - `${name}` → NameRef（晚绑定）
- * - `${d.field}` → FieldValue（含 `.` 的限定引用）
- * - `${SUM(d.field)}` → Aggregate（聚合函数）
+ * `${...}` 文本 → Value 节点（对齐 Java `Templates.parse`，含归约规则）：
+ * - 无洞（纯文本）→ Literal
+ * - 整串单个洞、无文本 → 直接返回洞内 Value（FieldValue / Aggregate / …）
+ * - 文本 + 洞混合 → Template
+ *
+ * 洞内表达式：`${name}`→NameRef、`${d.field}`→FieldValue、`${SUM(d.field)}`→Aggregate
  */
 export function parseTemplate(str: string): ReportValue {
   const parts: NonNullable<ReportValue['parts']> = [];
@@ -132,6 +134,15 @@ export function parseTemplate(str: string): ReportValue {
     last = m.index + m[0].length;
   }
   if (last < str.length) parts.push({ kind: 'text', text: str.slice(last) });
+
+  // 归约：无洞→Literal；整串单洞→裸 Value；否则 Template
+  const holes = parts.filter((p) => p.kind === 'hole');
+  if (holes.length === 0) {
+    return { type: 'Literal', payload: parts.map((p) => p.text || '').join('') };
+  }
+  if (parts.length === 1 && parts[0].kind === 'hole') {
+    return parts[0].value!;
+  }
   return { type: 'Template', parts };
 }
 

@@ -25,6 +25,9 @@ export type {
   SummaryRow,
   // 模板预设
   TemplatePreset,
+  // 公式目录
+  FunctionMeta,
+  ExpressionCatalog,
   // 组件 Props
   ReportEngineProps,
 } from './types';

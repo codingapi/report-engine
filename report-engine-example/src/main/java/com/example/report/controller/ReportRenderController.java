@@ -214,7 +214,8 @@ public class ReportRenderController {
             String expandMode,
             boolean mergeRepeated,
             String parentCell,
-            List<ConditionDTO> conditions) {
+            List<ConditionDTO> conditions,
+            String preview) {
     }
 
     public record ValueDTO(
@@ -252,6 +253,6 @@ public class ReportRenderController {
     public record FieldRefDTO(String datasetId, String field) {
     }
 
-    public record SummaryCellDTO(int column, String kind, String payload, String aggregation) {
+    public record SummaryCellDTO(int column, String kind, String payload, String aggregation, String preview) {
     }
 }
