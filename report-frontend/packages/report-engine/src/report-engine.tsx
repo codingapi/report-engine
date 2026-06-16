@@ -157,6 +157,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
   // ─── 加载报表配置（整体恢复设计态） ───
   const loadReportConfig = useCallback((config: ReportConfig) => {
+    // 清除当前选中状态，避免 loadSnapshot 后旧 sheetId 的残留选中导致面板显示异常
+    setSelectedCell(null);
+
     if (config.template) sheetRef.current?.loadSnapshot(config.template);
 
     // 获取 Univer 活动工作表的实际 ID（可能是 UUID，不一定是 "sheet1"）

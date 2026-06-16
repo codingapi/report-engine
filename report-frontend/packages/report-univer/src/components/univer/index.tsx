@@ -106,9 +106,10 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
             // 创建高亮管理器
             highlightManagerRef.current = createHighlightManager(univerAPI);
 
-            // 注册单元格选中事件（含 CellHandle + cellProps）
+            // 注册单元格选中事件（含 CellHandle + cellProps + DOM click 保底）
             registerCellSelection(
                 univerAPI,
+                containerRef.current,
                 () => onCellSelectRef.current,
                 () => highlightManagerRef.current,
                 () => cellPropsRef.current,
