@@ -1,6 +1,5 @@
 import React from 'react';
-import { Button, Input, Select, Radio, Popconfirm, Space } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Button, Input, Select, Radio, Space } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, Aggregation } from '../../types';
 import { findDataset, AGG_LABELS } from '../../types';
 import SectionLabel from './section-label';
@@ -12,7 +11,6 @@ interface SummaryRowEditorProps {
   column: number;
   datasets: Dataset[];
   onChange: (row: SummaryRow) => void;
-  onDelete: () => void;
 }
 
 /** 解析 "datasetId.field" */
@@ -27,7 +25,6 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   column,
   datasets,
   onChange,
-  onDelete,
 }) => {
   const isGroup = summaryRow.groupBy != null;
   const cell = summaryRow.cells.find((c) => c.column === column);
@@ -216,21 +213,6 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
             </Button>
           </>
         )}
-      </div>
-
-      {/* 删除整行 */}
-      <div className="re-prop-actions">
-        <Popconfirm
-          title="取消本行的汇总配置？"
-          description="将移除整行所有汇总单元格"
-          onConfirm={onDelete}
-          okText="取消汇总"
-          cancelText="返回"
-        >
-          <Button type="text" danger size="small" icon={<DeleteOutlined />}>
-            取消汇总行
-          </Button>
-        </Popconfirm>
       </div>
     </div>
   );

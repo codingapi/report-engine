@@ -1,6 +1,6 @@
-import React from 'react';
-import { Button, Popconfirm, Badge, Space } from 'antd';
-import { PlusOutlined, DeleteOutlined, TableOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button, Popconfirm, Badge, Space, Tabs } from 'antd';
+import { PlusOutlined, DeleteOutlined, TableOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
 import ExpressionBuilder from './expression-builder';
@@ -23,6 +23,7 @@ interface PropertyPanelProps {
   onSummaryRowChange: (id: string, row: SummaryRow) => void;
   onSummaryRowCreate: (row: number) => void;
   onSummaryRowDelete: (id: string) => void;
+  onCollapse?: () => void;
 }
 
 const PropertyPanel: React.FC<PropertyPanelProps> = ({
@@ -39,11 +40,37 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   onSummaryRowChange,
   onSummaryRowCreate,
   onSummaryRowDelete,
+  onCollapse,
 }) => {
+  const [activeTab, setActiveTab] = useState<string>('content');
+  const prevCellKeyRef = useRef<string | null>(null);
+
+  // 切换单元格时重置 Tab 到"内容"
+  useEffect(() => {
+    if (!selectedCell) return;
+    const { info } = selectedCell;
+    const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
+    if (cellKey !== prevCellKeyRef.current) {
+      prevCellKeyRef.current = cellKey;
+      setActiveTab('content');
+    }
+  }, [selectedCell]);
+
+  // ─── 空态 ───
   if (!selectedCell) {
     return (
       <div className="re-panel">
-        <div className="re-panel__title" style={{ paddingLeft: 32 }}>属性面板</div>
+        <div className="re-panel__title">
+          {onCollapse && (
+            <Button
+              type="text"
+              size="small"
+              icon={<MenuFoldOutlined />}
+              onClick={onCollapse}
+            />
+          )}
+          <span>属性面板</span>
+        </div>
         <div className="re-panel__content">
           <div className="re-prop-empty">选择一个单元格查看属性</div>
         </div>
@@ -54,7 +81,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const { info } = selectedCell;
   const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
   const binding = cellBindings.find((b) => b.cellKey === cellKey);
-  // 选中行是否为汇总行（设计态按行号锚定）
   const summaryRow = summaries.find((s) => s.row === info.row);
 
   const updateBinding = (patch: Partial<CellBinding>) => {
@@ -62,7 +88,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     onBindingChange(cellKey, { ...binding, ...patch });
   };
 
-  // 顶部统一预览：当前格配置编译成的表达式（与单元格呈现一致）
+  // 预览文本
   const previewText = summaryRow
     ? (() => {
         const c = summaryRow.cells.find((sc) => sc.column === info.column);
@@ -72,43 +98,21 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
       ? valueDisplayText(binding.value, datasets, loopBlocks)
       : '';
 
-  return (
-    <div className="re-panel">
-      <div className="re-panel__title" style={{ paddingLeft: 32 }}>属性面板</div>
-      <div className="re-panel__content">
-        {/* 单元格信息：位置 + 预览（统一格式） */}
-        <div className="re-prop-meta">
-          <div className="re-prop-meta__item">
-            <div className="re-prop-meta__label">位置</div>
-            <div className="re-prop-meta__value">
-              {info.a1Notation || `${info.row},${info.column}`}
-              {summaryRow && (
-                <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />
-              )}
-            </div>
-          </div>
-          <div className="re-prop-meta__item">
-            <div className="re-prop-meta__label">预览</div>
-            <div className="re-prop-meta__value">
-              <code>{previewText || '（未配置）'}</code>
-            </div>
-          </div>
-        </div>
+  // 位置显示（A1 记法）
+  const positionText = info.a1Notation || `${info.row + 1},${info.column + 1}`;
 
-        {summaryRow ? (
-          /* ── 汇总行单元格 ── */
-          <SummaryRowEditor
-            summaryRow={summaryRow}
-            column={info.column}
-            datasets={datasets}
-            onChange={(row) => onSummaryRowChange(summaryRow.id, row)}
-            onDelete={() => onSummaryRowDelete(summaryRow.id)}
-          />
-        ) : binding ? (
-          /* ── 数据绑定单元格：纵向分区 ── */
-          <>
-            <div className="re-prop-section">
-              <div className="re-prop-section__title">内容设定</div>
+  // ─── 已绑定：Tab 内容 ───
+  const bindingTabItems = binding
+    ? [
+        {
+          key: 'content',
+          label: '内容',
+          children: (
+            <div className="re-prop-tab-content">
+              <div className="re-prop-preview">
+                <div className="re-prop-preview__label">预览</div>
+                <code>{previewText || '（未配置）'}</code>
+              </div>
               <ExpressionBuilder
                 key={cellKey}
                 value={binding.value}
@@ -119,9 +123,13 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 onChange={(value) => updateBinding({ value })}
               />
             </div>
-
-            <div className="re-prop-section">
-              <div className="re-prop-section__title">扩展设置</div>
+          ),
+        },
+        {
+          key: 'expansion',
+          label: '扩展',
+          children: (
+            <div className="re-prop-tab-content">
               <ExpansionEditor
                 expansion={binding.expansion}
                 expandMode={binding.expandMode}
@@ -132,14 +140,20 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 onChange={(patch) => updateBinding(patch)}
               />
             </div>
-
-            <div className="re-prop-section">
-              <div className="re-prop-section__title">
-                过滤条件
-                {binding.conditions.length > 0 && (
-                  <Badge count={binding.conditions.length} size="small" style={{ marginLeft: 6 }} />
-                )}
-              </div>
+          ),
+        },
+        {
+          key: 'condition',
+          label: (
+            <span>
+              条件
+              {binding.conditions.length > 0 && (
+                <Badge count={binding.conditions.length} size="small" style={{ marginLeft: 4 }} />
+              )}
+            </span>
+          ),
+          children: (
+            <div className="re-prop-tab-content">
               <ConditionEditor
                 conditions={binding.conditions}
                 datasets={datasets}
@@ -147,20 +161,64 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 onChange={(conditions) => updateBinding({ conditions })}
               />
             </div>
+          ),
+        },
+      ]
+    : [];
 
-            <div className="re-prop-actions">
-              <Popconfirm
-                title="确定删除此绑定？"
-                onConfirm={() => onBindingDelete(cellKey)}
-                okText="删除"
-                cancelText="取消"
-              >
-                <Button type="text" danger size="small" icon={<DeleteOutlined />}>
-                  删除绑定
-                </Button>
-              </Popconfirm>
-            </div>
-          </>
+  return (
+    <div className="re-panel">
+      {/* ─── Title 栏：收缩 + 位置/标题 + 清空操作 ─── */}
+      <div className="re-panel__title">
+        {onCollapse && (
+          <Button
+            type="text"
+            size="small"
+            icon={<MenuFoldOutlined />}
+            onClick={onCollapse}
+          />
+        )}
+        <span className="re-panel__title-text">
+          {positionText}
+          {summaryRow && <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />}
+        </span>
+        {(summaryRow || binding) && (
+          <Popconfirm
+            title={summaryRow ? '取消本行的汇总配置？' : '确定清除此绑定？'}
+            description={summaryRow ? '将移除整行所有汇总单元格' : undefined}
+            onConfirm={() => {
+              if (summaryRow) onSummaryRowDelete(summaryRow.id);
+              else if (binding) onBindingDelete(cellKey);
+            }}
+            okText={summaryRow ? '取消汇总' : '清除'}
+            cancelText="取消"
+          >
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              清空
+            </Button>
+          </Popconfirm>
+        )}
+      </div>
+
+      <div className="re-panel__content">
+        {summaryRow ? (
+          /* ── 汇总行：单页展示 ── */
+          <SummaryRowEditor
+            summaryRow={summaryRow}
+            column={info.column}
+            datasets={datasets}
+            onChange={(row) => onSummaryRowChange(summaryRow.id, row)}
+          />
+        ) : binding ? (
+          /* ── 数据绑定：Tab 切换 ── */
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            size="small"
+            type="card"
+            className="re-prop-tabs"
+            items={bindingTabItems}
+          />
         ) : (
           /* ── 空白单元格 ── */
           <div className="re-prop-unbound">

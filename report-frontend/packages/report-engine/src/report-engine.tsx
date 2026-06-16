@@ -649,33 +649,22 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                 </Tooltip>
               </div>
             ) : (
-              <div className="re-panel-wrapper">
-                <div className="re-panel-collapse-btn re-panel-collapse-btn--left">
-                  <Tooltip title="收起">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<MenuUnfoldOutlined />}
-                      onClick={() => rightPanelRef.current?.collapse()}
-                    />
-                  </Tooltip>
-                </div>
-                <PropertyPanel
-                  selectedCell={selectedCell}
-                  cellBindings={cellBindings}
-                  summaries={summaries}
-                  loopBlocks={loopBlocks}
-                  datasets={datasets}
-                  params={params}
-                  functions={functions}
-                  onBindingChange={handleBindingChange}
-                  onBindingCreate={handleBindingCreate}
-                  onBindingDelete={handleBindingDelete}
-                  onSummaryRowChange={handleSummaryRowChange}
-                  onSummaryRowCreate={handleSummaryRowCreate}
-                  onSummaryRowDelete={handleSummaryRowDelete}
-                />
-              </div>
+              <PropertyPanel
+                selectedCell={selectedCell}
+                cellBindings={cellBindings}
+                summaries={summaries}
+                loopBlocks={loopBlocks}
+                datasets={datasets}
+                params={params}
+                functions={functions}
+                onBindingChange={handleBindingChange}
+                onBindingCreate={handleBindingCreate}
+                onBindingDelete={handleBindingDelete}
+                onSummaryRowChange={handleSummaryRowChange}
+                onSummaryRowCreate={handleSummaryRowCreate}
+                onSummaryRowDelete={handleSummaryRowDelete}
+                onCollapse={() => rightPanelRef.current?.collapse()}
+              />
             )}
           </ResizablePanel>
         </Group>
