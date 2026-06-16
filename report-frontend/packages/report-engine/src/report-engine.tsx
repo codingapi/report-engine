@@ -13,7 +13,7 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig, ReportValue } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
@@ -21,8 +21,26 @@ import { useReportIO } from './hooks/use-report-io';
 import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
-function migrateSummaryCell(cell: any): SummaryCell {
-  if (cell.value) return cell as SummaryCell; // 已是新格式
+interface LegacySummaryCell {
+  column: number;
+  value?: unknown;
+  kind?: 'label' | 'agg';
+  payload?: string;
+  aggregation?: string;
+}
+
+/** 兼容旧持久化数据的 SummaryRow（cells 可能是旧格式） */
+interface LegacySummaryRow {
+  id: string;
+  row: number;
+  fromColumn: number;
+  toColumn: number;
+  groupBy: { datasetId: string; field: string } | null;
+  cells: LegacySummaryCell[];
+}
+
+function migrateSummaryCell(cell: LegacySummaryCell): SummaryCell {
+  if (cell.value) return cell as unknown as SummaryCell; // 已是新格式
   if (cell.kind === 'label') {
     return { column: cell.column, value: parseTemplate(cell.payload || '') };
   }
@@ -31,7 +49,7 @@ function migrateSummaryCell(cell: any): SummaryCell {
     column: cell.column,
     value: {
       type: 'Aggregate',
-      aggregation: cell.aggregation || 'SUM',
+      aggregation: (cell.aggregation || 'SUM') as ReportValue['aggregation'],
       operand: { type: 'FieldValue', payload: cell.payload || '' },
     },
   };
@@ -203,7 +221,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }));
 
     // 迁移汇总行：旧格式（kind/payload）→ 新格式（value: ReportValue）
-    const migratedSummaries = (config.summaries || []).map((s: any) => ({
+    const migratedSummaries: SummaryRow[] = (config.summaries || []).map((s: LegacySummaryRow) => ({
       ...s,
       cells: (s.cells || []).map(migrateSummaryCell),
     }));

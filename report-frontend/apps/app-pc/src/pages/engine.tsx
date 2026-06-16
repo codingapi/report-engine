@@ -3,18 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spin } from 'antd';
 import { ReportEngine } from '@coding-report/report-engine';
 import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
-import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship } from '@coding-report/report-engine';
+import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship, ReportValue } from '@coding-report/report-engine';
 import {
   importExcel, fetchFonts, renderReport, fetchFunctions,
   saveReportConfig, loadReportConfig,
 } from '@coding-report/report-api';
-import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog } from '@coding-report/report-api';
-import type { DataModelInfo } from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 
 // ─── 转换函数 ──────────────────────────────────
 
-function toValueDTO(value: any): RenderValueDTO {
+function toValueDTO(value: ReportValue): RenderValueDTO {
   return {
     type: value.type,
     payload: value.payload,
@@ -22,7 +21,7 @@ function toValueDTO(value: any): RenderValueDTO {
     operand: value.operand ? toValueDTO(value.operand) : undefined,
     funcName: value.funcName,
     args: value.args?.map(toValueDTO),
-    parts: value.parts?.map((p: any) => ({
+    parts: value.parts?.map((p) => ({
       kind: p.kind,
       text: p.text,
       value: p.value ? toValueDTO(p.value) : undefined,
@@ -46,6 +45,11 @@ function toBindingDTO(binding: CellBinding): RenderBindingDTO {
     })),
     preview: binding.preview,
   };
+}
+
+/** 加载的报表配置（附带后端注入的数据模型信息） */
+interface LoadedReportConfig extends ReportConfig {
+  dataModel?: DataModelInfo;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -85,14 +89,14 @@ const EnginePage = () => {
     const init = async () => {
       if (reportIdFromUrl) {
         try {
-          const config = await loadReportConfig(reportIdFromUrl);
-          const dm = config.dataModel as DataModelInfo | undefined;
+          const config = await loadReportConfig<LoadedReportConfig>(reportIdFromUrl);
+          const dm = config.dataModel;
           if (dm) {
             setDatasets(
               dm.datasets.map((d) => ({
                 id: d.id,
                 alias: d.alias || d.id,
-                sourceType: (d.dataSourceType || 'CSV') as Dataset['sourceType'],
+                sourceType: d.dataSourceType || 'CSV',
                 fields: d.fields.map((f) => ({
                   name: f.name,
                   alias: f.alias || f.name,
@@ -105,12 +109,12 @@ const EnginePage = () => {
               dm.relationships.map((r) => ({
                 left: r.left,
                 right: r.right,
-                joinType: r.joinType as Relationship['joinType'],
+                joinType: r.joinType,
               })),
             );
           }
-          if (config.dataModelId) setDataModelId(config.dataModelId as string);
-          engineRef.current?.loadReportConfig(config as unknown as ReportConfig);
+          if (config.dataModelId) setDataModelId(config.dataModelId);
+          engineRef.current?.loadReportConfig(config);
         } catch (e) {
           console.error('加载报表失败:', e);
         } finally {
@@ -158,7 +162,7 @@ const EnginePage = () => {
   };
 
   const handleSaveReport = async (config: ReportConfig): Promise<string> => {
-    return saveReportConfig({ ...config, dataModelId } as unknown as Record<string, unknown>);
+    return saveReportConfig({ ...config, dataModelId });
   };
 
   if (loading) {

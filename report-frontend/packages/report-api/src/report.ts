@@ -66,15 +66,15 @@ export interface ReportBrief {
 }
 
 /** 保存报表配置（含 id 则更新），返回报表 id */
-export async function saveReportConfig(config: Record<string, unknown>): Promise<string> {
+export async function saveReportConfig(config: unknown): Promise<string> {
   const res = await http.post('/report/configs', config);
   return res.data as string;
 }
 
-/** 加载指定报表的完整配置 */
-export async function loadReportConfig(id: string): Promise<Record<string, unknown>> {
+/** 加载指定报表的完整配置（附带数据模型信息），T 为业务方期望的配置形态 */
+export async function loadReportConfig<T = Record<string, unknown>>(id: string): Promise<T> {
   const res = await http.get(`/report/configs/${id}`);
-  return res.data;
+  return res.data as T;
 }
 
 /** 示例报表列表（预存的测试报表） */
