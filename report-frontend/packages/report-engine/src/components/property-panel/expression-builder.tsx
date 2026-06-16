@@ -1,9 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Input, Button, Select, Space, Tooltip } from 'antd';
+import React, { useRef, useState, useMemo } from 'react';
+import { Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import type { InputRef } from 'antd';
-import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog } from '../../types';
+import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '../../types';
 import { findDataset } from '../../types';
 import { templateToString, parseTemplate } from '../../value-text';
+import { matchWithPinyin } from '../../pinyin';
 
 interface ExpressionBuilderProps {
   value: ReportValue;
@@ -14,27 +16,32 @@ interface ExpressionBuilderProps {
   onChange: (value: ReportValue) => void;
 }
 
-type InsertMode = 'field' | 'loop' | 'param' | 'formula' | null;
+type Category = 'field' | 'loop' | 'param' | 'agg' | 'func';
 
 /** 内置聚合（后端未提供时的兜底） */
-const FALLBACK_AGGS = ['COUNT', 'COUNT_DISTINCT', 'SUM', 'AVG', 'MAX', 'MIN'];
+const FALLBACK_AGGS: FunctionMeta[] = [
+  { name: 'COUNT', label: '计数', params: ['字段'], description: '统计行数，如 COUNT(employees.id)' },
+  { name: 'COUNT_DISTINCT', label: '去重计数', params: ['字段'], description: '统计不重复的行数' },
+  { name: 'SUM', label: '求和', params: ['字段'], description: '计算数值字段的总和' },
+  { name: 'AVG', label: '平均值', params: ['字段'], description: '计算数值字段的平均值' },
+  { name: 'MAX', label: '最大值', params: ['字段'], description: '获取字段的最大值' },
+  { name: 'MIN', label: '最小值', params: ['字段'], description: '获取字段的最小值' },
+];
 
 /** 判断光标位置是否落在某个 ${…} 占位内部 */
 function isInsideHole(text: string, pos: number): boolean {
   const re = /\$\{[^}]*\}/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
-    const innerStart = m.index + 2; // 跳过 "${"
-    const innerEnd = m.index + m[0].length - 1; // "}" 的位置
+    const innerStart = m.index + 2;
+    const innerEnd = m.index + m[0].length - 1;
     if (pos >= innerStart && pos <= innerEnd) return true;
   }
   return false;
 }
 
 /**
- * 表达式构建器：textarea 自由编辑 + 插入按钮（字段/循环变量/公式）+ 二级选择。
- * 文本用引用形式（${depart.name} / ${SUM(depart.salary)}），onChange 解析为 Value 节点。
- * 嵌套时（光标在 ${…} 内）插入裸表达式，不再重复套 ${}。
+ * 表达式构建器：textarea + 一级分类菜单 + 二级选择列表
  */
 const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
   value,
@@ -45,13 +52,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
   onChange,
 }) => {
   const [text, setText] = useState(() => templateToString(value));
-  const [mode, setMode] = useState<InsertMode>(null);
-  const [fieldDs, setFieldDs] = useState<string>();
-  const [loopId, setLoopId] = useState<string>();
+  const [category, setCategory] = useState<Category | null>(null);
+  const [search, setSearch] = useState('');
   const taRef = useRef<InputRef>(null);
 
   const getTA = (): HTMLTextAreaElement | null => {
-    // antd Input.TextArea 的底层 textarea
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (taRef.current as any)?.resizableTextArea?.textArea ?? null;
   };
@@ -61,7 +66,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     onChange(parseTemplate(next));
   };
 
-  /** 在光标处插入表达式：caretFromEnd 让光标停在插入文本末尾前若干位（如括号内） */
+  /** 在光标处插入表达式 */
   const doInsert = (rawExpr: string, caretFromEnd = 0) => {
     const ta = getTA();
     const pos = ta ? ta.selectionStart : text.length;
@@ -78,13 +83,116 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     });
   };
 
+  // 可用的分类列表（根据上下文动态生成）
+  const availableCategories = useMemo(() => {
+    const cats: { key: Category; label: string }[] = [];
+    if (datasets.length > 0) {
+      cats.push({ key: 'field', label: '字段' });
+    }
+    if (loopBlocks.length > 0) {
+      cats.push({ key: 'loop', label: '循环变量' });
+    }
+    if (params.length > 0) {
+      cats.push({ key: 'param', label: '参数' });
+    }
+    cats.push({ key: 'agg', label: '聚合函数' });
+    if (functions?.functions && functions.functions.length > 0) {
+      cats.push({ key: 'func', label: '通用函数' });
+    }
+    return cats;
+  }, [datasets, loopBlocks, params, functions]);
+
   const aggs = functions?.aggregations ?? FALLBACK_AGGS;
   const funcs = functions?.functions ?? [];
 
-  const loopDs = (() => {
-    const lb = loopBlocks.find((l) => l.id === loopId);
-    return lb ? findDataset(datasets, lb.source.datasetId) : null;
-  })();
+  // 二级列表内容
+  const secondLevelItems = useMemo(() => {
+    const keyword = search.trim();
+
+    if (category === 'field') {
+      const items: { expr: string; label: string; desc: string }[] = [];
+      for (const ds of datasets) {
+        const dsLabel = ds.alias || ds.id;
+        for (const f of ds.fields) {
+          const fLabel = f.alias || f.name;
+          const displayLabel = `${dsLabel}.${fLabel}`;
+          const desc = `${ds.id}.${f.name}`;
+          if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
+            continue;
+          }
+          items.push({ expr: `${ds.id}.${f.name}`, label: displayLabel, desc });
+        }
+      }
+      return items;
+    }
+
+    if (category === 'loop') {
+      const items: { expr: string; label: string; desc: string }[] = [];
+      for (const lb of loopBlocks) {
+        const ds = findDataset(datasets, lb.source.datasetId);
+        if (!ds) continue;
+        const lbLabel = lb.label || lb.id;
+        for (const f of ds.fields) {
+          const fLabel = f.alias || f.name;
+          const displayLabel = `${lbLabel}.${fLabel}`;
+          const desc = `${lb.id}.${f.name}`;
+          if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
+            continue;
+          }
+          items.push({ expr: `${lb.id}.${f.name}`, label: displayLabel, desc });
+        }
+      }
+      return items;
+    }
+
+    if (category === 'param') {
+      return params
+        .filter((p) => {
+          if (!keyword) return true;
+          const label = p.label || p.name;
+          return matchWithPinyin(label, keyword) || matchWithPinyin(p.name, keyword);
+        })
+        .map((p) => ({
+          expr: p.name,
+          label: p.label || p.name,
+          desc: `\${${p.name}}`,
+        }));
+    }
+
+    if (category === 'agg') {
+      return aggs
+        .filter((a) => {
+          if (!keyword) return true;
+          return matchWithPinyin(a.name, keyword) ||
+            matchWithPinyin(a.label, keyword) ||
+            matchWithPinyin(a.description, keyword);
+        })
+        .map((a) => ({
+          expr: `${a.name}()`,
+          label: `${a.name} - ${a.label}`,
+          desc: a.description,
+          caretFromEnd: 2,
+        }));
+    }
+
+    if (category === 'func') {
+      return funcs
+        .filter((f) => {
+          if (!keyword) return true;
+          return matchWithPinyin(f.name, keyword) ||
+            matchWithPinyin(f.label, keyword) ||
+            matchWithPinyin(f.description, keyword);
+        })
+        .map((f) => ({
+          expr: `${f.name}()`,
+          label: `${f.name} - ${f.label}`,
+          desc: f.description,
+          caretFromEnd: 2,
+        }));
+    }
+
+    return [];
+  }, [category, search, datasets, loopBlocks, params, aggs, funcs]);
 
   return (
     <div className="re-expr-builder">
@@ -96,78 +204,53 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         placeholder={'例：部门${depart.name} 共 ${SUM(depart.salary)} 元；纯文本直接输入'}
       />
 
-      <div className="re-expr-toolbar">
-        <Button size="small" type={mode === 'field' ? 'primary' : 'default'}
-          onClick={() => setMode(mode === 'field' ? null : 'field')}>插入字段</Button>
-        <Button size="small" type={mode === 'loop' ? 'primary' : 'default'}
-          disabled={loopBlocks.length === 0}
-          onClick={() => setMode(mode === 'loop' ? null : 'loop')}>插入循环变量</Button>
-        <Button size="small" type={mode === 'param' ? 'primary' : 'default'}
-          disabled={params.length === 0}
-          onClick={() => setMode(mode === 'param' ? null : 'param')}>插入参数</Button>
-        <Button size="small" type={mode === 'formula' ? 'primary' : 'default'}
-          onClick={() => setMode(mode === 'formula' ? null : 'formula')}>插入公式</Button>
+      <div className="re-expr-panel">
+        {/* 一级菜单 */}
+        <div className="re-expr-categories">
+          {availableCategories.map((cat) => (
+            <div
+              key={cat.key}
+              className={`re-expr-category ${category === cat.key ? 're-expr-category--active' : ''}`}
+              onClick={() => {
+                setCategory(category === cat.key ? null : cat.key);
+                setSearch('');
+              }}
+            >
+              {cat.label}
+            </div>
+          ))}
+        </div>
+
+        {/* 二级选择区 */}
+        {category && (
+          <div className="re-expr-selector">
+            <Input
+              size="small"
+              prefix={<SearchOutlined />}
+              placeholder="搜索..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              allowClear
+            />
+            <div className="re-expr-list">
+              {secondLevelItems.length === 0 ? (
+                <div className="re-expr-empty">无匹配项</div>
+              ) : (
+                secondLevelItems.map((item, idx) => (
+                  <div
+                    key={`${item.expr}-${idx}`}
+                    className="re-expr-item"
+                    onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
+                  >
+                    <div className="re-expr-item__label">{item.label}</div>
+                    <div className="re-expr-item__desc">{item.desc}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      {mode === 'field' && (
-        <div className="re-expr-picker">
-          <Select size="small" placeholder="数据集" value={fieldDs} onChange={setFieldDs}
-            style={{ width: '40%' }} showSearch
-            options={datasets.map((d) => ({ value: d.id, label: d.alias || d.id }))} />
-          <Select size="small" placeholder="选字段插入" value={undefined} disabled={!fieldDs}
-            style={{ flex: 1, minWidth: 0 }} showSearch
-            onChange={(f) => doInsert(`${fieldDs}.${f}`)}
-            options={(findDataset(datasets, fieldDs || '')?.fields || []).map((f) => ({
-              value: f.name, label: f.alias || f.name,
-            }))} />
-        </div>
-      )}
-
-      {mode === 'loop' && (
-        <div className="re-expr-picker">
-          <Select size="small" placeholder="循环块" value={loopId} onChange={setLoopId}
-            style={{ width: '40%' }}
-            options={loopBlocks.map((l) => ({ value: l.id, label: l.label || l.id }))} />
-          <Select size="small" placeholder="选字段插入" value={undefined} disabled={!loopId}
-            style={{ flex: 1, minWidth: 0 }} showSearch
-            onChange={(f) => doInsert(`${loopId}.${f}`)}
-            options={(loopDs?.fields || []).map((f) => ({
-              value: f.name, label: f.alias || f.name,
-            }))} />
-        </div>
-      )}
-
-      {mode === 'param' && (
-        <div className="re-expr-picker">
-          <Select<string> size="small" placeholder="选参数插入" value={undefined}
-            style={{ flex: 1, minWidth: 0 }} showSearch
-            onChange={(name) => doInsert(name)}
-            options={params.map((p) => ({ value: p.name, label: p.label || p.name }))} />
-        </div>
-      )}
-
-      {mode === 'formula' && (
-        <div className="re-expr-picker re-expr-picker--wrap">
-          <div className="re-expr-group-label">聚合</div>
-          <Space size={4} wrap>
-            {aggs.map((a) => (
-              <Button key={a} size="small" onClick={() => doInsert(`${a}()`, 2)}>{a}</Button>
-            ))}
-          </Space>
-          {funcs.length > 0 && (
-            <>
-              <div className="re-expr-group-label">函数</div>
-              <Space size={4} wrap>
-                {funcs.map((f) => (
-                  <Tooltip key={f.name} title={`${f.description}（参数：${f.params.join('、')}）`}>
-                    <Button size="small" onClick={() => doInsert(`${f.name}()`, 2)}>{f.label}</Button>
-                  </Tooltip>
-                ))}
-              </Space>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 };

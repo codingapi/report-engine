@@ -170,13 +170,55 @@
 
 /* ─── 表达式构建器 ─── */
 .re-expr-builder { display: flex; flex-direction: column; gap: 8px; }
-.re-expr-toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
-.re-expr-picker {
-  display: flex; gap: 6px; align-items: center;
-  padding: 8px; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 4px;
+
+.re-expr-panel {
+  display: flex; border: 1px solid #e8e8e8; border-radius: 4px;
+  height: 200px; overflow: hidden;
 }
-.re-expr-picker--wrap { flex-direction: column; align-items: stretch; gap: 6px; }
-.re-expr-group-label { font-size: 11px; color: #999; }
+
+/* 一级分类菜单 */
+.re-expr-categories {
+  flex: 0 0 80px; background: #fafafa; border-right: 1px solid #e8e8e8;
+  padding: 4px 0; overflow-y: auto;
+}
+.re-expr-category {
+  padding: 8px 12px; font-size: 12px; color: #333;
+  cursor: pointer; border-left: 3px solid transparent;
+  transition: all 0.2s;
+}
+.re-expr-category:hover { background: #f0f0f0; }
+.re-expr-category--active {
+  background: #e6f4ff; color: #1677ff; border-left-color: #1677ff; font-weight: 500;
+}
+
+/* 二级选择区 */
+.re-expr-selector {
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+  padding: 8px;
+}
+.re-expr-selector > .ant-input-affix-wrapper { margin-bottom: 8px; }
+
+.re-expr-list {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+  max-height: 200px;
+}
+.re-expr-empty {
+  padding: 20px; text-align: center; font-size: 12px; color: #bbb;
+}
+
+.re-expr-item {
+  padding: 6px 8px; border-radius: 4px; cursor: pointer;
+  transition: background 0.15s;
+}
+.re-expr-item:hover { background: #f5f5f5; }
+.re-expr-item__label {
+  font-size: 12px; color: #333; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.re-expr-item__desc {
+  font-size: 11px; color: #999; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ─── 分组小计 ${group} 提示 ─── */
 .re-prop-group-hint {

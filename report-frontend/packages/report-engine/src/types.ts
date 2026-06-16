@@ -192,9 +192,9 @@ export interface FunctionMeta {
   description: string;
 }
 
-/** 可用公式目录：聚合 + 函数 */
+/** 可用公式目录：聚合 + 函数（均使用 FunctionMeta 格式） */
 export interface ExpressionCatalog {
-  aggregations: string[];
+  aggregations: FunctionMeta[];
   functions: FunctionMeta[];
 }
 

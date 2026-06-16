@@ -79,12 +79,20 @@ export function valueDisplayText(value: ReportValue, datasets: Dataset[], loopBl
 
 // ─── Template parts ↔ `${...}` 文本 ────────────
 
-/** Template 节点 → 可逆的 `${...}` 文本（也用作单元格占位） */
+/** Value 节点 → 可逆的文本表示（用于 ExpressionBuilder 编辑） */
 export function templateToString(value: ReportValue): string {
-  if (value.type !== 'Template' || !value.parts) return value.payload || '';
-  return value.parts
-    .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToSource(p.value)}}`))
-    .join('');
+  // Template 类型：拼接文本和洞
+  if (value.type === 'Template' && value.parts) {
+    return value.parts
+      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToSource(p.value)}}`))
+      .join('');
+  }
+  // Literal 类型：直接返回文本
+  if (value.type === 'Literal') {
+    return value.payload || '';
+  }
+  // 其他类型（Aggregate, FieldValue 等）：包装为 ${...} 表达式
+  return `\${${exprToSource(value)}}`;
 }
 
 /** 洞内表达式 → 源码字符串（用原始 payload，保证可逆 parse） */
