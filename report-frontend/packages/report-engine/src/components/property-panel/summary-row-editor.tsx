@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button, Select, Radio } from 'antd';
+import React, { useEffect, useRef } from 'react';
+import { Select, Radio } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
 import { findDataset } from '../../types';
 import { valueDisplayText } from '../../value-text';
@@ -27,6 +27,12 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
 }) => {
   const isGroup = summaryRow.groupBy != null;
   const cell = summaryRow.cells.find((c) => c.column === column);
+  const initializedRef = useRef<string | null>(null);
+
+  /** 创建空值（由用户自行填写） */
+  const createEmptyValue = (): ReportValue => {
+    return { type: 'Literal', payload: '' };
+  };
 
   /** 写入/更新本列单元格 */
   const setCellValue = (value: ReportValue) => {
@@ -39,20 +45,14 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
     onChange({ ...summaryRow, cells });
   };
 
-  /** 创建默认值（快捷按钮用） */
-  const createDefaultValue = (): ReportValue => {
-    if (isGroup) {
-      // 分组小计：默认用 ${group}小计
-      return {
-        type: 'Template',
-        parts: [
-          { kind: 'hole', value: { type: 'NameRef', payload: 'group' } },
-          { kind: 'text', text: '小计' },
-        ],
-      };
+  // 自动初始化：当切换到未配置的列时，自动创建空值
+  useEffect(() => {
+    const cellKey = `${summaryRow.id}-${column}`;
+    if (!cell && initializedRef.current !== cellKey) {
+      initializedRef.current = cellKey;
+      setCellValue(createEmptyValue());
     }
-    return { type: 'Literal', payload: '合计' };
-  };
+  }, [summaryRow.id, column, cell]);
 
   // 当前分组字段别名（用于 ${group} 说明）
   const groupFieldLabel = isGroup
@@ -131,11 +131,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
           hint="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。"
         />
 
-        {!cell ? (
-          <Button size="small" onClick={() => setCellValue(createDefaultValue())}>
-            配置本格
-          </Button>
-        ) : (
+        {cell && (
           <>
             {/* 表达式编辑器 */}
             <ExpressionBuilder
