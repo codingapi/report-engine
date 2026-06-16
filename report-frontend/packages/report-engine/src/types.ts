@@ -213,6 +213,7 @@ export interface TemplatePreset {
 export interface ReportConfig {
   id?: string;
   name: string;
+  dataModelId?: string;
   cellBindings: CellBinding[];
   loopBlocks: LoopBlock[];
   summaries: SummaryRow[];
@@ -228,6 +229,8 @@ export interface ReportEngineProps {
   datasets: Dataset[];
   /** 数据关系列表（由父组件从 API 获取后传入，只读展示） */
   relationships?: Relationship[];
+  /** 数据模型 ID（保存时写入配置） */
+  dataModelId?: string;
   /** 可用公式目录（聚合 + 函数，由父组件从 API 获取后传入；缺省时构建器用内置聚合） */
   functions?: ExpressionCatalog;
   /** 报表标题（支持 ReactNode，可在标题区域嵌入自定义内容） */

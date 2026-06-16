@@ -77,6 +77,12 @@ export async function loadReportConfig(id: string): Promise<Record<string, unkno
   return res.data;
 }
 
+/** 示例报表列表（预存的测试报表） */
+export async function listExampleReports(): Promise<ReportBrief[]> {
+  const res = await http.get('/report/configs/examples');
+  return res.data.list;
+}
+
 /** 报表列表（id + name） */
 export async function listReportConfigs(): Promise<ReportBrief[]> {
   const res = await http.get('/report/configs');

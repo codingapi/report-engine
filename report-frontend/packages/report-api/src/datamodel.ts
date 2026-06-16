@@ -1,8 +1,7 @@
-import http from './http';
 import type { DataType } from './dataset';
 
 // ============================================================
-// Types（匹配后端 ReportRenderController.DataModelDTO）
+// Types（匹配后端 ReportConfigController 返回的 dataModel 结构）
 // ============================================================
 
 export interface DataModelField {
@@ -33,14 +32,4 @@ export interface RelationshipInfo {
 export interface DataModelInfo {
   datasets: DataModelDataset[];
   relationships: RelationshipInfo[];
-}
-
-// ============================================================
-// API
-// ============================================================
-
-/** 获取当前报表的数据模型（数据集 + 数据关系） */
-export async function fetchDataModel(): Promise<DataModelInfo> {
-  const res = await http.get('/report/datamodel');
-  return res.data;
 }

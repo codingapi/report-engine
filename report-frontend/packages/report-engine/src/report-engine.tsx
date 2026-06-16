@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, Input, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Badge, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
@@ -35,6 +35,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 }> = ({
   datasets,
   relationships = [],
+  dataModelId,
   functions,
   title,
   engineRef,
@@ -53,7 +54,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [summaries, setSummaries] = useState<SummaryRow[]>([]);
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
-  const [reportName, setReportName] = useState('');
   const [savingReport, setSavingReport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -158,16 +158,48 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   // ─── 加载报表配置（整体恢复设计态） ───
   const loadReportConfig = useCallback((config: ReportConfig) => {
     if (config.template) sheetRef.current?.loadSnapshot(config.template);
+
+    // 获取 Univer 活动工作表的实际 ID（可能是 UUID，不一定是 "sheet1"）
+    const actualSheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
+
+    // 将 cellKey/parentCell 中的 sheet ID 重映射为实际 ID
+    const remapKey = (key: string | null) => {
+      if (!key) return null;
+      const parts = key.split(':');
+      return `${actualSheetId}:${parts[1]}:${parts[2]}`;
+    };
+
+    const configLoops = config.loopBlocks || [];
+    const remappedLoops = configLoops.map((lb) => ({ ...lb, sheetId: actualSheetId }));
+
+    const remappedBindings = (config.cellBindings || []).map((b) => ({
+      ...b,
+      cellKey: remapKey(b.cellKey)!,
+      parentCell: remapKey(b.parentCell),
+    }));
+
     setReportId(config.id ?? null);
-    setReportName(config.name || '');
-    setCellBindings(config.cellBindings || []);
-    setLoopBlocks(config.loopBlocks || []);
+    setCellBindings(remappedBindings);
+    setLoopBlocks(remappedLoops);
     setSummaries(config.summaries || []);
     setParams(config.params || []);
     setActiveTemplate(null);
     lastAppliedRef.current = null;
+
+    // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
+    const ds = datasets;
+    for (const b of remappedBindings) {
+      const [, r, c] = b.cellKey.split(':');
+      sheetRef.current?.setCellValue(
+        actualSheetId,
+        parseInt(r, 10),
+        parseInt(c, 10),
+        valueDisplayText(b.value, ds, remappedLoops),
+      );
+    }
+
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
-  }, [messageApi]);
+  }, [messageApi, datasets]);
 
   // ─── 保存报表配置 ───
   const handleSaveReport = useCallback(async () => {
@@ -181,7 +213,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     try {
       const config: ReportConfig = {
         id: reportId ?? undefined,
-        name: reportName.trim() || '未命名报表',
+        name: '未命名报表',
+        dataModelId,
         cellBindings,
         loopBlocks,
         summaries,
@@ -196,7 +229,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     } finally {
       setSavingReport(false);
     }
-  }, [onSaveReport, reportId, reportName, cellBindings, loopBlocks, summaries, params, messageApi]);
+  }, [onSaveReport, reportId, dataModelId, cellBindings, loopBlocks, summaries, params, messageApi]);
 
   // 暴露 ref
   React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
@@ -483,21 +516,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         <div className="re-header__title">{title ?? '报表设计器'}</div>
         <div className="re-header__actions">
           {onSaveReport && (
-            <>
-              <Input
-                placeholder="报表名称"
-                value={reportName}
-                onChange={(e) => setReportName(e.target.value)}
-                style={{ width: 160 }}
-              />
-              <Button
-                icon={<SaveOutlined />}
-                loading={savingReport}
-                onClick={handleSaveReport}
-              >
-                保存
-              </Button>
-            </>
+            <Button
+              icon={<SaveOutlined />}
+              loading={savingReport}
+              onClick={handleSaveReport}
+            >
+              保存
+            </Button>
           )}
           <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
             <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>

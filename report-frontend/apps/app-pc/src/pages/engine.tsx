@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Spin, Button, Space, Tooltip, Select } from 'antd';
-import { FileTextOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Spin } from 'antd';
 import { ReportEngine } from '@coding-report/report-engine';
-import type { ReportEngineHandle, TemplatePreset, ReportConfig } from '@coding-report/report-engine';
+import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship } from '@coding-report/report-engine';
-import { ALL_TEMPLATES } from './templates';
 import {
-  importExcel, fetchFonts, fetchDataModel, renderReport, fetchFunctions,
-  saveReportConfig, loadReportConfig, listReportConfigs,
+  importExcel, fetchFonts, renderReport, fetchFunctions,
+  saveReportConfig, loadReportConfig,
 } from '@coding-report/report-api';
-import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog, ReportBrief } from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog } from '@coding-report/report-api';
+import type { DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 
 // ─── 转换函数 ──────────────────────────────────
@@ -59,102 +59,78 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-// ─── 标题区域（含快捷模板） ────────────────────
-
-function TitleBar({
-  templates,
-  activeTemplate,
-  onApply,
-  reports,
-  onOpenReport,
-  onRefreshReports,
-}: {
-  templates: TemplatePreset[];
-  activeTemplate: string | null;
-  onApply: (tpl: TemplatePreset) => void;
-  reports: ReportBrief[];
-  onOpenReport: (id: string) => void;
-  onRefreshReports: () => void;
-}) {
-  return (
-    <>
-      <span>报表设计器</span>
-      <Select
-        size="small"
-        placeholder="打开报表"
-        suffixIcon={<FolderOpenOutlined />}
-        style={{ width: 160, marginLeft: 12 }}
-        value={null}
-        onDropdownVisibleChange={(open) => open && onRefreshReports()}
-        onChange={onOpenReport}
-        options={reports.map((r) => ({ value: r.id, label: r.name }))}
-        notFoundContent="暂无已保存报表"
-      />
-      {templates.length > 0 && (
-        <Space size={4} wrap style={{ marginLeft: 12 }}>
-          <span style={{ fontSize: 13, color: '#666', fontWeight: 'normal' }}>
-            <FileTextOutlined /> 快速模板：
-          </span>
-          {templates.map((tpl) => (
-            <Tooltip key={tpl.id} title={tpl.description}>
-              <Button
-                size="small"
-                type={activeTemplate === tpl.id ? 'primary' : 'default'}
-                onClick={() => onApply(tpl)}
-              >
-                {tpl.label}
-              </Button>
-            </Tooltip>
-          ))}
-        </Space>
-      )}
-    </>
-  );
-}
-
 // ─── 页面组件 ──────────────────────────────────
 
 const EnginePage = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const reportIdFromUrl = searchParams.get('id');
+
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [dataModelId, setDataModelId] = useState<string>('default');
   const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
-  const [reports, setReports] = useState<ReportBrief[]>([]);
   const engineRef = useRef<ReportEngineHandle>(null);
 
+  // 加载公式目录
   useEffect(() => {
     fetchFunctions()
       .then(setFunctions)
       .catch((e) => console.error('加载公式列表失败:', e));
   }, []);
 
+  // 根据 URL 参数加载或创建报表
   useEffect(() => {
-    fetchDataModel()
-      .then((dm) => {
-        setDatasets(
-          dm.datasets.map((d) => ({
-            id: d.id,
-            alias: d.alias || d.id,
-            fields: d.fields.map((f) => ({
-              name: f.name,
-              alias: f.alias || f.name,
-              dataType: f.dataType,
-              primaryKey: f.primaryKey,
-            })),
-          })),
-        );
-        setRelationships(
-          dm.relationships.map((r) => ({
-            left: r.left,
-            right: r.right,
-            joinType: r.joinType as Relationship['joinType'],
-          })),
-        );
-      })
-      .catch((e) => console.error('加载数据模型失败:', e))
-      .finally(() => setLoading(false));
-  }, []);
+    const init = async () => {
+      if (reportIdFromUrl) {
+        try {
+          const config = await loadReportConfig(reportIdFromUrl);
+          const dm = config.dataModel as DataModelInfo | undefined;
+          if (dm) {
+            setDatasets(
+              dm.datasets.map((d) => ({
+                id: d.id,
+                alias: d.alias || d.id,
+                fields: d.fields.map((f) => ({
+                  name: f.name,
+                  alias: f.alias || f.name,
+                  dataType: f.dataType,
+                  primaryKey: f.primaryKey,
+                })),
+              })),
+            );
+            setRelationships(
+              dm.relationships.map((r) => ({
+                left: r.left,
+                right: r.right,
+                joinType: r.joinType as Relationship['joinType'],
+              })),
+            );
+          }
+          if (config.dataModelId) setDataModelId(config.dataModelId as string);
+          engineRef.current?.loadReportConfig(config as unknown as ReportConfig);
+        } catch (e) {
+          console.error('加载报表失败:', e);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // 无 id → 创建空白报表并跳转
+        try {
+          const newId = await saveReportConfig({
+            name: '未命名报表',
+            dataModelId: 'default',
+          });
+          navigate(`/engine?id=${newId}`, { replace: true });
+        } catch (e) {
+          console.error('创建报表失败:', e);
+          setLoading(false);
+        }
+      }
+    };
+    init();
+  }, [reportIdFromUrl, navigate]);
 
   const handleImport = async (file: File): Promise<ExcelWorkbook> => {
     return importExcel(file);
@@ -180,33 +156,14 @@ const EnginePage = () => {
     downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const handleApplyTemplate = (tpl: TemplatePreset) => {
-    engineRef.current?.applyTemplate(tpl);
-    setActiveTemplate(tpl.id);
-  };
-
-  const refreshReports = () => {
-    listReportConfigs().then(setReports).catch((e) => console.error('加载报表列表失败:', e));
-  };
-
-  const handleOpenReport = async (id: string) => {
-    try {
-      const config = await loadReportConfig(id);
-      engineRef.current?.loadReportConfig(config as unknown as ReportConfig);
-      setActiveTemplate(null);
-    } catch (e) {
-      console.error('打开报表失败:', e);
-    }
-  };
-
   const handleSaveReport = async (config: ReportConfig): Promise<string> => {
-    return saveReportConfig(config as unknown as Record<string, unknown>);
+    return saveReportConfig({ ...config, dataModelId } as unknown as Record<string, unknown>);
   };
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Spin size="large" tip="加载数据集..." />
+        <Spin size="large" tip="加载报表..." />
       </div>
     );
   }
@@ -215,17 +172,8 @@ const EnginePage = () => {
     <ReportEngine
       datasets={datasets}
       relationships={relationships}
+      dataModelId={dataModelId}
       functions={functions}
-      title={
-        <TitleBar
-          templates={ALL_TEMPLATES}
-          activeTemplate={activeTemplate}
-          onApply={handleApplyTemplate}
-          reports={reports}
-          onOpenReport={handleOpenReport}
-          onRefreshReports={refreshReports}
-        />
-      }
       engineRef={engineRef}
       onImport={handleImport}
       onExport={handleExport}
