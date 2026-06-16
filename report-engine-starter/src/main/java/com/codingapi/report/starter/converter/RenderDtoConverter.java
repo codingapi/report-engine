@@ -2,7 +2,6 @@ package com.codingapi.report.starter.converter;
 
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
-import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.expression.Value;
@@ -67,7 +66,7 @@ public final class RenderDtoConverter {
                 yield new Value.LoopFieldValue(parts[0], parts[1]);
             }
             case "Aggregate" -> new Value.Aggregate(
-                    Aggregation.valueOf(dto.aggregation()),
+                    dto.aggregation(),
                     convertValue(dto.operand()));
             case "FunctionCall" -> new Value.FunctionCall(
                     dto.funcName(),
@@ -144,7 +143,7 @@ public final class RenderDtoConverter {
                         String[] parts = c.payload().split("\\.", 2);
                         cells.add(SummaryCell.agg(c.column(),
                                 new FieldRef(parts[0], parts[1]),
-                                Aggregation.valueOf(c.aggregation())));
+                                c.aggregation()));
                     }
                 }
             }

@@ -2,7 +2,7 @@ package com.codingapi.report.data.datamodel;
 
 import com.codingapi.report.render.Report;
 
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.Templates;
@@ -177,7 +177,7 @@ class ReportModelTest {
         CellBinding scoreCell = findFieldCell(report, new FieldRef("d_score", "score"));
         assertEquals(Expansion.NONE, scoreCell.getExpansion());
         Value.Aggregate agg = assertInstanceOf(Value.Aggregate.class, scoreCell.getValue());
-        assertEquals(Aggregation.AVG, agg.aggregation());
+        assertEquals("AVG", agg.aggregation());
     }
 
     @Test
@@ -406,7 +406,7 @@ class ReportModelTest {
                 .build();
         CellBinding scoreCell = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 1))
-                .value(new Value.Aggregate(Aggregation.AVG, new Value.FieldValue(new FieldRef("d_score", "score"))))
+                .value(new Value.Aggregate("AVG", new Value.FieldValue(new FieldRef("d_score", "score"))))
                 .expansion(Expansion.NONE)
                 .parentCell(new CellRef("sheet1", 2, 0))
                 .build();

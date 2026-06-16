@@ -1,7 +1,7 @@
 package com.codingapi.report.expression;
 
 import com.codingapi.report.data.dataset.FieldRef;
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -86,7 +86,7 @@ class TemplatesTest {
         Value v = Templates.parse("${COUNT(d.name)}");
         assertInstanceOf(Value.Aggregate.class, v);
         Value.Aggregate agg = (Value.Aggregate) v;
-        assertEquals(Aggregation.COUNT, agg.aggregation());
+        assertEquals("COUNT", agg.aggregation());
         assertInstanceOf(Value.FieldValue.class, agg.operand());
         assertEquals("name", ((Value.FieldValue) agg.operand()).ref().field());
     }
@@ -96,7 +96,7 @@ class TemplatesTest {
     void sumAggregate() {
         Value v = Templates.parse("${SUM(d.salary)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.SUM, ((Value.Aggregate) v).aggregation());
+        assertEquals("SUM", ((Value.Aggregate) v).aggregation());
     }
 
     @Test
@@ -104,7 +104,7 @@ class TemplatesTest {
     void avgAggregate() {
         Value v = Templates.parse("${AVG(d.score)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.AVG, ((Value.Aggregate) v).aggregation());
+        assertEquals("AVG", ((Value.Aggregate) v).aggregation());
     }
 
     @Test
@@ -112,7 +112,7 @@ class TemplatesTest {
     void maxAggregate() {
         Value v = Templates.parse("${MAX(d.price)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.MAX, ((Value.Aggregate) v).aggregation());
+        assertEquals("MAX", ((Value.Aggregate) v).aggregation());
     }
 
     @Test
@@ -120,7 +120,7 @@ class TemplatesTest {
     void minAggregate() {
         Value v = Templates.parse("${MIN(d.price)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.MIN, ((Value.Aggregate) v).aggregation());
+        assertEquals("MIN", ((Value.Aggregate) v).aggregation());
     }
 
     @Test
@@ -128,7 +128,7 @@ class TemplatesTest {
     void countDistinctAggregate() {
         Value v = Templates.parse("${COUNT_DISTINCT(d.dept)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.COUNT_DISTINCT, ((Value.Aggregate) v).aggregation());
+        assertEquals("COUNT_DISTINCT", ((Value.Aggregate) v).aggregation());
     }
 
     @Test
@@ -136,7 +136,7 @@ class TemplatesTest {
     void lowercaseAggregate() {
         Value v = Templates.parse("${count(d.name)}");
         assertInstanceOf(Value.Aggregate.class, v);
-        assertEquals(Aggregation.COUNT, ((Value.Aggregate) v).aggregation());
+        assertEquals("COUNT", ((Value.Aggregate) v).aggregation());
     }
 
     // ============================================================
@@ -203,7 +203,7 @@ class TemplatesTest {
 
         Value.Template.Hole hole = (Value.Template.Hole) tpl.parts().get(1);
         assertInstanceOf(Value.Aggregate.class, hole.value());
-        assertEquals(Aggregation.COUNT, ((Value.Aggregate) hole.value()).aggregation());
+        assertEquals("COUNT", ((Value.Aggregate) hole.value()).aggregation());
     }
 
     @Test

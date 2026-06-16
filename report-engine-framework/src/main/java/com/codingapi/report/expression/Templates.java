@@ -1,7 +1,7 @@
 package com.codingapi.report.expression;
 
 import com.codingapi.report.data.dataset.FieldRef;
-import com.codingapi.report.operator.aggregation.Aggregation;
+import com.codingapi.report.operator.aggregation.Aggregators;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -97,7 +97,7 @@ public final class Templates {
             Value operand = argsStr.isEmpty()
                     ? new Value.Literal(null)
                     : parseHole(argsStr);
-            return new Value.Aggregate(Aggregation.valueOf(name.toUpperCase()), operand);
+            return new Value.Aggregate(name.toUpperCase(), operand);
         }
 
         List<Value> args = argsStr.isEmpty()
@@ -106,14 +106,9 @@ public final class Templates {
         return new Value.FunctionCall(name, args);
     }
 
-    /** 判断名字是否为聚合关键字（COUNT / SUM / AVG / MIN / MAX / COUNT_DISTINCT） */
+    /** 判断名字是否为聚合关键字（由 {@link Aggregators} 注册表分发） */
     private static boolean isAggregation(String name) {
-        try {
-            Aggregation.valueOf(name.toUpperCase());
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
+        return Aggregators.isRegistered(name);
     }
 
     /** 按逗号分割参数并逐个解析（不支持嵌套括号和字符串字面量中的逗号） */

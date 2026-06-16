@@ -10,7 +10,7 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.Templates;
@@ -90,7 +90,7 @@ class ReportScenarioTest {
         // 总计行：合计 + 总价（groupBy=null）
         SummaryRow total = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
                 SummaryCell.label(0, "合计"),
-                SummaryCell.agg(1, new FieldRef("d_prod", "price"), Aggregation.SUM))).build();
+                SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
         Report report = report("r_prod", dm, List.of(title, h1, h2, nameCol, priceCol),
                 List.of(), List.of(), List.of(total));
 
@@ -181,11 +181,11 @@ class ReportScenarioTest {
                 .parentCell(unitRef).build();
         // 人数：按 部门 粒度 COUNT（parent=部门）
         CellBinding countCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 2))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .expansion(Expansion.VERTICAL).parentCell(deptRef).build();
         // 总人数：按 单位 粒度 COUNT（parent=单位），跨该单位的部门行合并
         CellBinding unitTotalCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 3))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .expansion(Expansion.VERTICAL).parentCell(unitRef)
                 .mergeRepeated(true).build();
         Report report = report("r_staff", dm,
@@ -396,12 +396,12 @@ class ReportScenarioTest {
         SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit"))
                 .fromColumn(0).toColumn(3).cells(List.of(
                 SummaryCell.label(1, "${group}小计"),
-                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
         // 总计：全表末尾
         SummaryRow grandTotal = SummaryRow.builder().groupBy(null)
                 .fromColumn(0).toColumn(3).cells(List.of(
                 SummaryCell.label(0, "总计"),
-                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
 
         Report report = report("r_sd", dm,
                 List.of(title, h0, h1, h2, h3, unitCol, deptCol, nameCol, salaryCol),
@@ -541,7 +541,7 @@ class ReportScenarioTest {
         CellBinding totalLabel = label(2, 0, "员工总数");
         CellBinding totalCount = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 1))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .build();
 
         Report report = report("r_indep", dm,
@@ -615,10 +615,10 @@ class ReportScenarioTest {
         // 各带各自一行总计：staff 落 col 0-1，products 落 col 2-3
         SummaryRow staffTotal = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
                 SummaryCell.label(0, "员工合计"),
-                SummaryCell.agg(1, new FieldRef("d_staff", "name"), Aggregation.COUNT))).build();
+                SummaryCell.agg(1, new FieldRef("d_staff", "name"), "COUNT"))).build();
         SummaryRow prodTotal = SummaryRow.builder().groupBy(null).fromColumn(2).toColumn(3).cells(List.of(
                 SummaryCell.label(2, "商品合计"),
-                SummaryCell.agg(3, new FieldRef("d_prod", "price"), Aggregation.SUM))).build();
+                SummaryCell.agg(3, new FieldRef("d_prod", "price"), "SUM"))).build();
 
         Report report = report("r_indep2", dm,
                 List.of(h1, h2, h3, h4, staffName, staffUnit, prodName, prodPrice),

@@ -1,7 +1,7 @@
 package com.codingapi.report.expression;
 
 import com.codingapi.report.data.dataset.FieldRef;
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import com.codingapi.report.param.ParamContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,7 +66,7 @@ class ExpressionEngineTest {
     void aggregateField() {
         List<Map<String, Object>> rows = new ArrayList<>(List.of(
                 row("emp.salary", 8000.0), row("emp.salary", 9000.0), row("emp.salary", 7500.0)));
-        Value sum = new Value.Aggregate(Aggregation.SUM, new Value.FieldValue(new FieldRef("emp", "salary")));
+        Value sum = new Value.Aggregate("SUM", new Value.FieldValue(new FieldRef("emp", "salary")));
         assertEquals(24500.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
     }
 
@@ -74,7 +74,7 @@ class ExpressionEngineTest {
     @DisplayName("聚合：任意子表达式走逐行合成临时列")
     void aggregateExpression() {
         List<Map<String, Object>> rows = new ArrayList<>(List.of(row(), row(), row()));
-        Value sum = new Value.Aggregate(Aggregation.SUM, new Value.Literal(5));
+        Value sum = new Value.Aggregate("SUM", new Value.Literal(5));
         assertEquals(15.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
     }
 
