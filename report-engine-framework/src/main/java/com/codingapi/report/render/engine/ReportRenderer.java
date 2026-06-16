@@ -149,22 +149,19 @@ public class ReportRenderer {
      *
      * <h3>处理步骤</h3>
      * <ol>
-     *   <li>分类：收集 cellBindings（跳过属于循环块范围内的格子，那些由 {@link #renderLoop} 处理），
+     *   <li>分类：收集 cellBindings（跳过属于循环块范围内的格子），
      *       按 expansion 分为纵向带和单值格</li>
-     *   <li>提取 + JOIN：收集所有 CellBinding 引用的数据集，按 Relationship 链式 join 成组合表</li>
-     *   <li>过滤：收集所有格子的条件，AND 求解后过滤组合表</li>
-     *   <li>分组：CellBinding 按 expansion 分为纵向带（VERTICAL）和单值格（NONE/HORIZONTAL）</li>
-     *   <li>纵向带渲染：先渲染带（产出 N 行），计算 shift = N - 1（模板里带占 1 行，实际展开 N 行）</li>
-     *   <li>其他格子：带下方的格子（如总计行、标题等）坐标下移 shift 行，自适应数据量</li>
+     *   <li>按数据集连通性分组：用 union-find 按 Relationship 图将数据格分为连通分量</li>
+     *   <li>每组独立渲染纵向带：组内 JOIN + 过滤 + renderBand，各自有独立的行数（shift）</li>
+     *   <li>单值格用 max(shifts) 做行偏移，保证位于带下方的总计行/页脚正确下移</li>
      * </ol>
      *
-     * <h3>行偏移的自适应</h3>
-     * <p>模板里纵向带只占 1 行（声明行），实际数据可能有 N 行。shift = N - 1 就是
-     * "多出来的行数"。模板里位于带下方的格子（row > bandBase）需要下移 shift 行，
-     * 这样无论数据量怎么变，下方的总计行、页脚等始终紧跟在数据之后。
+     * <h3>独立数据带</h3>
+     * <p>当报表中引用了多个无关系的数据集时（如员工表 + 商品表并排），它们属于不同的
+     * 连通分量，各自独立展开——行数可以不同，互不影响。这是"并列独立数据区"报表模式的核心支持。
      */
     private void renderFree(Report report, ParamContext ctx, Canvas canvas) {
-        // 1. 收集非循环区格子：纵向扩展的进"带"，其余进"单值/文本"；引用字段的进"数据格子"
+        // 1. 收集非循环区格子
         List<CellBinding> band = new ArrayList<>();
         List<CellBinding> singles = new ArrayList<>();
         List<CellBinding> dataCells = new ArrayList<>();
@@ -178,30 +175,154 @@ public class ReportRenderer {
             }
         }
 
-        // 2. 提取 + JOIN + 过滤（仅当有格子引用字段）
-        RawTable filtered = null;
-        if (!dataCells.isEmpty()) {
-            RawTable combined = buildCombinedTable(dataCells);
-            filtered = Operators.filter(combined, collectConditions(dataCells), ctx, engine);
+        // 2. 按数据集连通性分组
+        List<List<CellBinding>> groups = groupByConnectivity(dataCells);
+
+        // 3. 每组独立渲染纵向带
+        int globalShift = 0;
+        int globalBandBase = Integer.MAX_VALUE;
+        RawTable firstGroupFiltered = null;
+
+        for (List<CellBinding> group : groups) {
+            // 组内 band cells
+            List<CellBinding> groupBand = new ArrayList<>();
+            for (CellBinding b : group) {
+                if (b.getExpansion() == Expansion.VERTICAL) {
+                    groupBand.add(b);
+                }
+            }
+            if (groupBand.isEmpty()) continue;
+
+            // 组内 JOIN + 过滤
+            RawTable combined = buildCombinedTable(group);
+            RawTable filtered = Operators.filter(combined, collectConditions(group), ctx, engine);
+
+            if (firstGroupFiltered == null) {
+                firstGroupFiltered = filtered;
+            }
+
+            // 组内 bandBase
+            int groupBandBase = Integer.MAX_VALUE;
+            for (CellBinding b : groupBand) {
+                groupBandBase = Math.min(groupBandBase, b.getCell().row());
+            }
+            globalBandBase = Math.min(globalBandBase, groupBandBase);
+
+            // 渲染带
+            int n = renderBand(groupBand, report.getSummaries(), filtered, groupBandBase, ctx, canvas);
+            int groupShift = n > 0 ? n - 1 : 0;
+            globalShift = Math.max(globalShift, groupShift);
         }
 
-        // 3. 先渲染纵向带，拿到展开行数 N 与带的起始行
-        int n = 0;
-        int bandBase = Integer.MAX_VALUE;
-        if (!band.isEmpty()) {
-            for (CellBinding b : band) {
-                bandBase = Math.min(bandBase, b.getCell().row());
-            }
-            n = renderBand(band, report.getSummaries(), filtered, bandBase, ctx, canvas);
-        }
-        final int shift = n > 0 ? n - 1 : 0;  // 纵向带多出来的行数
-        final int base = bandBase;
+        final int shift = globalShift;
+        final int base = globalBandBase;
+        final RawTable evalTable = firstGroupFiltered;
 
         // 4. 单值/文本格子：表达式求值，带下方的行下移 shift
         for (CellBinding b : singles) {
-            Object v = evalSingle(b, filtered, ctx);
+            Object v = evalSingle(b, evalTable, ctx);
             int row = b.getCell().row() > base ? b.getCell().row() + shift : b.getCell().row();
             place(canvas, b.getCell(), row, b.getCell().column(), v);
+        }
+    }
+
+    // ============================================================
+    // 数据集连通性分组（union-find）
+    // ============================================================
+
+    /**
+     * 按数据集连通性将 CellBinding 分组。
+     * <p>两个数据集如果在 DataModel 的 Relationship 图中连通（直接或间接），
+     * 则归入同一组，渲染时走 JOIN 同行迭代；不连通的各自独立渲染。
+     */
+    private List<List<CellBinding>> groupByConnectivity(List<CellBinding> dataCells) {
+        if (dataCells.isEmpty()) return List.of();
+
+        // 收集所有引用的 datasetId
+        Set<String> allIds = new LinkedHashSet<>();
+        for (CellBinding b : dataCells) {
+            List<FieldRef> refs = new ArrayList<>();
+            collectFieldRefs(b.getValue(), refs);
+            if (b.getConditions() != null) {
+                for (Condition c : b.getConditions()) {
+                    collectFieldRefs(c.getLeft(), refs);
+                    collectFieldRefs(c.getRight(), refs);
+                }
+            }
+            for (FieldRef r : refs) {
+                allIds.add(r.datasetId());
+            }
+        }
+
+        List<String> ids = new ArrayList<>(allIds);
+        if (ids.size() <= 1) {
+            // 只有一个数据集（或无），不需要分组
+            return List.of(dataCells);
+        }
+
+        // Union-find 初始化
+        Map<String, String> parent = new HashMap<>();
+        for (String id : ids) {
+            parent.put(id, id);
+        }
+
+        // 按 Relationship 合并
+        if (dm.getRelationships() != null) {
+            for (Relationship rel : dm.getRelationships()) {
+                String a = rel.getLeft().datasetId();
+                String b = rel.getRight().datasetId();
+                if (allIds.contains(a) && allIds.contains(b)) {
+                    union(parent, a, b);
+                }
+            }
+        }
+
+        // 按根节点分组 datasetId
+        Map<String, List<String>> idGroups = new LinkedHashMap<>();
+        for (String id : ids) {
+            idGroups.computeIfAbsent(find(parent, id), k -> new ArrayList<>()).add(id);
+        }
+
+        // 只有一个连通分量 → 全部归一组
+        if (idGroups.size() == 1) {
+            return List.of(dataCells);
+        }
+
+        // 将 CellBinding 分配到对应组
+        Map<String, List<CellBinding>> cellGroups = new LinkedHashMap<>();
+        for (String root : idGroups.keySet()) {
+            cellGroups.put(root, new ArrayList<>());
+        }
+        for (CellBinding b : dataCells) {
+            List<FieldRef> refs = new ArrayList<>();
+            collectFieldRefs(b.getValue(), refs);
+            if (b.getConditions() != null) {
+                for (Condition c : b.getConditions()) {
+                    collectFieldRefs(c.getLeft(), refs);
+                    collectFieldRefs(c.getRight(), refs);
+                }
+            }
+            String dsId = refs.isEmpty() ? null : refs.get(0).datasetId();
+            String root = dsId != null ? find(parent, dsId) : idGroups.keySet().iterator().next();
+            cellGroups.get(root).add(b);
+        }
+
+        return new ArrayList<>(cellGroups.values());
+    }
+
+    private String find(Map<String, String> parent, String x) {
+        while (!parent.get(x).equals(x)) {
+            parent.put(x, parent.get(parent.get(x))); // 路径压缩
+            x = parent.get(x);
+        }
+        return x;
+    }
+
+    private void union(Map<String, String> parent, String a, String b) {
+        String ra = find(parent, a);
+        String rb = find(parent, b);
+        if (!ra.equals(rb)) {
+            parent.put(ra, rb);
         }
     }
 

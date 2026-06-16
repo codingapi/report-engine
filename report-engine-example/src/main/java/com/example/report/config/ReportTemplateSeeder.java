@@ -46,6 +46,7 @@ public class ReportTemplateSeeder {
         seedMasterDetail();
         seedSubtotal();
         seedPayslipLoop();
+        seedIndependentBands();
         log.info("已预存 {} 个示例报表", exampleIds.size());
     }
 
@@ -258,6 +259,40 @@ public class ReportTemplateSeeder {
                 cell(1, 1, "岗位薪资"),
                 cell(1, 2, "绩效工资")
         ), 6, 4));
+        exampleIds.add(save(config));
+    }
+
+    // ============================================================
+    // 7. 独立数据带：员工 + 商品并列（无关系，各自独立展开）
+    // ============================================================
+
+    private void seedIndependentBands() {
+        Map<String, Object> config = baseConfig("员工商品并列报表");
+
+        // 表头（Row 0）
+        config.put("cellBindings", List.of(
+                binding(0, 0, literal("姓名"), "NONE", "LIST"),
+                binding(0, 1, literal("单位"), "NONE", "LIST"),
+                binding(0, 2, literal("商品名"), "NONE", "LIST"),
+                binding(0, 3, literal("价格"), "NONE", "LIST"),
+                // 员工数据带（col 0-1, VERTICAL）
+                binding(1, 0, fieldValue("staff", "name"), "VERTICAL", "LIST"),
+                binding(1, 1, fieldValue("staff", "unit"), "VERTICAL", "LIST"),
+                // 商品数据带（col 2-3, VERTICAL）— 与员工无关系，各自独立展开
+                binding(1, 2, fieldValue("products", "name"), "VERTICAL", "LIST"),
+                binding(1, 3, fieldValue("products", "price"), "VERTICAL", "LIST"),
+                // 员工总数（single 聚合，会被 shift 下移）
+                binding(2, 0, literal("员工总数"), "NONE", "LIST"),
+                bindingWith(2, 1, aggregate("COUNT", "staff", "name"), "NONE", "LIST")
+        ));
+
+        config.put("template", buildWorkbook(List.of(
+                cell(0, 0, "姓名"),
+                cell(0, 1, "单位"),
+                cell(0, 2, "商品名"),
+                cell(0, 3, "价格"),
+                cell(2, 0, "员工总数")
+        ), 8, 6));
         exampleIds.add(save(config));
     }
 

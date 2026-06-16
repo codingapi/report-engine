@@ -499,6 +499,81 @@ class ReportScenarioTest {
     }
 
     // ============================================================
+    // 7. 独立数据带：两个无关系数据集并列展开
+    // ============================================================
+
+    @Test
+    @DisplayName("独立数据带：staff(4行) 和 products(3行) 无关系并列 → 各自独立展开")
+    void independentBands() throws Exception {
+        // 两个数据集，无 Relationship
+        DataSource srcStaff = csv("ds_staff", "/data/staff.csv");
+        Dataset staff = TableDataset.builder().id("d_staff").datasourceId("ds_staff").sourceTable("staff.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("unit").dataType(DataType.STRING).build()))
+                .build();
+        DataSource srcProd = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_indep").name("独立模型")
+                .datasources(List.of(srcStaff, srcProd))
+                .datasets(List.of(staff, prod))
+                .relationships(List.of())  // 无关系
+                .build();
+
+        // Row 0: 表头
+        CellBinding h1 = label(0, 0, "姓名");
+        CellBinding h2 = label(0, 1, "单位");
+        CellBinding h3 = label(0, 2, "商品名");
+        CellBinding h4 = label(0, 3, "价格");
+        // Row 1: staff 数据带（col 0-1）
+        CellBinding staffName = listCol(new CellRef("sheet1", 1, 0), new FieldRef("d_staff", "name"));
+        CellBinding staffUnit = listCol(new CellRef("sheet1", 1, 1), new FieldRef("d_staff", "unit"));
+        // Row 1: products 数据带（col 2-3）
+        CellBinding prodName = listCol(new CellRef("sheet1", 1, 2), new FieldRef("d_prod", "name"));
+        CellBinding prodPrice = listCol(new CellRef("sheet1", 1, 3), new FieldRef("d_prod", "price"));
+        // Row 2: 员工总数（single 聚合，应被 shift 到 row 2 + max(3,2) = 5）
+        CellBinding totalLabel = label(2, 0, "员工总数");
+        CellBinding totalCount = CellBinding.builder()
+                .cell(new CellRef("sheet1", 2, 1))
+                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .build();
+
+        Report report = report("r_indep", dm,
+                List.of(h1, h2, h3, h4, staffName, staffUnit, prodName, prodPrice, totalLabel, totalCount),
+                List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "independent-bands");
+
+        // 表头
+        assertEquals("姓名", text(sheet, 0, 0));
+        assertEquals("单位", text(sheet, 0, 1));
+        assertEquals("商品名", text(sheet, 0, 2));
+        assertEquals("价格", text(sheet, 0, 3));
+
+        // staff 数据（4 行：张三、李四、王五、赵六）
+        assertEquals("张三", text(sheet, 1, 0));
+        assertEquals("研发中心", text(sheet, 1, 1));
+        assertEquals("赵六", text(sheet, 4, 0));
+
+        // products 数据（3 行：苹果、香蕉、橙子）
+        assertEquals("苹果", text(sheet, 1, 2));
+        assertEquals(5.0, number(sheet, 1, 3), 0.0001);
+        assertEquals("橙子", text(sheet, 3, 2));
+
+        // products 只有 3 行，第 4 行（row 4）col 2-3 应为空
+        assertNull(findCell(sheet, 4, 2), "products 只有 3 行，第 4 行应为空");
+        assertNull(findCell(sheet, 4, 3), "products 只有 3 行，第 4 行应为空");
+
+        // 员工总数 single 从 row 2 下移 max(4-1, 3-1) = 3 → row 5
+        assertEquals("员工总数", text(sheet, 5, 0));
+        assertEquals(4.0, number(sheet, 5, 1), 0.0001);
+    }
+
+    // ============================================================
     // ---- 公共构造 / 运行 / 断言辅助 ----
     // ============================================================
 
