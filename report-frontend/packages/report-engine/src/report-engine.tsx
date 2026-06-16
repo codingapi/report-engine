@@ -54,6 +54,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [summaries, setSummaries] = useState<SummaryRow[]>([]);
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [reportName, setReportName] = useState<string>('未命名报表');
   const [savingReport, setSavingReport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -182,6 +183,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }));
 
     setReportId(config.id ?? null);
+    setReportName(config.name || '未命名报表');
     setCellBindings(remappedBindings);
     setLoopBlocks(remappedLoops);
     setSummaries(config.summaries || []);
@@ -216,7 +218,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     try {
       const config: ReportConfig = {
         id: reportId ?? undefined,
-        name: '未命名报表',
+        name: reportName,
         dataModelId,
         cellBindings,
         loopBlocks,
@@ -232,7 +234,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     } finally {
       setSavingReport(false);
     }
-  }, [onSaveReport, reportId, dataModelId, cellBindings, loopBlocks, summaries, params, messageApi]);
+  }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, messageApi]);
 
   // 暴露 ref
   React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
@@ -516,7 +518,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
       {/* 顶栏 */}
       <div className="re-header">
-        <div className="re-header__title">{title ?? '报表设计器'}</div>
+        <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
           {onSaveReport && (
             <Button
