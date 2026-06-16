@@ -21,6 +21,10 @@
 	<dependencies>
 		<dependency>
 			<groupId>com.codingapi.report</groupId>
+			<artifactId>report-engine-framework</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.codingapi.report</groupId>
 			<artifactId>report-engine-excel</artifactId>
 		</dependency>
 		<dependency>

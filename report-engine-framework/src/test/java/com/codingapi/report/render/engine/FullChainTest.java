@@ -10,7 +10,7 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.Templates;
@@ -139,7 +139,7 @@ class FullChainTest {
 
         CellBinding avg = CellBinding.builder()
                 .cell(new CellRef("sheet1", 1, 1))
-                .value(new Value.Aggregate(Aggregation.AVG, new Value.FieldValue(new FieldRef("d_score", "score"))))
+                .value(new Value.Aggregate("AVG", new Value.FieldValue(new FieldRef("d_score", "score"))))
                 .expansion(Expansion.NONE)
                 .build();
 

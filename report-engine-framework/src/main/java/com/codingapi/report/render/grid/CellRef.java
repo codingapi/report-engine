@@ -24,4 +24,13 @@ package com.codingapi.report.render.grid;
  * @param column  列号（0-based，与 Excel POI 一致）
  */
 public record CellRef(String sheetId, int row, int column) {
+
+    /**
+     * 解析单元格键 {@code "sheetId:row:column"} 为 CellRef。
+     * <p>前端以该格式传输格子坐标（如 {@code "sheet1:2:3"}）。
+     */
+    public static CellRef parse(String key) {
+        String[] parts = key.split(":");
+        return new CellRef(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+    }
 }

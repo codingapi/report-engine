@@ -25,7 +25,7 @@ package com.codingapi.report.render.grid;
  *       </pre></li>
  *
  *   <li>{@link #NONE}（不扩展）：格子不铺开，通常配合
- *       {@link Aggregation} 取单值。
+ *       聚合表达式（如 {@code COUNT}）取单值。
  *       <pre>
  *         员工总数: 42              ← COUNT(员工.id), expansion=NONE
  *       </pre></li>

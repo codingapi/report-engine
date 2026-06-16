@@ -3,7 +3,6 @@ package com.codingapi.report.render.grid;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.expression.Templates;
 import com.codingapi.report.expression.Value;
-import com.codingapi.report.operator.aggregation.Aggregation;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -48,9 +47,9 @@ public class SummaryCell {
      *
      * @param column      列坐标
      * @param field       聚合目标字段
-     * @param aggregation 聚合方式
+     * @param aggregation 聚合名（如 {@code "SUM"} / {@code "COUNT"}），由注册表分发
      */
-    public static SummaryCell agg(int column, FieldRef field, Aggregation aggregation) {
+    public static SummaryCell agg(int column, FieldRef field, String aggregation) {
         return new SummaryCell(column, new Value.Aggregate(aggregation, new Value.FieldValue(field)));
     }
 }

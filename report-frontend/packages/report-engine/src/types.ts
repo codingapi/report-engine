@@ -161,6 +161,13 @@ export interface SummaryRow {
    * 仅前端设计态使用；渲染时 framework 仍按 groupBy 动态追加，后端忽略此字段。
    */
   row: number;
+  /**
+   * 汇总作用的列区间 [fromColumn, toColumn]（0-based，含）。
+   * 由右键框选区域生成：框选起止列即区间。后端按该区间与数据带列集合求交决定归属，
+   * 使同一设计行上的多个并列汇总（各占不同列段）互不串扰。
+   */
+  fromColumn: number;
+  toColumn: number;
   groupBy: { datasetId: string; field: string } | null;
   cells: SummaryCell[];
 }

@@ -4,6 +4,12 @@ import type { DataType } from './dataset';
 // Types（匹配后端 ReportConfigController 返回的 dataModel 结构）
 // ============================================================
 
+/** 数据源类型（对齐后端 DataSourceType 枚举） */
+export type DataSourceType = 'CSV' | 'JSON' | 'DB' | 'API' | 'EXCEL';
+
+/** JOIN 类型 */
+export type JoinType = 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
+
 export interface DataModelField {
   name: string;
   alias?: string;
@@ -14,7 +20,7 @@ export interface DataModelField {
 export interface DataModelDataset {
   id: string;
   alias?: string;
-  dataSourceType?: string;
+  dataSourceType?: DataSourceType;
   fields: DataModelField[];
 }
 
@@ -26,7 +32,7 @@ export interface FieldRefInfo {
 export interface RelationshipInfo {
   left: FieldRefInfo;
   right: FieldRefInfo;
-  joinType: string;
+  joinType: JoinType;
 }
 
 /** 报表所用的数据模型：数据集 + 数据关系（报表参数属报表级，前端管理，不在此） */

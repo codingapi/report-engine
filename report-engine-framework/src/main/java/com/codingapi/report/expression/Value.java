@@ -1,7 +1,6 @@
 package com.codingapi.report.expression;
 
 import com.codingapi.report.data.dataset.FieldRef;
-import com.codingapi.report.operator.aggregation.Aggregation;
 
 import java.util.List;
 
@@ -21,7 +20,7 @@ import java.util.List;
  *   <li>{@link ParamValue} — 读报表参数</li>
  *   <li>{@link LoopFieldValue} — 读循环当前迭代行的字段</li>
  *   <li>{@link Template} — 文本插值（文本片段 + 表达式洞）</li>
- *   <li>{@link Aggregate} — 对行集合按某 {@link Aggregation} 聚合一个子表达式</li>
+ *   <li>{@link Aggregate} — 对行集合按聚合名（如 SUM/COUNT）聚合一个子表达式</li>
  *   <li>{@link FunctionCall} — 调用函数（格式化/日期/拼接/round…），函数本身可扩展注册</li>
  * </ul>
  *
@@ -76,8 +75,11 @@ public sealed interface Value
         }
     }
 
-    /** 聚合：对上下文的行集合，按 {@code aggregation} 聚合 {@code operand} 求出的每行值。 */
-    record Aggregate(Aggregation aggregation, Value operand) implements Value {
+    /**
+     * 聚合：对上下文的行集合，按聚合名（如 {@code "SUM"} / {@code "COUNT"}）聚合 {@code operand} 求出的每行值。
+     * <p>聚合名由 {@link com.codingapi.report.operator.aggregation.Aggregators} 注册表分发到具体 {@code Aggregator}。
+     */
+    record Aggregate(String aggregation, Value operand) implements Value {
     }
 
     /** 函数调用：参数先各自求值，再交给同名 {@code ValueFunction} 处理（格式化/日期等）。 */

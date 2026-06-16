@@ -1,4 +1,4 @@
-package com.example.report.controller;
+package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
@@ -6,10 +6,10 @@ import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.Dataset;
-import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,8 +20,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 数据集元数据 API：列出数据集（含字段定义）、预览前 N 行，供前端左面板树形展示。
+ */
 @RestController
 @RequestMapping("/api/datasets")
+@ConditionalOnClass(RestController.class)
 public class DatasetController {
 
     private final DataModel dataModel;

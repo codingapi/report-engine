@@ -10,7 +10,7 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
-import com.codingapi.report.operator.aggregation.Aggregation;
+
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.Templates;
@@ -88,9 +88,9 @@ class ReportScenarioTest {
         CellBinding nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
         CellBinding priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
         // 总计行：合计 + 总价（groupBy=null）
-        SummaryRow total = SummaryRow.builder().groupBy(null).cells(List.of(
+        SummaryRow total = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
                 SummaryCell.label(0, "合计"),
-                SummaryCell.agg(1, new FieldRef("d_prod", "price"), Aggregation.SUM))).build();
+                SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
         Report report = report("r_prod", dm, List.of(title, h1, h2, nameCol, priceCol),
                 List.of(), List.of(), List.of(total));
 
@@ -181,11 +181,11 @@ class ReportScenarioTest {
                 .parentCell(unitRef).build();
         // 人数：按 部门 粒度 COUNT（parent=部门）
         CellBinding countCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 2))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .expansion(Expansion.VERTICAL).parentCell(deptRef).build();
         // 总人数：按 单位 粒度 COUNT（parent=单位），跨该单位的部门行合并
         CellBinding unitTotalCol = CellBinding.builder().cell(new CellRef("sheet1", 2, 3))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .expansion(Expansion.VERTICAL).parentCell(unitRef)
                 .mergeRepeated(true).build();
         Report report = report("r_staff", dm,
@@ -393,13 +393,15 @@ class ReportScenarioTest {
         CellBinding salaryCol = listCol(new CellRef("sheet1", 2, 3), new FieldRef("d_sd", "salary"));
 
         // 单位小计：每个单位结束后，部门列放"${单位}小计"标签，薪资列放 SUM
-        SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit")).cells(List.of(
+        SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit"))
+                .fromColumn(0).toColumn(3).cells(List.of(
                 SummaryCell.label(1, "${group}小计"),
-                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
         // 总计：全表末尾
-        SummaryRow grandTotal = SummaryRow.builder().groupBy(null).cells(List.of(
+        SummaryRow grandTotal = SummaryRow.builder().groupBy(null)
+                .fromColumn(0).toColumn(3).cells(List.of(
                 SummaryCell.label(0, "总计"),
-                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), Aggregation.SUM))).build();
+                SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
 
         Report report = report("r_sd", dm,
                 List.of(title, h0, h1, h2, h3, unitCol, deptCol, nameCol, salaryCol),
@@ -539,7 +541,7 @@ class ReportScenarioTest {
         CellBinding totalLabel = label(2, 0, "员工总数");
         CellBinding totalCount = CellBinding.builder()
                 .cell(new CellRef("sheet1", 2, 1))
-                .value(new Value.Aggregate(Aggregation.COUNT, new Value.FieldValue(new FieldRef("d_staff", "name"))))
+                .value(new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("d_staff", "name"))))
                 .build();
 
         Report report = report("r_indep", dm,
@@ -571,6 +573,86 @@ class ReportScenarioTest {
         // 员工总数 single 从 row 2 下移 max(4-1, 3-1) = 3 → row 5
         assertEquals("员工总数", text(sheet, 5, 0));
         assertEquals(4.0, number(sheet, 5, 1), 0.0001);
+    }
+
+    // ============================================================
+    // 7b. 并列独立数据带 + 各带各自的行汇总（验证汇总作用域不串扰）
+    // ============================================================
+
+    @Test
+    @DisplayName("并列各带行汇总：staff 总计落 col0-1/row5，products 总计落 col2-3/row4，互不串扰")
+    void independentBandsEachWithSummary() throws Exception {
+        // 两个数据集，无 Relationship —— 与 independentBands 同构
+        DataSource srcStaff = csv("ds_staff", "/data/staff.csv");
+        Dataset staff = TableDataset.builder().id("d_staff").datasourceId("ds_staff").sourceTable("staff.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("unit").dataType(DataType.STRING).build()))
+                .build();
+        DataSource srcProd = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_indep2").name("独立模型-双汇总")
+                .datasources(List.of(srcStaff, srcProd))
+                .datasets(List.of(staff, prod))
+                .relationships(List.of())
+                .build();
+
+        // Row 0: 表头
+        CellBinding h1 = label(0, 0, "姓名");
+        CellBinding h2 = label(0, 1, "单位");
+        CellBinding h3 = label(0, 2, "商品名");
+        CellBinding h4 = label(0, 3, "价格");
+        // Row 1: staff 带（col 0-1），products 带（col 2-3）
+        CellBinding staffName = listCol(new CellRef("sheet1", 1, 0), new FieldRef("d_staff", "name"));
+        CellBinding staffUnit = listCol(new CellRef("sheet1", 1, 1), new FieldRef("d_staff", "unit"));
+        CellBinding prodName = listCol(new CellRef("sheet1", 1, 2), new FieldRef("d_prod", "name"));
+        CellBinding prodPrice = listCol(new CellRef("sheet1", 1, 3), new FieldRef("d_prod", "price"));
+
+        // 各带各自一行总计：staff 落 col 0-1，products 落 col 2-3
+        SummaryRow staffTotal = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
+                SummaryCell.label(0, "员工合计"),
+                SummaryCell.agg(1, new FieldRef("d_staff", "name"), "COUNT"))).build();
+        SummaryRow prodTotal = SummaryRow.builder().groupBy(null).fromColumn(2).toColumn(3).cells(List.of(
+                SummaryCell.label(2, "商品合计"),
+                SummaryCell.agg(3, new FieldRef("d_prod", "price"), "SUM"))).build();
+
+        Report report = report("r_indep2", dm,
+                List.of(h1, h2, h3, h4, staffName, staffUnit, prodName, prodPrice),
+                List.of(), List.of(), List.of(staffTotal, prodTotal));
+
+        Sheet sheet = run(dm, report, Map.of(), "independent-bands-summary");
+
+        // 表头
+        assertEquals("姓名", text(sheet, 0, 0));
+        assertEquals("价格", text(sheet, 0, 3));
+
+        // staff 明细：4 行（row 1-4），第 4 行为赵六/市场中心
+        assertEquals("张三", text(sheet, 1, 0));
+        assertEquals("赵六", text(sheet, 4, 0));
+        assertEquals("市场中心", text(sheet, 4, 1));
+
+        // staff 总计：seq = 4 明细 + 1 总计 → 落在 row 5（col 0-1）
+        assertEquals("员工合计", text(sheet, 5, 0));
+        assertEquals(4.0, number(sheet, 5, 1), 0.0001);
+
+        // products 明细：3 行（row 1-3）
+        assertEquals("苹果", text(sheet, 1, 2));
+        assertEquals("橙子", text(sheet, 3, 2));
+
+        // products 总计：seq = 3 明细 + 1 总计 → 落在 row 4（col 2-3），SUM=5+3+4=12
+        assertEquals("商品合计", text(sheet, 4, 2));
+        assertEquals(12.0, number(sheet, 4, 3), 0.0001);
+
+        // ---- 隔离验证（旧实现会因总计广播而失败）----
+        // staff 总计行（row 5）右侧无内容：products 总计不应被广播到这里
+        assertNull(findCell(sheet, 5, 2), "staff 总计行右侧不应出现 products 汇总");
+        assertNull(findCell(sheet, 5, 3), "staff 总计行右侧不应出现 products 汇总");
+        // products 总计行（row 4）左侧是 staff 明细赵六，而非被广播的"员工合计"
+        assertEquals("赵六", text(sheet, 4, 0), "products 总计行左侧应是 staff 明细，而非被广播的员工合计");
     }
 
     // ============================================================

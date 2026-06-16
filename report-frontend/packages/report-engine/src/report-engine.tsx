@@ -13,14 +13,34 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig, ReportValue } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
+import { parseCellKey, makeCellKey } from './utils/excel-cell';
+import { useReportIO } from './hooks/use-report-io';
 import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
-function migrateSummaryCell(cell: any): SummaryCell {
-  if (cell.value) return cell as SummaryCell; // 已是新格式
+interface LegacySummaryCell {
+  column: number;
+  value?: unknown;
+  kind?: 'label' | 'agg';
+  payload?: string;
+  aggregation?: string;
+}
+
+/** 兼容旧持久化数据的 SummaryRow（cells 可能是旧格式） */
+interface LegacySummaryRow {
+  id: string;
+  row: number;
+  fromColumn: number;
+  toColumn: number;
+  groupBy: { datasetId: string; field: string } | null;
+  cells: LegacySummaryCell[];
+}
+
+function migrateSummaryCell(cell: LegacySummaryCell): SummaryCell {
+  if (cell.value) return cell as unknown as SummaryCell; // 已是新格式
   if (cell.kind === 'label') {
     return { column: cell.column, value: parseTemplate(cell.payload || '') };
   }
@@ -29,7 +49,7 @@ function migrateSummaryCell(cell: any): SummaryCell {
     column: cell.column,
     value: {
       type: 'Aggregate',
-      aggregation: cell.aggregation || 'SUM',
+      aggregation: (cell.aggregation || 'SUM') as ReportValue['aggregation'],
       operand: { type: 'FieldValue', payload: cell.payload || '' },
     },
   };
@@ -72,9 +92,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
-  const [savingReport, setSavingReport] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const lastAppliedRef = useRef<TemplatePreset | null>(null);
 
@@ -85,20 +102,24 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loopDrawerOpen, setLoopDrawerOpen] = useState(false);
 
+  // ─── 报表 IO（保存/导出/导入） ───
+  const { savingReport, exporting, importing, handleSaveReport, handleExport, handleImport } = useReportIO({
+    sheetRef, datasets, dataModelId,
+    cellBindings, loopBlocks, summaries, params,
+    reportId, reportName, onReportIdChange: setReportId,
+    onSaveReport, onExport, onImport, messageApi,
+  });
+
   // ─── 清空旧模板单元格 ───
   const clearPreviousTemplate = useCallback((sheetId: string) => {
     const prev = lastAppliedRef.current;
     if (!prev) return;
     // 清空旧模板设置过的单元格（标题 + 表头 + 数据区域 + 汇总行）
     const prevSummaries = prev.summaries || [];
-    const maxRow = Math.max(...prev.bindings.map((b) => {
-      const parts = b.cellKey.split(':');
-      return parseInt(parts[1], 10);
-    }), ...prev.cellValues.map((cv) => cv.row), ...prevSummaries.map((s) => s.row));
-    const maxCol = Math.max(...prev.bindings.map((b) => {
-      const parts = b.cellKey.split(':');
-      return parseInt(parts[2], 10);
-    }), ...prev.cellValues.map((cv) => cv.col),
+    const maxRow = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).row),
+      ...prev.cellValues.map((cv) => cv.row), ...prevSummaries.map((s) => s.row));
+    const maxCol = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).col),
+      ...prev.cellValues.map((cv) => cv.col),
       ...prevSummaries.flatMap((s) => s.cells.map((c) => c.column)));
     // 清空 0..maxRow × 0..maxCol 区域
     for (let r = 0; r <= maxRow; r++) {
@@ -127,8 +148,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 将模板中的 cellKey/parentCell 替换为实际 sheet ID
     const remapKey = (key: string | null) => {
       if (!key) return null;
-      const parts = key.split(':');
-      return `${sheetId}:${parts[1]}:${parts[2]}`;
+      const { row, col } = parseCellKey(key);
+      return makeCellKey(sheetId, row, col);
     };
 
     const remappedBindings = tpl.bindings.map((b) => ({
@@ -149,11 +170,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     // 回写所有绑定的显示文本，让数据区字段/聚合配置在表格中可见
     for (const b of remappedBindings) {
-      const [, r, c] = b.cellKey.split(':');
+      const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         sheetId,
-        parseInt(r, 10),
-        parseInt(c, 10),
+        row,
+        col,
         valueDisplayText(b.value, datasets, remappedLoops),
       );
     }
@@ -186,8 +207,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 将 cellKey/parentCell 中的 sheet ID 重映射为实际 ID
     const remapKey = (key: string | null) => {
       if (!key) return null;
-      const parts = key.split(':');
-      return `${actualSheetId}:${parts[1]}:${parts[2]}`;
+      const { row, col } = parseCellKey(key);
+      return makeCellKey(actualSheetId, row, col);
     };
 
     const configLoops = config.loopBlocks || [];
@@ -200,7 +221,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }));
 
     // 迁移汇总行：旧格式（kind/payload）→ 新格式（value: ReportValue）
-    const migratedSummaries = (config.summaries || []).map((s: any) => ({
+    const migratedSummaries: SummaryRow[] = (config.summaries || []).map((s: LegacySummaryRow) => ({
       ...s,
       cells: (s.cells || []).map(migrateSummaryCell),
     }));
@@ -217,11 +238,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
     const ds = datasets;
     for (const b of remappedBindings) {
-      const [, r, c] = b.cellKey.split(':');
+      const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         actualSheetId,
-        parseInt(r, 10),
-        parseInt(c, 10),
+        row,
+        col,
         valueDisplayText(b.value, ds, remappedLoops),
       );
     }
@@ -235,36 +256,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
   }, [messageApi, datasets]);
-
-  // ─── 保存报表配置 ───
-  const handleSaveReport = useCallback(async () => {
-    if (!onSaveReport) return;
-    const snapshot = sheetRef.current?.getSnapshot();
-    if (!snapshot) {
-      messageApi.warning('表格为空，无法保存');
-      return;
-    }
-    setSavingReport(true);
-    try {
-      const config: ReportConfig = {
-        id: reportId ?? undefined,
-        name: reportName,
-        dataModelId,
-        cellBindings,
-        loopBlocks,
-        summaries,
-        params,
-        template: snapshot,
-      };
-      const id = await onSaveReport(config);
-      if (id) setReportId(id);
-      messageApi.success('报表已保存');
-    } catch (e) {
-      messageApi.error(`保存失败: ${e}`);
-    } finally {
-      setSavingReport(false);
-    }
-  }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, messageApi]);
 
   // 暴露 ref
   React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
@@ -306,13 +297,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     for (const b of cellBindings) {
       // 纯文本（Literal）就是普通文字，不高亮
       if (b.value.type === 'Literal') continue;
-      const [sheetId, r, c] = b.cellKey.split(':');
-      const row = parseInt(r, 10);
-      const col = parseInt(c, 10);
+      const { sheetId, row, col } = parseCellKey(b.cellKey);
       ranges.push({ sheetId, startRow: row, startColumn: col, endRow: row, endColumn: col });
     }
     // 汇总行：仅聚合格高亮（label 文本格视同普通文字）
-    const sumSheet = cellBindings[0]?.cellKey.split(':')[0]
+    const sumSheet = (cellBindings[0] ? parseCellKey(cellBindings[0].cellKey).sheetId : undefined)
       || sheetRef.current?.getActiveSheetId() || 'sheet1';
     for (const s of summaries) {
       for (const cell of s.cells) {
@@ -333,13 +322,12 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   // ─── 将绑定值回写为单元格显示文本（设计态占位） ───
   const writeBindingText = useCallback(
     (cellKey: string, binding: CellBinding) => {
-      const parts = cellKey.split(':');
-      if (parts.length !== 3) return;
-      const [sheetId, row, col] = parts;
+      if (cellKey.split(':').length !== 3) return;
+      const { sheetId, row, col } = parseCellKey(cellKey);
       sheetRef.current?.setCellValue(
         sheetId,
-        parseInt(row, 10),
-        parseInt(col, 10),
+        row,
+        col,
         valueDisplayText(binding.value, datasets, loopBlocks),
       );
     },
@@ -381,11 +369,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   }, []);
 
   // ─── 汇总行回调（小计/总计） ───
-  const handleSummaryRowCreate = useCallback((row: number) => {
-    setSummaries((prev) => [...prev, { id: genId(), row, groupBy: null, cells: [] }]);
-    setActiveTemplate(null);
-  }, []);
-
   const handleSummaryRowChange = useCallback(
     (id: string, newRow: SummaryRow) => {
       const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
@@ -442,6 +425,30 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [datasets, messageApi],
   );
 
+  // ─── 右键：将选中区域（同一行）设为汇总行 ───
+  const handleCreateSummaryFromRange = useCallback(
+    (range: CellRange) => {
+      if (range.startRow !== range.endRow) {
+        messageApi.warning('汇总行需选择同一行内的连续单元格');
+        return;
+      }
+      setSummaries((prev) => [
+        ...prev,
+        {
+          id: genId(),
+          row: range.startRow,
+          fromColumn: range.startColumn,
+          toColumn: range.endColumn,
+          groupBy: null,
+          cells: [],
+        },
+      ]);
+      setActiveTemplate(null);
+      messageApi.success('已创建汇总行，请在右侧属性面板逐列配置标签/聚合');
+    },
+    [messageApi],
+  );
+
   const contextMenuGroups = useMemo<MenuGroupDef[]>(
     () => [
       {
@@ -454,10 +461,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
             tooltip: '将选中区域设为循环渲染块',
             onClick: handleCreateLoopFromRange,
           },
+          {
+            id: 'set-summary-row',
+            title: '设为汇总行',
+            tooltip: '将选中的同行单元格设为汇总行（小计/总计），框选列段即作用区间',
+            onClick: handleCreateSummaryFromRange,
+          },
         ],
       },
     ],
-    [handleCreateLoopFromRange],
+    [handleCreateLoopFromRange, handleCreateSummaryFromRange],
   );
 
   // ─── 字段拖入 → 创建 CellBinding ───
@@ -494,52 +507,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       }
     },
     [messageApi],
-  );
-
-  // ─── 导出 ───
-  const handleExport = useCallback(async () => {
-    if (!onExport) return;
-    const snapshot = sheetRef.current?.getSnapshot();
-    if (!snapshot) {
-      messageApi.warning('表格为空，无法导出');
-      return;
-    }
-    setExporting(true);
-    try {
-      // 导出时附带表达式预览（友好文本），随配置一起存储到后端
-      const bindingsOut = cellBindings.map((b) => ({
-        ...b,
-        preview: valueDisplayText(b.value, datasets, loopBlocks),
-      }));
-      const summariesOut = summaries.map((s) => ({
-        ...s,
-        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks) })),
-      }));
-      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
-      messageApi.success('导出成功');
-    } catch (e) {
-      messageApi.error(`导出失败: ${e}`);
-    } finally {
-      setExporting(false);
-    }
-  }, [onExport, cellBindings, loopBlocks, summaries, params, datasets, messageApi]);
-
-  // ─── 导入 ───
-  const handleImport = useCallback(
-    async (file: File) => {
-      if (!onImport) return;
-      setImporting(true);
-      try {
-        const snapshot = await onImport(file);
-        sheetRef.current?.loadSnapshot(snapshot);
-        messageApi.success('导入成功');
-      } catch (e) {
-        messageApi.error(`导入失败: ${e}`);
-      } finally {
-        setImporting(false);
-      }
-    },
-    [onImport, messageApi],
   );
 
   return (
@@ -691,7 +658,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                 onBindingCreate={handleBindingCreate}
                 onBindingDelete={handleBindingDelete}
                 onSummaryRowChange={handleSummaryRowChange}
-                onSummaryRowCreate={handleSummaryRowCreate}
                 onSummaryRowDelete={handleSummaryRowDelete}
                 onCollapse={() => rightPanelRef.current?.collapse()}
               />
@@ -705,10 +671,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         title="循环块管理"
         extra={<span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>定义模板中需要重复渲染的区域</span>}
         placement="right"
-        width={520}
+        styles={{ wrapper: { width: 520 } }}
         open={loopDrawerOpen}
         onClose={() => setLoopDrawerOpen(false)}
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <LoopBlockManager
           loopBlocks={loopBlocks}

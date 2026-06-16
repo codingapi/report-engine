@@ -10,8 +10,8 @@
 后端 (Java 17 + Maven)
 ├── report-engine-framework   报表核心框架（声明式数据模型 + 内存渲染引擎）
 ├── report-engine-excel       Excel 构建/解析 + 字体管理（Apache POI 封装）
-├── report-engine-starter     Spring Boot 自动配置 + REST API
-└── report-engine-example     示例应用（仅启动类）
+├── report-engine-starter     Spring Boot 自动配置 + 全部通用 REST API + 存储/DTO 抽象
+└── report-engine-example     示例应用（数据集配置 + 示例报表预存）
 
 前端 (React 18 + TypeScript + pnpm monorepo)
 ├── packages/report-univer    Univer 电子表格 React 封装（字体管理、快照导入导出）
@@ -34,7 +34,7 @@
 - [x] **字体管理系统**：
   - 后端：双目录扫描（内置 + 自定义）、文件名前缀排序、JVM 注册
   - 前端：`onFontRequest` 回调机制、localStorage 缓存、@font-face 动态注入
-- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry、FontController、ExcelController
+- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 / 字体 / Excel）；`ReportRepository`、`ExampleReportRegistry` 抽接口 + 默认实现，`@ConditionalOnMissingBean` 允许使用方覆盖
 - [x] **API 响应标准化**：统一使用 `SingleResponse` / `MultiResponse` 包装，前端 axios 拦截器自动解包
 - [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据模型 / 表格 / 属性），可拖拽调整宽度，面板可收缩
 - [x] **循环块管理**：右键菜单创建/删除，Tab 化多循环块管理，蓝色虚线高亮，循环字段级联选择
@@ -46,14 +46,14 @@
   - 参数域：ParamSource（External / Cell / Constant）
   - 渲染域：CellBinding（值层 Value + 控制层 expansion/merge/conditions）/ LoopBlock / SummaryRow
 - [x] **表达式引擎**：统一 `${...}` 文本语法（`Templates.parse()`），支持字段引用、聚合函数、文本插值、函数调用
-- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染
+- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染；汇总行支持列区间作用域（并列报表各带独立汇总互不串扰）
 - [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联
 - [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（CSV/JSON/DB/API/EXCEL）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
-- [x] **报表配置持久化**：`ReportConfigController` 保存/加载 API，数据模型随配置附带返回，7 个示例报表预存
-- [x] **报表渲染导出**：`POST /api/report/render` → 填充数据的 .xlsx 下载，DTO 层匹配前端 JSON 格式
+- [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载 API，数据模型随配置附带返回；example 用 `ReportConfigBuilder` 链式预存 8 个示例报表
+- [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，starter DTO 层（`RenderDtos` + `RenderDtoConverter`）匹配前端 JSON 格式
 - [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发
