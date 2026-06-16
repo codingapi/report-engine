@@ -87,7 +87,7 @@ function groupDatasets(
 
 interface FieldRelation {
   targetDatasetAlias: string;
-  targetField: string;
+  targetFieldAlias: string;
 }
 
 function buildFieldRelationMap(
@@ -95,15 +95,19 @@ function buildFieldRelationMap(
   datasets: Dataset[],
 ): Map<string, FieldRelation[]> {
   const map = new Map<string, FieldRelation[]>();
-  const findAlias = (datasetId: string) =>
+  const findDsAlias = (datasetId: string) =>
     datasets.find((d) => d.id === datasetId)?.alias || datasetId;
+  const findFieldAlias = (datasetId: string, fieldName: string) => {
+    const ds = datasets.find((d) => d.id === datasetId);
+    return ds?.fields.find((f) => f.name === fieldName)?.alias || fieldName;
+  };
 
   for (const rel of relationships) {
     const leftKey = `${rel.left.datasetId}.${rel.left.field}`;
     if (!map.has(leftKey)) map.set(leftKey, []);
     map.get(leftKey)!.push({
-      targetDatasetAlias: findAlias(rel.right.datasetId),
-      targetField: rel.right.field,
+      targetDatasetAlias: findDsAlias(rel.right.datasetId),
+      targetFieldAlias: findFieldAlias(rel.right.datasetId, rel.right.field),
     });
   }
   return map;
@@ -145,7 +149,7 @@ function buildGroupedTreeData(
               {relations &&
                 relations.map((rel, i) => (
                   <span key={i} className="re-field-relation">
-                    🔗 {rel.targetDatasetAlias}.{rel.targetField}
+                    🔗 {rel.targetDatasetAlias}.{rel.targetFieldAlias}
                   </span>
                 ))}
             </span>
