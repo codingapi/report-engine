@@ -1,4 +1,4 @@
-package com.codingapi.report.starter.repository;
+package com.codingapi.report.repository;
 
 import java.util.ArrayList;
 import java.util.List;

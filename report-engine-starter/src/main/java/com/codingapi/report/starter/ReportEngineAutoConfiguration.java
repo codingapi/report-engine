@@ -9,10 +9,9 @@ import com.codingapi.report.starter.controller.ExpressionController;
 import com.codingapi.report.starter.controller.FontController;
 import com.codingapi.report.starter.controller.ReportConfigController;
 import com.codingapi.report.starter.controller.ReportRenderController;
+import com.codingapi.report.repository.InMemoryReportRepository;
+import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.properties.ReportFontProperties;
-import com.codingapi.report.starter.repository.ExampleReportRegistry;
-import com.codingapi.report.starter.repository.InMemoryReportRepository;
-import com.codingapi.report.starter.repository.ReportRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -53,18 +52,11 @@ public class ReportEngineAutoConfiguration {
         return registry;
     }
 
-    /** 报表配置存储：默认内存实现，使用方可提供持久化实现覆盖。 */
+    /** 报表配置存储：默认 framework 内存实现，使用方可提供持久化实现覆盖。 */
     @Bean
     @ConditionalOnMissingBean
     public ReportRepository reportRepository() {
         return new InMemoryReportRepository();
-    }
-
-    /** 示例报表注册表：默认空，使用方（如 example）预存示例后覆盖。 */
-    @Bean
-    @ConditionalOnMissingBean
-    public ExampleReportRegistry exampleReportRegistry() {
-        return List::of;
     }
 
     /**
@@ -104,9 +96,8 @@ public class ReportEngineAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public ReportConfigController reportConfigController(ReportRepository repository, DataModel dataModel,
-                                                            ExampleReportRegistry exampleRegistry) {
-            return new ReportConfigController(repository, dataModel, exampleRegistry);
+        public ReportConfigController reportConfigController(ReportRepository repository, DataModel dataModel) {
+            return new ReportConfigController(repository, dataModel);
         }
     }
 }

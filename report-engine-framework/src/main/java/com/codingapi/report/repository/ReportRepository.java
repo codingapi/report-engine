@@ -1,4 +1,4 @@
-package com.codingapi.report.starter.repository;
+package com.codingapi.report.repository;
 
 import java.util.List;
 import java.util.Map;
@@ -9,7 +9,8 @@ import java.util.Map;
  * 配置包含 name/cellBindings/loopBlocks/summaries/params/template，
  * 引擎不解析其结构，仅做存取；渲染走独立的 {@code /api/report/render} 接口。
  * <p>
- * starter 提供默认内存实现（见自动配置），使用方（如 example）可提供自己的持久化实现覆盖。
+ * framework 提供 {@link InMemoryReportRepository} 默认实现；使用方可提供自己的持久化实现，
+ * 由 starter 自动配置以 {@code @ConditionalOnMissingBean} 装配。
  */
 public interface ReportRepository {
 

@@ -1,7 +1,6 @@
 package com.example.report.config;
 
-import com.codingapi.report.starter.repository.ExampleReportRegistry;
-import com.codingapi.report.starter.repository.ReportRepository;
+import com.codingapi.report.repository.ReportRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -27,27 +26,27 @@ import static com.example.report.config.ReportConfigBuilder.literal;
  * {@code GET /api/report/configs/examples} 获取列表，
  * 点击即导航到 {@code /engine?id=xxx} 打开对应报表。
  * <p>
- * 实现 {@link ExampleReportRegistry}，向 starter 的 ReportConfigController 提供有序示例 id。
+ * 向 {@code ExampleReportController}（同 example 模块）提供有序示例 id，
  * 配置用 {@link ReportConfigBuilder} 链式构造。
  * </p>
  */
 @Slf4j
 @Component
-public class ReportTemplateSeeder implements ExampleReportRegistry {
+public class ReportTemplateSeeder {
 
     private static final String SHEET = "sheet1";
 
     private final ReportRepository repository;
 
-    /** 预存报表的 id 集合，供 API 过滤用。 */
+    /** 预存报表的 id 集合，供示例 API 过滤用。 */
     private final List<String> exampleIds = new ArrayList<>();
 
     public ReportTemplateSeeder(ReportRepository repository) {
         this.repository = repository;
     }
 
-    @Override
-    public List<String> exampleReportIds() {
+    /** 预存示例报表的有序 id 列表（供同模块的 ExampleReportController 调用）。 */
+    public List<String> getExampleIds() {
         return List.copyOf(exampleIds);
     }
 
