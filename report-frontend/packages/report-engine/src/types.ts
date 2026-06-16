@@ -49,9 +49,13 @@ export interface DatasetField {
   primaryKey?: boolean;
 }
 
+/** 数据源类型（对齐后端 DataSourceType 枚举） */
+export type DataSourceType = 'CSV' | 'JSON' | 'DB' | 'API' | 'EXCEL';
+
 export interface Dataset {
   id: string;
   alias: string;
+  sourceType?: DataSourceType;
   fields: DatasetField[];
 }
 

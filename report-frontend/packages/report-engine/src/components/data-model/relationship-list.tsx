@@ -1,7 +1,7 @@
-import React from 'react';
-import { Empty, Tag } from 'antd';
-import { SwapOutlined } from '@ant-design/icons';
-import type { Relationship, Dataset } from '../../types';
+import React, { useMemo } from 'react';
+import { Empty, Tag, Tree, Divider } from 'antd';
+import { SwapOutlined, KeyOutlined } from '@ant-design/icons';
+import type { Relationship, Dataset, DataSourceType } from '../../types';
 import { findDataset } from '../../types';
 
 interface RelationshipListProps {
@@ -9,14 +9,203 @@ interface RelationshipListProps {
   datasets: Dataset[];
 }
 
-/** 只读展示数据关系：数据集A.字段 ↔ 数据集B.字段 (JOIN) */
-const RelationshipList: React.FC<RelationshipListProps> = ({ relationships, datasets }) => {
+// ─── 数据源类型标签 ──────────────────────────────────────
+
+const SOURCE_COLORS: Record<DataSourceType, string> = {
+  CSV: 'green',
+  JSON: 'orange',
+  DB: 'blue',
+  API: 'purple',
+  EXCEL: 'cyan',
+};
+
+function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
+  if (!sourceType) return null;
+  return (
+    <Tag color={SOURCE_COLORS[sourceType] || 'default'} style={{ marginRight: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+      {sourceType}
+    </Tag>
+  );
+}
+
+// ─── Union-Find 分组 ──────────────────────────────────────
+
+interface DatasetGroup {
+  datasets: Dataset[];
+}
+
+/**
+ * 按 relationships 将 datasets 分为连通分量。
+ * 仅返回有关系的数据集（standalone 被过滤掉）。
+ */
+function groupDatasets(
+  datasets: Dataset[],
+  relationships: Relationship[],
+): DatasetGroup[] {
+  if (relationships.length === 0) return [];
+
+  const parent = new Map<string, string>();
+
+  function find(x: string): string {
+    if (!parent.has(x)) parent.set(x, x);
+    if (parent.get(x) !== x) parent.set(x, find(parent.get(x)!));
+    return parent.get(x)!;
+  }
+
+  function union(a: string, b: string) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  for (const rel of relationships) {
+    union(rel.left.datasetId, rel.right.datasetId);
+  }
+
+  // 收集有关系的数据集 ID
+  const involvedIds = new Set<string>();
+  for (const rel of relationships) {
+    involvedIds.add(rel.left.datasetId);
+    involvedIds.add(rel.right.datasetId);
+  }
+
+  // 按连通分量分组
+  const groupMap = new Map<string, DatasetGroup>();
+  for (const ds of datasets) {
+    if (!involvedIds.has(ds.id)) continue;
+    const root = find(ds.id);
+    if (!groupMap.has(root)) {
+      groupMap.set(root, { datasets: [] });
+    }
+    groupMap.get(root)!.datasets.push(ds);
+  }
+
+  return Array.from(groupMap.values());
+}
+
+// ─── 字段关联标注（仅 FK 侧） ────────────────────────────
+
+interface FieldRelation {
+  targetDatasetAlias: string;
+  targetField: string;
+}
+
+function buildFieldRelationMap(
+  relationships: Relationship[],
+  datasets: Dataset[],
+): Map<string, FieldRelation[]> {
+  const map = new Map<string, FieldRelation[]>();
+  const findAlias = (datasetId: string) =>
+    datasets.find((d) => d.id === datasetId)?.alias || datasetId;
+
+  for (const rel of relationships) {
+    const leftKey = `${rel.left.datasetId}.${rel.left.field}`;
+    if (!map.has(leftKey)) map.set(leftKey, []);
+    map.get(leftKey)!.push({
+      targetDatasetAlias: findAlias(rel.right.datasetId),
+      targetField: rel.right.field,
+    });
+  }
+  return map;
+}
+
+// ─── 分组树节点构建 ──────────────────────────────────────
+
+function buildGroupedTreeData(
+  datasets: Dataset[],
+  relationships: Relationship[],
+): any[] {
+  const groups = groupDatasets(datasets, relationships);
+  if (groups.length === 0) return [];
+
+  const fieldRelationMap = buildFieldRelationMap(relationships, datasets);
+
+  return groups.map((g) => {
+    const groupLabel = g.datasets.map((ds) => ds.alias || ds.id).join(' - ');
+
+    const children = g.datasets.map((ds) => ({
+      key: `grouped-${ds.id}`,
+      title: (
+        <span>
+          {getSourceTag(ds.sourceType)}
+          {ds.alias || ds.id}
+        </span>
+      ),
+      selectable: false,
+      children: ds.fields.map((f) => {
+        const fieldKey = `${ds.id}.${f.name}`;
+        const relations = fieldRelationMap.get(fieldKey);
+        return {
+          key: `grouped-${fieldKey}`,
+          title: (
+            <span>
+              <span style={{ marginRight: 4 }}>{f.alias || f.name}</span>
+              <span className="re-field-type">{f.dataType}</span>
+              {f.primaryKey && <KeyOutlined className="re-field-pk" style={{ marginLeft: 4 }} />}
+              {relations &&
+                relations.map((rel, i) => (
+                  <span key={i} className="re-field-relation">
+                    🔗 {rel.targetDatasetAlias}.{rel.targetField}
+                  </span>
+                ))}
+            </span>
+          ),
+          isLeaf: true,
+          selectable: false,
+        };
+      }),
+    }));
+
+    return {
+      key: `group-${g.datasets.map((d) => d.id).sort().join('-')}`,
+      title: <span className="re-ds-group-title">📦 {groupLabel}</span>,
+      selectable: false,
+      children,
+    };
+  });
+}
+
+// ─── 关系列表渲染 ────────────────────────────────────────
+
+function RelationshipItems({
+  relationships,
+  datasets,
+}: {
+  relationships: Relationship[];
+  datasets: Dataset[];
+}) {
   const endpoint = (ref: { datasetId: string; field: string }) => {
     const ds = findDataset(datasets, ref.datasetId);
     const dsName = ds?.alias || ref.datasetId;
     const fieldName = ds?.fields.find((f) => f.name === ref.field)?.alias || ref.field;
     return `${dsName}.${fieldName}`;
   };
+
+  return (
+    <div className="re-rel-list">
+      {relationships.map((r, i) => (
+        <div key={i} className="re-rel-item">
+          <span className="re-rel-endpoint">{endpoint(r.left)}</span>
+          <SwapOutlined className="re-rel-icon" />
+          <span className="re-rel-endpoint">{endpoint(r.right)}</span>
+          <Tag color="blue" style={{ marginLeft: 'auto' }}>{r.joinType}</Tag>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── 主组件 ──────────────────────────────────────────────
+
+/**
+ * 数据关系面板：上半区关系列表 + 下半区数据分组树。
+ * 分组树仅展示有关系的数据集（按连通分量分组），不展示 JOIN 细节。
+ */
+const RelationshipList: React.FC<RelationshipListProps> = ({ relationships, datasets }) => {
+  const groupedTreeData = useMemo(
+    () => buildGroupedTreeData(datasets, relationships),
+    [datasets, relationships],
+  );
 
   if (relationships.length === 0) {
     return (
@@ -29,15 +218,21 @@ const RelationshipList: React.FC<RelationshipListProps> = ({ relationships, data
   }
 
   return (
-    <div className="re-rel-list">
-      {relationships.map((r, i) => (
-        <div key={i} className="re-rel-item">
-          <span className="re-rel-endpoint">{endpoint(r.left)}</span>
-          <SwapOutlined className="re-rel-icon" />
-          <span className="re-rel-endpoint">{endpoint(r.right)}</span>
-          <Tag color="blue" style={{ marginLeft: 'auto' }}>{r.joinType}</Tag>
-        </div>
-      ))}
+    <div className="re-rel-panel">
+      {/* 上半区：关系列表 */}
+      <RelationshipItems relationships={relationships} datasets={datasets} />
+
+      {/* 下半区：数据分组树 */}
+      <Divider style={{ margin: '12px 0' }} />
+      <div className="re-rel-group-header">数据分组</div>
+      <div className="re-dataset-tree">
+        <Tree
+          treeData={groupedTreeData}
+          defaultExpandAll
+          blockNode
+          showLine={{ showLeafIcon: false }}
+        />
+      </div>
     </div>
   );
 };

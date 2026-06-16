@@ -32,17 +32,20 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
           items={[
             {
               key: 'datasets',
-              label: '数据集',
-              children: <DatasetTree datasets={datasets} />,
+              label: (
+                <span>
+                  数据集
+                  <Badge count={datasets.length} showZero size="small" style={{ marginLeft: 4 }} />
+                </span>
+              ),
+              children: <DatasetTree datasets={datasets} relationships={relationships} />,
             },
             {
               key: 'relations',
               label: (
                 <span>
                   数据关系
-                  {relationships.length > 0 && (
-                    <Badge count={relationships.length} size="small" style={{ marginLeft: 4 }} />
-                  )}
+                  <Badge count={relationships.length} showZero size="small" style={{ marginLeft: 4 }} />
                 </span>
               ),
               children: <RelationshipList relationships={relationships} datasets={datasets} />,
@@ -52,9 +55,7 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
               label: (
                 <span>
                   报表参数
-                  {params.length > 0 && (
-                    <Badge count={params.length} size="small" style={{ marginLeft: 4 }} />
-                  )}
+                  <Badge count={params.length} showZero size="small" style={{ marginLeft: 4 }} />
                 </span>
               ),
               children: <ParamManager params={params} onChange={onParamsChange} />,

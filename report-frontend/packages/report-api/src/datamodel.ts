@@ -14,6 +14,7 @@ export interface DataModelField {
 export interface DataModelDataset {
   id: string;
   alias?: string;
+  dataSourceType?: string;
   fields: DataModelField[];
 }
 

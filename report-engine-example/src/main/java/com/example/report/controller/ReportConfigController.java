@@ -1,6 +1,7 @@
 package com.example.report.controller;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.relation.Relationship;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
@@ -91,6 +92,14 @@ public class ReportConfigController {
     // ============================================================
 
     private Map<String, Object> buildDataModelDTO() {
+        // 构建 datasourceId → type 映射
+        Map<String, String> sourceTypeMap = new LinkedHashMap<>();
+        if (dataModel.getDatasources() != null) {
+            for (DataSource ds : dataModel.getDatasources()) {
+                sourceTypeMap.put(ds.getId(), ds.getType().name());
+            }
+        }
+
         List<Map<String, Object>> datasets = dataModel.getDatasets().stream()
                 .filter(ds -> ds instanceof TableDataset)
                 .map(ds -> {
@@ -108,6 +117,7 @@ public class ReportConfigController {
                     Map<String, Object> dm = new LinkedHashMap<>();
                     dm.put("id", tds.getId());
                     dm.put("alias", tds.getAlias());
+                    dm.put("dataSourceType", sourceTypeMap.getOrDefault(tds.getDatasourceId(), "CSV"));
                     dm.put("fields", fields);
                     return dm;
                 })

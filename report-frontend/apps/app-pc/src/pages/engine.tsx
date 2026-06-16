@@ -92,6 +92,7 @@ const EnginePage = () => {
               dm.datasets.map((d) => ({
                 id: d.id,
                 alias: d.alias || d.id,
+                sourceType: (d.dataSourceType || 'CSV') as Dataset['sourceType'],
                 fields: d.fields.map((f) => ({
                   name: f.name,
                   alias: f.alias || f.name,
