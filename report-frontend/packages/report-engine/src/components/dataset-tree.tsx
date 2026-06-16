@@ -36,13 +36,14 @@ function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
 // ─── 字段关联标注构建 ────────────────────────────────────
 
 interface FieldRelation {
+  direction: '→' | '←';
   targetDatasetAlias: string;
   targetFieldAlias: string;
 }
 
 /**
- * 构建字段关联映射：仅标注 FK 侧（left），PK 侧（right）不标注。
- * left 是引用方（外键），right 是被引用方（主键）。
+ * 构建字段关联映射：双侧标注，用箭头区分方向。
+ * → 表示引用方（FK 侧），← 表示被引用方（PK 侧）。
  */
 function buildFieldRelationMap(
   relationships: Relationship[],
@@ -60,10 +61,22 @@ function buildFieldRelationMap(
 
   for (const rel of relationships) {
     const leftKey = `${rel.left.datasetId}.${rel.left.field}`;
+    const rightKey = `${rel.right.datasetId}.${rel.right.field}`;
+
+    // left 侧 → 指向 right
     if (!map.has(leftKey)) map.set(leftKey, []);
     map.get(leftKey)!.push({
+      direction: '→',
       targetDatasetAlias: findDsAlias(rel.right.datasetId),
       targetFieldAlias: findFieldAlias(rel.right.datasetId, rel.right.field),
+    });
+
+    // right 侧 ← 来自 left
+    if (!map.has(rightKey)) map.set(rightKey, []);
+    map.get(rightKey)!.push({
+      direction: '←',
+      targetDatasetAlias: findDsAlias(rel.left.datasetId),
+      targetFieldAlias: findFieldAlias(rel.left.datasetId, rel.left.field),
     });
   }
 
@@ -103,7 +116,7 @@ function buildFieldNode(
         {relations &&
           relations.map((rel, i) => (
             <span key={i} className="re-field-relation">
-              🔗 {rel.targetDatasetAlias}.{rel.targetFieldAlias}
+              🔗 {rel.direction} {rel.targetDatasetAlias}.{rel.targetFieldAlias}
             </span>
           ))}
       </span>

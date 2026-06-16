@@ -86,6 +86,7 @@ function groupDatasets(
 // ─── 字段关联标注（仅 FK 侧） ────────────────────────────
 
 interface FieldRelation {
+  direction: '→' | '←';
   targetDatasetAlias: string;
   targetFieldAlias: string;
 }
@@ -104,10 +105,20 @@ function buildFieldRelationMap(
 
   for (const rel of relationships) {
     const leftKey = `${rel.left.datasetId}.${rel.left.field}`;
+    const rightKey = `${rel.right.datasetId}.${rel.right.field}`;
+
     if (!map.has(leftKey)) map.set(leftKey, []);
     map.get(leftKey)!.push({
+      direction: '→',
       targetDatasetAlias: findDsAlias(rel.right.datasetId),
       targetFieldAlias: findFieldAlias(rel.right.datasetId, rel.right.field),
+    });
+
+    if (!map.has(rightKey)) map.set(rightKey, []);
+    map.get(rightKey)!.push({
+      direction: '←',
+      targetDatasetAlias: findDsAlias(rel.left.datasetId),
+      targetFieldAlias: findFieldAlias(rel.left.datasetId, rel.left.field),
     });
   }
   return map;
@@ -149,7 +160,7 @@ function buildGroupedTreeData(
               {relations &&
                 relations.map((rel, i) => (
                   <span key={i} className="re-field-relation">
-                    🔗 {rel.targetDatasetAlias}.{rel.targetFieldAlias}
+                    🔗 {rel.direction} {rel.targetDatasetAlias}.{rel.targetFieldAlias}
                   </span>
                 ))}
             </span>
