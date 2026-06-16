@@ -64,7 +64,7 @@ public class ReportTemplateSeeder {
                 binding(2, 1, fieldValue("products", "price"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(null, List.of(
+                summary(3, null, List.of(
                         labelCell(0, "合计"),
                         aggCell(1, "products.price", "SUM")
                 ))
@@ -72,8 +72,9 @@ public class ReportTemplateSeeder {
         config.put("template", buildWorkbook(List.of(
                 cell(0, 0, "商品清单"),
                 cell(1, 0, "商品名"),
-                cell(1, 1, "价格")
-        ), 6, 4));
+                cell(1, 1, "价格"),
+                cell(3, 0, "合计")
+        ), 6, 5));
         exampleIds.add(save(config));
     }
 
@@ -179,11 +180,11 @@ public class ReportTemplateSeeder {
                 binding(2, 3, fieldValue("salary_detail", "salary"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
+                summary(3, Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
                         labelCell(1, "${group}小计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 )),
-                summary(null, List.of(
+                summary(4, null, List.of(
                         labelCell(0, "总计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 ))
@@ -193,8 +194,10 @@ public class ReportTemplateSeeder {
                 cell(1, 0, "单位"),
                 cell(1, 1, "部门"),
                 cell(1, 2, "姓名"),
-                cell(1, 3, "薪资")
-        ), 8, 4));
+                cell(1, 3, "薪资"),
+                cell(3, 1, "${group}小计"),
+                cell(4, 0, "总计")
+        ), 8, 6));
         exampleIds.add(save(config));
     }
 
@@ -368,21 +371,57 @@ public class ReportTemplateSeeder {
         return b;
     }
 
-    private Map<String, Object> summary(Map<String, Object> groupBy, List<Map<String, Object>> cells) {
+    private Map<String, Object> summary(int row, Map<String, Object> groupBy, List<Map<String, Object>> cells) {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("id", "sum-" + System.nanoTime());
-        s.put("row", 0);
+        s.put("row", row);
         s.put("groupBy", groupBy);
         s.put("cells", cells);
         return s;
     }
 
-    private Map<String, Object> labelCell(int column, String payload) {
-        return Map.of("column", column, "kind", "label", "payload", payload);
+    private Map<String, Object> labelCell(int column, String label) {
+        Map<String, Object> value;
+        if (label.contains("${")) {
+            // 构造 Template：解析 ${...} 占位为 NameRef
+            value = buildTemplateValue(label);
+        } else {
+            value = Map.of("type", "Literal", "payload", label);
+        }
+        return Map.of("column", column, "value", value);
     }
 
     private Map<String, Object> aggCell(int column, String payload, String aggregation) {
-        return Map.of("column", column, "kind", "agg", "payload", payload, "aggregation", aggregation);
+        return Map.of("column", column, "value", Map.of(
+                "type", "Aggregate",
+                "aggregation", aggregation,
+                "operand", Map.of("type", "FieldValue", "payload", payload)
+        ));
+    }
+
+    /** 构造 Template Value：支持 ${name} 占位符（编译为 NameRef） */
+    private Map<String, Object> buildTemplateValue(String text) {
+        List<Map<String, Object>> parts = new ArrayList<>();
+        int i = 0;
+        while (i < text.length()) {
+            int start = text.indexOf("${", i);
+            if (start == -1) {
+                parts.add(Map.of("kind", "text", "text", text.substring(i)));
+                break;
+            }
+            if (start > i) {
+                parts.add(Map.of("kind", "text", "text", text.substring(i, start)));
+            }
+            int end = text.indexOf("}", start + 2);
+            String name = text.substring(start + 2, end);
+            parts.add(Map.of("kind", "hole", "value", Map.of("type", "NameRef", "payload", name)));
+            i = end + 1;
+        }
+        // 如果整个字符串就是一个洞，直接返回洞内 Value
+        if (parts.size() == 1 && "hole".equals(parts.get(0).get("kind"))) {
+            return (Map<String, Object>) parts.get(0).get("value");
+        }
+        return Map.of("type", "Template", "parts", parts);
     }
 
     // ─── ExcelWorkbook 构建 ───

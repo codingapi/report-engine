@@ -1,54 +1,58 @@
 import React from 'react';
-import { Button, Input, Select, Radio, Popconfirm, Space } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
-import type { SummaryRow, SummaryCell, Dataset, Aggregation } from '../../types';
-import { findDataset, AGG_LABELS } from '../../types';
+import { Button, Select, Radio } from 'antd';
+import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
+import { findDataset } from '../../types';
+import { valueDisplayText } from '../../value-text';
 import SectionLabel from './section-label';
+import ExpressionBuilder from './expression-builder';
 
 interface SummaryRowEditorProps {
-  /** 当前选中单元格所在的汇总行 */
   summaryRow: SummaryRow;
-  /** 当前选中列 */
   column: number;
   datasets: Dataset[];
+  loopBlocks: LoopBlock[];
+  params: ReportParam[];
+  functions?: ExpressionCatalog;
   onChange: (row: SummaryRow) => void;
-  onDelete: () => void;
-}
-
-/** 解析 "datasetId.field" */
-function parseRef(ref: string): { datasetId: string; field: string } {
-  const dot = ref.indexOf('.');
-  if (dot === -1) return { datasetId: '', field: '' };
-  return { datasetId: ref.slice(0, dot), field: ref.slice(dot + 1) };
 }
 
 const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   summaryRow,
   column,
   datasets,
+  loopBlocks,
+  params,
+  functions,
   onChange,
-  onDelete,
 }) => {
   const isGroup = summaryRow.groupBy != null;
   const cell = summaryRow.cells.find((c) => c.column === column);
 
   /** 写入/更新本列单元格 */
-  const setCell = (patch: Partial<SummaryCell>) => {
+  const setCellValue = (value: ReportValue) => {
     let cells: SummaryCell[];
     if (cell) {
-      cells = summaryRow.cells.map((c) => (c.column === column ? { ...c, ...patch } : c));
+      cells = summaryRow.cells.map((c) => (c.column === column ? { ...c, value } : c));
     } else {
-      cells = [...summaryRow.cells, { column, kind: 'label', payload: '', ...patch }];
+      cells = [...summaryRow.cells, { column, value }];
     }
     onChange({ ...summaryRow, cells });
   };
 
-  /** 移除本列单元格 */
-  const clearCell = () => {
-    onChange({ ...summaryRow, cells: summaryRow.cells.filter((c) => c.column !== column) });
+  /** 创建默认值（快捷按钮用） */
+  const createDefaultValue = (): ReportValue => {
+    if (isGroup) {
+      // 分组小计：默认用 ${group}小计
+      return {
+        type: 'Template',
+        parts: [
+          { kind: 'hole', value: { type: 'NameRef', payload: 'group' } },
+          { kind: 'text', text: '小计' },
+        ],
+      };
+    }
+    return { type: 'Literal', payload: '合计' };
   };
-
-  const { datasetId } = parseRef(cell?.payload || '');
 
   // 当前分组字段别名（用于 ${group} 说明）
   const groupFieldLabel = isGroup
@@ -59,6 +63,14 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
 
   return (
     <div>
+      {/* 预览 */}
+      {cell && (
+        <div className="re-prop-preview">
+          <div className="re-prop-preview__label">预览</div>
+          <code>{valueDisplayText(cell.value, datasets, loopBlocks) || '（空）'}</code>
+        </div>
+      )}
+
       {/* 汇总范围（整行） */}
       <div className="re-prop-exp-section">
         <SectionLabel
@@ -116,121 +128,34 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
       <div className="re-prop-exp-section">
         <SectionLabel
           text="本格内容"
-          hint="当前选中列在汇总行显示什么：固定文本（如 合计，分组小计支持 ${group} 占位当前分组值）或对某字段的聚合值。"
+          hint="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。"
         />
 
         {!cell ? (
-          <Space>
-            <Button size="small" onClick={() => setCell({ kind: 'label', payload: isGroup ? '${group}小计' : '合计' })}>
-              设为文本
-            </Button>
-            <Button size="small" onClick={() => setCell({ kind: 'agg', payload: '', aggregation: 'SUM' })}>
-              设为聚合
-            </Button>
-          </Space>
+          <Button size="small" onClick={() => setCellValue(createDefaultValue())}>
+            配置本格
+          </Button>
         ) : (
           <>
-            <Radio.Group
-              size="small"
-              value={cell.kind}
-              onChange={(e) => {
-                const kind = e.target.value as 'label' | 'agg';
-                setCell({ kind, payload: '', aggregation: kind === 'agg' ? 'SUM' : undefined });
-              }}
-              optionType="button"
-              buttonStyle="solid"
-              style={{ marginBottom: 8 }}
-            >
-              <Radio.Button value="label">文本</Radio.Button>
-              <Radio.Button value="agg">聚合</Radio.Button>
-            </Radio.Group>
+            {/* 表达式编辑器 */}
+            <ExpressionBuilder
+              key={`${summaryRow.id}-${column}`}
+              value={cell.value}
+              datasets={datasets}
+              loopBlocks={loopBlocks}
+              params={params}
+              functions={functions}
+              onChange={setCellValue}
+            />
 
-            {cell.kind === 'label' ? (
-              <>
-                <Input
-                  size="small"
-                  value={cell.payload}
-                  onChange={(e) => setCell({ payload: e.target.value })}
-                  placeholder={isGroup ? '${group}小计' : '合计'}
-                />
-                {isGroup && (
-                  <div className="re-prop-group-hint">
-                    <span>
-                      可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）
-                    </span>
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={() => setCell({ payload: `${cell.payload || ''}\${group}` })}
-                      style={{ padding: 0 }}
-                    >
-                      插入 ${'{group}'}
-                    </Button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="re-prop-field-cascade">
-                <Select
-                  size="small"
-                  value={datasetId || undefined}
-                  onChange={(dsId) => setCell({ payload: `${dsId}.` })}
-                  placeholder="数据集"
-                  options={datasets.map((d) => ({ value: d.id, label: d.alias || d.id }))}
-                  showSearch
-                />
-                <Select
-                  size="small"
-                  value={cell.payload || undefined}
-                  onChange={(ref) => setCell({ payload: ref })}
-                  placeholder="字段"
-                  disabled={!datasetId}
-                  options={
-                    findDataset(datasets, datasetId)?.fields.map((f) => ({
-                      value: `${datasetId}.${f.name}`,
-                      label: f.alias || f.name,
-                    })) || []
-                  }
-                  showSearch
-                />
-                <Select
-                  size="small"
-                  value={cell.aggregation || 'SUM'}
-                  onChange={(agg: Aggregation) => setCell({ aggregation: agg })}
-                  style={{ flex: '0 0 76px' }}
-                  options={Object.entries(AGG_LABELS)
-                    .filter(([k]) => k !== 'NONE')
-                    .map(([v, l]) => ({ value: v, label: l }))}
-                />
+            {/* 分组小计提示 */}
+            {isGroup && (
+              <div className="re-prop-group-hint">
+                可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）
               </div>
             )}
-
-            <Button
-              type="link"
-              size="small"
-              danger
-              onClick={clearCell}
-              style={{ padding: 0, marginTop: 4 }}
-            >
-              清空本格
-            </Button>
           </>
         )}
-      </div>
-
-      {/* 删除整行 */}
-      <div className="re-prop-actions">
-        <Popconfirm
-          title="取消本行的汇总配置？"
-          description="将移除整行所有汇总单元格"
-          onConfirm={onDelete}
-          okText="取消汇总"
-          cancelText="返回"
-        >
-          <Button type="text" danger size="small" icon={<DeleteOutlined />}>
-            取消汇总行
-          </Button>
-        </Popconfirm>
       </div>
     </div>
   );

@@ -13,10 +13,27 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset, ReportParam, ReportConfig } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
-import { valueDisplayText, summaryCellText } from './value-text';
+import { valueDisplayText, parseTemplate } from './value-text';
+
+/** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
+function migrateSummaryCell(cell: any): SummaryCell {
+  if (cell.value) return cell as SummaryCell; // 已是新格式
+  if (cell.kind === 'label') {
+    return { column: cell.column, value: parseTemplate(cell.payload || '') };
+  }
+  // kind === 'agg'
+  return {
+    column: cell.column,
+    value: {
+      type: 'Aggregate',
+      aggregation: cell.aggregation || 'SUM',
+      operand: { type: 'FieldValue', payload: cell.payload || '' },
+    },
+  };
+}
 import './index.css';
 
 export interface ReportEngineHandle {
@@ -144,7 +161,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     // 回写汇总行（小计/总计）单元格的文本/聚合摘要，使其在表格中可见
     for (const s of tpl.summaries || []) {
       for (const cell of s.cells) {
-        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, summaryCellText(cell, datasets));
+        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops));
       }
     }
 
@@ -182,11 +199,17 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       parentCell: remapKey(b.parentCell),
     }));
 
+    // 迁移汇总行：旧格式（kind/payload）→ 新格式（value: ReportValue）
+    const migratedSummaries = (config.summaries || []).map((s: any) => ({
+      ...s,
+      cells: (s.cells || []).map(migrateSummaryCell),
+    }));
+
     setReportId(config.id ?? null);
     setReportName(config.name || '未命名报表');
     setCellBindings(remappedBindings);
     setLoopBlocks(remappedLoops);
-    setSummaries(config.summaries || []);
+    setSummaries(migratedSummaries);
     setParams(config.params || []);
     setActiveTemplate(null);
     lastAppliedRef.current = null;
@@ -201,6 +224,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         parseInt(c, 10),
         valueDisplayText(b.value, ds, remappedLoops),
       );
+    }
+
+    // 回写汇总行单元格文本（小计/总计在表格中可见）
+    for (const s of migratedSummaries) {
+      for (const c of s.cells) {
+        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops));
+      }
     }
 
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
@@ -286,8 +316,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       || sheetRef.current?.getActiveSheetId() || 'sheet1';
     for (const s of summaries) {
       for (const cell of s.cells) {
-        // 聚合格、或含 ${} 占位的标签格（如 ${group}小计）都属于配置项
-        const isExpr = cell.kind === 'agg' || /\$\{[^}]*\}/.test(cell.payload || '');
+        // 聚合格、Template（含 ${} 占位）都属于配置项，纯 Literal 文本不高亮
+        const isExpr = cell.value.type !== 'Literal';
         if (!isExpr) continue;
         ranges.push({ sheetId: sumSheet, startRow: s.row, startColumn: cell.column, endRow: s.row, endColumn: cell.column });
       }
@@ -370,7 +400,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         }
         // 回写当前列文本/聚合摘要
         for (const c of newRow.cells) {
-          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, summaryCellText(c, datasets));
+          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks));
         }
         return prev.map((s) => (s.id === id ? newRow : s));
       });
@@ -483,7 +513,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       }));
       const summariesOut = summaries.map((s) => ({
         ...s,
-        cells: s.cells.map((c) => ({ ...c, preview: summaryCellText(c, datasets) })),
+        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks) })),
       }));
       await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
       messageApi.success('导出成功');
@@ -649,33 +679,22 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                 </Tooltip>
               </div>
             ) : (
-              <div className="re-panel-wrapper">
-                <div className="re-panel-collapse-btn re-panel-collapse-btn--left">
-                  <Tooltip title="收起">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<MenuUnfoldOutlined />}
-                      onClick={() => rightPanelRef.current?.collapse()}
-                    />
-                  </Tooltip>
-                </div>
-                <PropertyPanel
-                  selectedCell={selectedCell}
-                  cellBindings={cellBindings}
-                  summaries={summaries}
-                  loopBlocks={loopBlocks}
-                  datasets={datasets}
-                  params={params}
-                  functions={functions}
-                  onBindingChange={handleBindingChange}
-                  onBindingCreate={handleBindingCreate}
-                  onBindingDelete={handleBindingDelete}
-                  onSummaryRowChange={handleSummaryRowChange}
-                  onSummaryRowCreate={handleSummaryRowCreate}
-                  onSummaryRowDelete={handleSummaryRowDelete}
-                />
-              </div>
+              <PropertyPanel
+                selectedCell={selectedCell}
+                cellBindings={cellBindings}
+                summaries={summaries}
+                loopBlocks={loopBlocks}
+                datasets={datasets}
+                params={params}
+                functions={functions}
+                onBindingChange={handleBindingChange}
+                onBindingCreate={handleBindingCreate}
+                onBindingDelete={handleBindingDelete}
+                onSummaryRowChange={handleSummaryRowChange}
+                onSummaryRowCreate={handleSummaryRowCreate}
+                onSummaryRowDelete={handleSummaryRowDelete}
+                onCollapse={() => rightPanelRef.current?.collapse()}
+              />
             )}
           </ResizablePanel>
         </Group>

@@ -177,9 +177,14 @@ public class ReportRenderController {
             List<SummaryCell> cells = new ArrayList<>();
             if (dto.cells() != null) {
                 for (SummaryCellDTO c : dto.cells()) {
-                    if ("label".equals(c.kind())) {
+                    if (c.value() != null) {
+                        // 新格式：直接使用 ValueDTO
+                        cells.add(new SummaryCell(c.column(), convertValue(c.value())));
+                    } else if ("label".equals(c.kind())) {
+                        // 旧格式兼容
                         cells.add(SummaryCell.label(c.column(), c.payload()));
                     } else {
+                        // 旧格式 agg 兼容
                         String[] parts = c.payload().split("\\.", 2);
                         cells.add(SummaryCell.agg(c.column(),
                                 new FieldRef(parts[0], parts[1]),
@@ -255,7 +260,7 @@ public class ReportRenderController {
     public record FieldRefDTO(String datasetId, String field) {
     }
 
-    public record SummaryCellDTO(int column, String kind, String payload, String aggregation, String preview) {
+    public record SummaryCellDTO(int column, ValueDTO value, String kind, String payload, String aggregation, String preview) {
     }
 
 }
