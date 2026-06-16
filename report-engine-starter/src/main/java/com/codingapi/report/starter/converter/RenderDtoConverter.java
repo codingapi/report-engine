@@ -1,19 +1,11 @@
-package com.example.report.controller;
+package com.codingapi.report.starter.converter;
 
-import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
-import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
-import com.codingapi.report.excel.ExcelExporter;
-import com.codingapi.report.excel.pojo.Workbook;
-import com.codingapi.report.expression.Templates;
-import com.codingapi.report.expression.Value;
 import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
-import com.codingapi.report.param.ParamContext;
-import com.codingapi.report.render.Report;
-import com.codingapi.report.render.engine.ReportRenderer;
+import com.codingapi.report.expression.Value;
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.render.grid.ExpandMode;
@@ -21,82 +13,46 @@ import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.codingapi.report.starter.dto.RenderDtos.BindingDTO;
+import com.codingapi.report.starter.dto.RenderDtos.ConditionDTO;
+import com.codingapi.report.starter.dto.RenderDtos.LoopBlockDTO;
+import com.codingapi.report.starter.dto.RenderDtos.PartDTO;
+import com.codingapi.report.starter.dto.RenderDtos.SummaryCellDTO;
+import com.codingapi.report.starter.dto.RenderDtos.SummaryRowDTO;
+import com.codingapi.report.starter.dto.RenderDtos.ValueDTO;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-@RestController
-@RequestMapping("/api/report")
-public class ReportRenderController {
+/**
+ * 渲染请求 DTO → framework 领域对象的转换器。
+ * <p>
+ * 因 {@code Value} 等 sealed interface 无 Jackson 多态注解，前端 JSON 经 {@link com.codingapi.report.starter.dto.RenderDtos}
+ * 承接后由此处统一转换。所有方法无状态（static）。
+ */
+public final class RenderDtoConverter {
 
-    private final DataModel dataModel;
-    private final CsvDataExtractor csvExtractor;
-
-    public ReportRenderController(DataModel dataModel, CsvDataExtractor csvExtractor) {
-        this.dataModel = dataModel;
-        this.csvExtractor = csvExtractor;
+    private RenderDtoConverter() {
     }
 
-    @PostMapping("/render")
-    public ResponseEntity<byte[]> render(@RequestBody RenderRequest request) {
-        ReportRenderer renderer = new ReportRenderer(List.of(csvExtractor));
-
-        List<CellBinding> bindings = convertBindings(request.cellBindings());
-        List<LoopBlock> loops = convertLoops(request.loopBlocks());
-        List<SummaryRow> summaries = convertSummaries(request.summaries());
-
-        Report report = Report.builder()
-                .id("render-" + System.currentTimeMillis())
-                .name("报表导出")
-                .dataModelId(dataModel.getId())
-                .cellBindings(bindings)
-                .loopBlocks(loops)
-                .summaries(summaries)
-                .build();
-
-        Workbook template = request.template();
-        Map<String, Object> paramValues = request.params() != null ? request.params() : Map.of();
-        Workbook result = renderer.render(dataModel, report, new ParamContext(paramValues), template);
-        byte[] xlsx = new ExcelExporter().export(result);
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report.xlsx")
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .contentLength(xlsx.length)
-                .body(xlsx);
-    }
-
-    // ============================================================
-    // DTO → 领域对象转换
-    // ============================================================
-
-    private List<CellBinding> convertBindings(List<BindingDTO> dtos) {
+    public static List<CellBinding> convertBindings(List<BindingDTO> dtos) {
         if (dtos == null) return List.of();
         List<CellBinding> result = new ArrayList<>();
         for (BindingDTO dto : dtos) {
             result.add(CellBinding.builder()
-                    .cell(parseCellKey(dto.cellKey()))
+                    .cell(CellRef.parse(dto.cellKey()))
                     .value(convertValue(dto.value()))
                     .expansion(dto.expansion() != null ? Expansion.valueOf(dto.expansion()) : null)
                     .expandMode(dto.expandMode() != null ? ExpandMode.valueOf(dto.expandMode()) : null)
                     .mergeRepeated(dto.mergeRepeated())
-                    .parentCell(dto.parentCell() != null ? parseCellKey(dto.parentCell()) : null)
+                    .parentCell(dto.parentCell() != null ? CellRef.parse(dto.parentCell()) : null)
                     .conditions(convertConditions(dto.conditions()))
                     .build());
         }
         return result;
     }
 
-    private Value convertValue(ValueDTO dto) {
+    public static Value convertValue(ValueDTO dto) {
         if (dto == null) return new Value.Literal(null);
         return switch (dto.type()) {
             case "FieldValue" -> {
@@ -115,7 +71,7 @@ public class ReportRenderController {
                     convertValue(dto.operand()));
             case "FunctionCall" -> new Value.FunctionCall(
                     dto.funcName(),
-                    dto.args() != null ? dto.args().stream().map(this::convertValue).toList() : List.of());
+                    dto.args() != null ? dto.args().stream().map(RenderDtoConverter::convertValue).toList() : List.of());
             case "Template" -> {
                 List<Value.Template.Part> parts = new ArrayList<>();
                 if (dto.parts() != null) {
@@ -133,7 +89,7 @@ public class ReportRenderController {
         };
     }
 
-    private List<Condition> convertConditions(List<ConditionDTO> dtos) {
+    public static List<Condition> convertConditions(List<ConditionDTO> dtos) {
         if (dtos == null) return List.of();
         List<Condition> result = new ArrayList<>();
         for (ConditionDTO dto : dtos) {
@@ -146,7 +102,7 @@ public class ReportRenderController {
         return result;
     }
 
-    private List<LoopBlock> convertLoops(List<LoopBlockDTO> dtos) {
+    public static List<LoopBlock> convertLoops(List<LoopBlockDTO> dtos) {
         if (dtos == null) return List.of();
         List<LoopBlock> result = new ArrayList<>();
         for (LoopBlockDTO dto : dtos) {
@@ -167,7 +123,7 @@ public class ReportRenderController {
         return result;
     }
 
-    private List<SummaryRow> convertSummaries(List<SummaryRowDTO> dtos) {
+    public static List<SummaryRow> convertSummaries(List<SummaryRowDTO> dtos) {
         if (dtos == null) return List.of();
         List<SummaryRow> result = new ArrayList<>();
         for (SummaryRowDTO dto : dtos) {
@@ -197,72 +153,6 @@ public class ReportRenderController {
                     .cells(cells).build());
         }
         return result;
-    }
-
-    private static CellRef parseCellKey(String key) {
-        String[] parts = key.split(":");
-        return new CellRef(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-    }
-
-    // ============================================================
-    // DTO Records
-    // ============================================================
-
-    public record RenderRequest(
-            List<BindingDTO> cellBindings,
-            List<LoopBlockDTO> loopBlocks,
-            List<SummaryRowDTO> summaries,
-            Map<String, Object> params,
-            Workbook template) {
-    }
-
-    public record BindingDTO(
-            String cellKey,
-            ValueDTO value,
-            String expansion,
-            String expandMode,
-            boolean mergeRepeated,
-            String parentCell,
-            List<ConditionDTO> conditions,
-            String preview) {
-    }
-
-    public record ValueDTO(
-            String type,
-            String payload,
-            String aggregation,
-            ValueDTO operand,
-            String funcName,
-            List<ValueDTO> args,
-            List<PartDTO> parts) {
-    }
-
-    public record PartDTO(String kind, String text, ValueDTO value) {
-    }
-
-    public record ConditionDTO(String id, ValueDTO left, String operator, ValueDTO right) {
-    }
-
-    public record LoopBlockDTO(
-            String id, String label, String sheetId,
-            int startRow, int startColumn, int endRow, int endColumn,
-            SourceDTO source) {
-    }
-
-    public record SourceDTO(
-            String datasetId,
-            List<ConditionDTO> filters,
-            List<String> groupBy,
-            List<String> orderBy) {
-    }
-
-    public record SummaryRowDTO(FieldRefDTO groupBy, int fromColumn, int toColumn, List<SummaryCellDTO> cells) {
-    }
-
-    public record FieldRefDTO(String datasetId, String field) {
-    }
-
-    public record SummaryCellDTO(int column, ValueDTO value, String kind, String payload, String aggregation, String preview) {
     }
 
 }

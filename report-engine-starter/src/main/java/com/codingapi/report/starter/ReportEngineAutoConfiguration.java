@@ -1,10 +1,20 @@
 package com.codingapi.report.starter;
 
+import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 import com.codingapi.report.excel.FontRegistry;
+import com.codingapi.report.starter.controller.DatasetController;
 import com.codingapi.report.starter.controller.ExcelController;
+import com.codingapi.report.starter.controller.ExpressionController;
 import com.codingapi.report.starter.controller.FontController;
+import com.codingapi.report.starter.controller.ReportConfigController;
+import com.codingapi.report.starter.controller.ReportRenderController;
 import com.codingapi.report.starter.properties.ReportFontProperties;
+import com.codingapi.report.starter.repository.ExampleReportRegistry;
+import com.codingapi.report.starter.repository.InMemoryReportRepository;
+import com.codingapi.report.starter.repository.ReportRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Report Engine 自动配置。
@@ -42,6 +53,20 @@ public class ReportEngineAutoConfiguration {
         return registry;
     }
 
+    /** 报表配置存储：默认内存实现，使用方可提供持久化实现覆盖。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ReportRepository reportRepository() {
+        return new InMemoryReportRepository();
+    }
+
+    /** 示例报表注册表：默认空，使用方（如 example）预存示例后覆盖。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ExampleReportRegistry exampleReportRegistry() {
+        return List::of;
+    }
+
     /**
      * Web 环境下的自动配置：注册 REST API Controller。
      */
@@ -57,6 +82,31 @@ public class ReportEngineAutoConfiguration {
         @Bean
         public ExcelController excelController() {
             return new ExcelController();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ReportRenderController reportRenderController(DataModel dataModel, CsvDataExtractor csvExtractor) {
+            return new ReportRenderController(dataModel, csvExtractor);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DatasetController datasetController(DataModel dataModel, CsvDataExtractor csvExtractor) {
+            return new DatasetController(dataModel, csvExtractor);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ExpressionController expressionController() {
+            return new ExpressionController();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ReportConfigController reportConfigController(ReportRepository repository, DataModel dataModel,
+                                                            ExampleReportRegistry exampleRegistry) {
+            return new ReportConfigController(repository, dataModel, exampleRegistry);
         }
     }
 }

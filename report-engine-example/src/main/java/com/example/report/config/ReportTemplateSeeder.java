@@ -1,6 +1,8 @@
 package com.example.report.config;
 
-import com.example.report.repository.ReportRepository;
+import com.codingapi.report.excel.CellRefs;
+import com.codingapi.report.starter.repository.ExampleReportRegistry;
+import com.codingapi.report.starter.repository.ReportRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -12,16 +14,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 预存示例报表：启动时将测试报表配置写入内存仓库。
+ * 预存示例报表：启动时将测试报表配置写入仓库（应用级数据）。
  * <p>
  * 对应 ReportScenarioTest 中的 8 个场景。前端通过
  * {@code GET /api/report/configs/examples} 获取列表，
  * 点击即导航到 {@code /engine?id=xxx} 打开对应报表。
+ * <p>
+ * 实现 {@link ExampleReportRegistry}，向 starter 的 ReportConfigController 提供有序示例 id。
  * </p>
  */
 @Slf4j
 @Component
-public class ReportTemplateSeeder {
+public class ReportTemplateSeeder implements ExampleReportRegistry {
 
     private static final String SHEET = "sheet1";
 
@@ -34,7 +38,8 @@ public class ReportTemplateSeeder {
         this.repository = repository;
     }
 
-    public List<String> getExampleIds() {
+    @Override
+    public List<String> exampleReportIds() {
         return List.copyOf(exampleIds);
     }
 
@@ -489,7 +494,7 @@ public class ReportTemplateSeeder {
             Map<String, Object> cell = new LinkedHashMap<>();
             cell.put("row", c.row);
             cell.put("col", c.col);
-            cell.put("ref", toRef(c.row, c.col));
+            cell.put("ref", CellRefs.toRef(c.row, c.col));
             cell.put("value", c.value);
             excelCells.add(cell);
         }
@@ -509,14 +514,4 @@ public class ReportTemplateSeeder {
         return Map.of("sheets", List.of(sheet));
     }
 
-    private String toRef(int row, int col) {
-        StringBuilder sb = new StringBuilder();
-        int c = col;
-        while (c >= 0) {
-            sb.insert(0, (char) ('A' + c % 26));
-            c = c / 26 - 1;
-        }
-        sb.append(row + 1);
-        return sb.toString();
-    }
 }

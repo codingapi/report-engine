@@ -1,9 +1,10 @@
-package com.example.report.controller;
+package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.expression.function.FunctionMeta;
 import com.codingapi.report.expression.function.Functions;
 import com.codingapi.report.operator.aggregation.Aggregation;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +21,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/expression")
+@ConditionalOnClass(RestController.class)
 public class ExpressionController {
 
     @GetMapping("/functions")

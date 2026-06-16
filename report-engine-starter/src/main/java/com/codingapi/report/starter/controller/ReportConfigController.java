@@ -1,13 +1,14 @@
-package com.example.report.controller;
+package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.relation.Relationship;
+import com.codingapi.report.starter.repository.ExampleReportRegistry;
+import com.codingapi.report.starter.repository.ReportRepository;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
-import com.example.report.config.ReportTemplateSeeder;
-import com.example.report.repository.ReportRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,20 +26,23 @@ import java.util.Map;
  * <p>
  * 配置以原样 JSON 存储（name/cellBindings/loopBlocks/summaries/params/template），
  * 打开报表时整体恢复前端状态。加载时附带数据模型信息（datasets + relationships）。
+ * <p>
+ * 存储交给 {@link ReportRepository}（使用方提供实现），示例报表 id 交给 {@link ExampleReportRegistry}。
  * </p>
  */
 @RestController
 @RequestMapping("/api/report")
+@ConditionalOnClass(RestController.class)
 public class ReportConfigController {
 
     private final ReportRepository repository;
     private final DataModel dataModel;
-    private final ReportTemplateSeeder templateSeeder;
+    private final ExampleReportRegistry exampleRegistry;
 
-    public ReportConfigController(ReportRepository repository, DataModel dataModel, ReportTemplateSeeder templateSeeder) {
+    public ReportConfigController(ReportRepository repository, DataModel dataModel, ExampleReportRegistry exampleRegistry) {
         this.repository = repository;
         this.dataModel = dataModel;
-        this.templateSeeder = templateSeeder;
+        this.exampleRegistry = exampleRegistry;
     }
 
     /** 保存报表配置，返回报表 id。 */
@@ -62,7 +66,7 @@ public class ReportConfigController {
     /** 示例报表列表（预存的测试报表，供快速打开）。 */
     @GetMapping("/configs/examples")
     public MultiResponse<ReportBrief> examples() {
-        List<ReportBrief> briefs = templateSeeder.getExampleIds().stream()
+        List<ReportBrief> briefs = exampleRegistry.exampleReportIds().stream()
                 .map(id -> {
                     Map<String, Object> config = repository.find(id);
                     String name = config != null && config.get("name") != null
