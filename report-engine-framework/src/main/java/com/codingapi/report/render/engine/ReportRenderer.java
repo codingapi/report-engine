@@ -208,8 +208,9 @@ public class ReportRenderer {
             }
             globalBandBase = Math.min(globalBandBase, groupBandBase);
 
-            // 渲染带
-            int n = renderBand(groupBand, report.getSummaries(), filtered, groupBandBase, ctx, canvas);
+            // 渲染带：只把"列落在本带"的汇总行交给本带，避免并列报表互相串扰
+            List<SummaryRow> groupSummaries = summariesForBand(report.getSummaries(), groupBand);
+            int n = renderBand(groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas);
             int groupShift = n > 0 ? n - 1 : 0;
             globalShift = Math.max(globalShift, groupShift);
         }
@@ -224,6 +225,34 @@ public class ReportRenderer {
             int row = b.getCell().row() > base ? b.getCell().row() + shift : b.getCell().row();
             place(canvas, b.getCell(), row, b.getCell().column(), v);
         }
+    }
+
+    /**
+     * 把汇总行按「列区间归属」过滤到某个数据带。
+     * <p>并列独立报表（多个无关系数据集排在同一批行上）共享同一份 {@link SummaryRow} 列表，
+     * 但每行汇总只应作用于它显式声明的列区间 [fromColumn, toColumn] 所覆盖的那个带。若不过滤，
+     * 一个带的小计/总计会被广播到其它带——尤其是分组小计在别的带里匹配不到分组列时会退化成
+     * 总计，污染并列报表。
+     * <p>归属判定：汇总行的列区间与本带占据的列集合有交集，即归属本带。
+     */
+    private static List<SummaryRow> summariesForBand(List<SummaryRow> summaries, List<CellBinding> groupBand) {
+        if (summaries == null || summaries.isEmpty()) {
+            return List.of();
+        }
+        Set<Integer> bandCols = new HashSet<>();
+        for (CellBinding b : groupBand) {
+            bandCols.add(b.getCell().column());
+        }
+        List<SummaryRow> result = new ArrayList<>();
+        for (SummaryRow s : summaries) {
+            for (int col = s.getFromColumn(); col <= s.getToColumn(); col++) {
+                if (bandCols.contains(col)) {
+                    result.add(s);
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     // ============================================================

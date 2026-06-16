@@ -54,9 +54,21 @@ public class SummaryRow {
     private FieldRef groupBy;
 
     /**
+     * 汇总作用的列区间起点（0-based，含）。
+     * <p>汇总行通过 [fromColumn, toColumn] 显式声明它覆盖的列带——渲染时只对
+     * 「列区间与本数据带有交集」的带生效（见 {@code ReportRenderer.summariesForBand}）。
+     * 这让并列独立报表（同一批行上多个无关系数据带）各自的汇总互不串扰：
+     * 左带汇总区间落在左列段、右带汇总区间落在右列段，谁也广播不到谁。
+     */
+    private int fromColumn;
+
+    /** 汇总作用的列区间终点（0-based，含）。见 {@link #fromColumn}。 */
+    private int toColumn;
+
+    /**
      * 该汇总行的单元格列表（标签 + 聚合值）。
      * <p>每个 SummaryCell 要么是文本标签（如"研发中心小计"），
-     * 要么是某字段的聚合值（如 SUM(工资)）。
+     * 要么是某字段的聚合值（如 SUM(工资)）。各 cell 的列应落在 [fromColumn, toColumn] 内。
      */
     private List<SummaryCell> cells;
 }

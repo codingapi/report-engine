@@ -381,11 +381,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   }, []);
 
   // ─── 汇总行回调（小计/总计） ───
-  const handleSummaryRowCreate = useCallback((row: number) => {
-    setSummaries((prev) => [...prev, { id: genId(), row, groupBy: null, cells: [] }]);
-    setActiveTemplate(null);
-  }, []);
-
   const handleSummaryRowChange = useCallback(
     (id: string, newRow: SummaryRow) => {
       const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
@@ -442,6 +437,30 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [datasets, messageApi],
   );
 
+  // ─── 右键：将选中区域（同一行）设为汇总行 ───
+  const handleCreateSummaryFromRange = useCallback(
+    (range: CellRange) => {
+      if (range.startRow !== range.endRow) {
+        messageApi.warning('汇总行需选择同一行内的连续单元格');
+        return;
+      }
+      setSummaries((prev) => [
+        ...prev,
+        {
+          id: genId(),
+          row: range.startRow,
+          fromColumn: range.startColumn,
+          toColumn: range.endColumn,
+          groupBy: null,
+          cells: [],
+        },
+      ]);
+      setActiveTemplate(null);
+      messageApi.success('已创建汇总行，请在右侧属性面板逐列配置标签/聚合');
+    },
+    [messageApi],
+  );
+
   const contextMenuGroups = useMemo<MenuGroupDef[]>(
     () => [
       {
@@ -454,10 +473,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
             tooltip: '将选中区域设为循环渲染块',
             onClick: handleCreateLoopFromRange,
           },
+          {
+            id: 'set-summary-row',
+            title: '设为汇总行',
+            tooltip: '将选中的同行单元格设为汇总行（小计/总计），框选列段即作用区间',
+            onClick: handleCreateSummaryFromRange,
+          },
         ],
       },
     ],
-    [handleCreateLoopFromRange],
+    [handleCreateLoopFromRange, handleCreateSummaryFromRange],
   );
 
   // ─── 字段拖入 → 创建 CellBinding ───
@@ -691,7 +716,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                 onBindingCreate={handleBindingCreate}
                 onBindingDelete={handleBindingDelete}
                 onSummaryRowChange={handleSummaryRowChange}
-                onSummaryRowCreate={handleSummaryRowCreate}
                 onSummaryRowDelete={handleSummaryRowDelete}
                 onCollapse={() => rightPanelRef.current?.collapse()}
               />

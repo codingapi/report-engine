@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * 预存示例报表：启动时将测试报表配置写入内存仓库。
  * <p>
- * 对应 ReportScenarioTest 中的 7 个场景。前端通过
+ * 对应 ReportScenarioTest 中的 8 个场景。前端通过
  * {@code GET /api/report/configs/examples} 获取列表，
  * 点击即导航到 {@code /engine?id=xxx} 打开对应报表。
  * </p>
@@ -47,6 +47,7 @@ public class ReportTemplateSeeder {
         seedSubtotal();
         seedPayslipLoop();
         seedIndependentBands();
+        seedIndependentBandsWithSummary();
         log.info("已预存 {} 个示例报表", exampleIds.size());
     }
 
@@ -64,7 +65,7 @@ public class ReportTemplateSeeder {
                 binding(2, 1, fieldValue("products", "price"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(3, null, List.of(
+                summary(3, 0, 1, null, List.of(
                         labelCell(0, "合计"),
                         aggCell(1, "products.price", "SUM")
                 ))
@@ -180,11 +181,11 @@ public class ReportTemplateSeeder {
                 binding(2, 3, fieldValue("salary_detail", "salary"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(3, Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
+                summary(3, 0, 3, Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
                         labelCell(1, "${group}小计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 )),
-                summary(4, null, List.of(
+                summary(4, 0, 3, null, List.of(
                         labelCell(0, "总计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 ))
@@ -300,6 +301,53 @@ public class ReportTemplateSeeder {
     }
 
     // ============================================================
+    // 8. 独立数据带 + 各带行汇总：员工合计(col 0-1) / 商品合计(col 2-3) 互不串扰
+    // ============================================================
+
+    private void seedIndependentBandsWithSummary() {
+        Map<String, Object> config = baseConfig("员工商品并列汇总报表");
+
+        // 表头（Row 0）+ 两条无关系数据带（Row 1）
+        config.put("cellBindings", List.of(
+                binding(0, 0, literal("姓名"), "NONE", "LIST"),
+                binding(0, 1, literal("单位"), "NONE", "LIST"),
+                binding(0, 2, literal("商品名"), "NONE", "LIST"),
+                binding(0, 3, literal("价格"), "NONE", "LIST"),
+                // 员工数据带（col 0-1, VERTICAL）
+                binding(1, 0, fieldValue("staff", "name"), "VERTICAL", "LIST"),
+                binding(1, 1, fieldValue("staff", "unit"), "VERTICAL", "LIST"),
+                // 商品数据带（col 2-3, VERTICAL）— 与员工无关系，各自独立展开
+                binding(1, 2, fieldValue("products", "name"), "VERTICAL", "LIST"),
+                binding(1, 3, fieldValue("products", "price"), "VERTICAL", "LIST")
+        ));
+
+        // 各带各自一行总计：列区间决定作用域（后端 summariesForBand 按 [fromColumn,toColumn] 与
+        // 数据带列集合求交归属），互不串扰。两个汇总同锚在设计行 2，分别占列区间 [0,1] 和 [2,3]——
+        // 前端右键框选区域即生成该区间，同一设计行可并列多个独立汇总。渲染时后端按各带真实行数
+        // 分别落位，与设计态行号无关（员工带 4 行、商品带 3 行 → 各自追加在自己数据末尾）。
+        config.put("summaries", List.of(
+                summary(2, 0, 1, null, List.of(
+                        labelCell(0, "员工合计"),
+                        aggCell(1, "staff.name", "COUNT")
+                )),
+                summary(2, 2, 3, null, List.of(
+                        labelCell(2, "商品合计"),
+                        aggCell(3, "products.price", "SUM")
+                ))
+        ));
+
+        config.put("template", buildWorkbook(List.of(
+                cell(0, 0, "姓名"),
+                cell(0, 1, "单位"),
+                cell(0, 2, "商品名"),
+                cell(0, 3, "价格"),
+                cell(2, 0, "员工合计"),
+                cell(2, 2, "商品合计")
+        ), 8, 6));
+        exampleIds.add(save(config));
+    }
+
+    // ============================================================
     // 辅助方法
     // ============================================================
 
@@ -371,10 +419,13 @@ public class ReportTemplateSeeder {
         return b;
     }
 
-    private Map<String, Object> summary(int row, Map<String, Object> groupBy, List<Map<String, Object>> cells) {
+    private Map<String, Object> summary(int row, int fromColumn, int toColumn,
+                                        Map<String, Object> groupBy, List<Map<String, Object>> cells) {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("id", "sum-" + System.nanoTime());
         s.put("row", row);
+        s.put("fromColumn", fromColumn);
+        s.put("toColumn", toColumn);
         s.put("groupBy", groupBy);
         s.put("cells", cells);
         return s;

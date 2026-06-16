@@ -71,11 +71,11 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
         </div>
       )}
 
-      {/* 汇总范围（整行） */}
+      {/* 汇总范围（列区间） */}
       <div className="re-prop-exp-section">
         <SectionLabel
           text="汇总范围"
-          hint="总计：在数据末尾追加一行；分组小计：按指定字段每组追加一行小计。作用于整行。"
+          hint="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。"
         />
         <Radio.Group
           size="small"

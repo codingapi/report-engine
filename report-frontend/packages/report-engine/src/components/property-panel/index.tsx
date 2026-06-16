@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Popconfirm, Badge, Space, Tabs } from 'antd';
-import { PlusOutlined, DeleteOutlined, TableOutlined, MenuFoldOutlined } from '@ant-design/icons';
+import { Button, Popconfirm, Badge, Tabs } from 'antd';
+import { PlusOutlined, DeleteOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
 import ExpressionBuilder from './expression-builder';
@@ -8,6 +8,17 @@ import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
 import { valueDisplayText } from '../../value-text';
+
+/** 列号 → 字母（0→A, 25→Z, 26→AA） */
+function colToLetter(col: number): string {
+  let str = '';
+  let c = col;
+  while (c >= 0) {
+    str = String.fromCharCode(65 + (c % 26)) + str;
+    c = Math.floor(c / 26) - 1;
+  }
+  return str;
+}
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;
@@ -21,7 +32,6 @@ interface PropertyPanelProps {
   onBindingCreate: (cellKey: string) => void;
   onBindingDelete: (cellKey: string) => void;
   onSummaryRowChange: (id: string, row: SummaryRow) => void;
-  onSummaryRowCreate: (row: number) => void;
   onSummaryRowDelete: (id: string) => void;
   onCollapse?: () => void;
 }
@@ -38,7 +48,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   onBindingCreate,
   onBindingDelete,
   onSummaryRowChange,
-  onSummaryRowCreate,
   onSummaryRowDelete,
   onCollapse,
 }) => {
@@ -81,7 +90,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const { info } = selectedCell;
   const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
   const binding = cellBindings.find((b) => b.cellKey === cellKey);
-  const summaryRow = summaries.find((s) => s.row === info.row);
+  // 汇总按列区间归属：点击的列落在某汇总的 [fromColumn, toColumn] 内即命中
+  // （同一设计行可并列多个汇总，各占不同列段）
+  const summaryRow = summaries.find(
+    (s) => s.row === info.row && info.column >= s.fromColumn && info.column <= s.toColumn,
+  );
 
   const updateBinding = (patch: Partial<CellBinding>) => {
     if (!binding) return;
@@ -100,6 +113,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
   // 位置显示（A1 记法）
   const positionText = info.a1Notation || `${info.row + 1},${info.column + 1}`;
+  // 汇总行：显示其作用列区间（A1 风格），如 A3:B3；单列时只显示一格
+  const summaryRangeText = summaryRow
+    ? summaryRow.fromColumn === summaryRow.toColumn
+      ? `${colToLetter(summaryRow.fromColumn)}${summaryRow.row + 1}`
+      : `${colToLetter(summaryRow.fromColumn)}${summaryRow.row + 1}:${colToLetter(summaryRow.toColumn)}${summaryRow.row + 1}`
+    : '';
 
   // ─── 已绑定：Tab 内容 ───
   const bindingTabItems = binding
@@ -180,12 +199,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         )}
         <span className="re-panel__title-text">
           {positionText}
+          {summaryRow && (
+            <span style={{ marginLeft: 8, opacity: 0.65, fontWeight: 400 }}>
+              范围:{summaryRangeText}
+            </span>
+          )}
           {summaryRow && <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />}
         </span>
         {(summaryRow || binding) && (
           <Popconfirm
-            title={summaryRow ? '取消本行的汇总配置？' : '确定清除此绑定？'}
-            description={summaryRow ? '将移除整行所有汇总单元格' : undefined}
+            title={summaryRow ? '取消该汇总配置？' : '确定清除此绑定？'}
+            description={summaryRow ? '将移除本汇总（列区间）的所有单元格' : undefined}
             onConfirm={() => {
               if (summaryRow) onSummaryRowDelete(summaryRow.id);
               else if (binding) onBindingDelete(cellKey);
@@ -225,26 +249,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           /* ── 空白单元格 ── */
           <div className="re-prop-unbound">
             <div className="re-prop-unbound__hint">
-              此单元格未配置。可绑定数据字段，或将本行设为汇总行（小计/总计）。
+              此单元格未配置。可绑定数据字段；如需汇总行（小计/总计），在表格中框选同一行的单元格后右键「设为汇总行」。
             </div>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Button
-                type="dashed"
-                icon={<PlusOutlined />}
-                block
-                onClick={() => onBindingCreate(cellKey)}
-              >
-                创建绑定
-              </Button>
-              <Button
-                type="dashed"
-                icon={<TableOutlined />}
-                block
-                onClick={() => onSummaryRowCreate(info.row)}
-              >
-                将第 {info.row + 1} 行设为汇总行
-              </Button>
-            </Space>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              block
+              onClick={() => onBindingCreate(cellKey)}
+            >
+              创建绑定
+            </Button>
           </div>
         )}
       </div>

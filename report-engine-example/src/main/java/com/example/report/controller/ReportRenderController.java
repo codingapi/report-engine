@@ -192,7 +192,9 @@ public class ReportRenderController {
                     }
                 }
             }
-            result.add(SummaryRow.builder().groupBy(groupBy).cells(cells).build());
+            result.add(SummaryRow.builder().groupBy(groupBy)
+                    .fromColumn(dto.fromColumn()).toColumn(dto.toColumn())
+                    .cells(cells).build());
         }
         return result;
     }
@@ -254,7 +256,7 @@ public class ReportRenderController {
             List<String> orderBy) {
     }
 
-    public record SummaryRowDTO(FieldRefDTO groupBy, List<SummaryCellDTO> cells) {
+    public record SummaryRowDTO(FieldRefDTO groupBy, int fromColumn, int toColumn, List<SummaryCellDTO> cells) {
     }
 
     public record FieldRefDTO(String datasetId, String field) {
