@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Popconfirm, Badge, Space } from 'antd';
 import { PlusOutlined, DeleteOutlined, TableOutlined } from '@ant-design/icons';
-import type { CellBinding, SummaryRow, LoopBlock, Dataset, ExpressionCatalog } from '../../types';
+import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
 import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
@@ -15,6 +15,7 @@ interface PropertyPanelProps {
   summaries: SummaryRow[];
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
+  params: ReportParam[];
   functions?: ExpressionCatalog;
   onBindingChange: (cellKey: string, binding: CellBinding) => void;
   onBindingCreate: (cellKey: string) => void;
@@ -30,6 +31,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   summaries,
   loopBlocks,
   datasets,
+  params,
   functions,
   onBindingChange,
   onBindingCreate,
@@ -112,6 +114,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 value={binding.value}
                 datasets={datasets}
                 loopBlocks={loopBlocks}
+                params={params}
                 functions={functions}
                 onChange={(value) => updateBinding({ value })}
               />

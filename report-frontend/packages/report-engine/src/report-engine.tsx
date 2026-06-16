@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Badge, Input, message } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
@@ -7,12 +8,12 @@ import {
 } from '@ant-design/icons';
 import { Group, Panel as ResizablePanel, Separator, usePanelRef } from 'react-resizable-panels';
 import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig, CellRange, MenuGroupDef } from '@coding-report/report-univer';
-import DatasetTree from './components/dataset-tree';
+import DataModelPanel from './components/data-model';
 import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, Dataset, ReportParam, ReportConfig } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { valueDisplayText, summaryCellText } from './value-text';
@@ -20,6 +21,8 @@ import './index.css';
 
 export interface ReportEngineHandle {
   applyTemplate: (template: TemplatePreset) => void;
+  /** 加载报表配置，整体恢复设计态 */
+  loadReportConfig: (config: ReportConfig) => void;
 }
 
 /**
@@ -31,11 +34,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   engineRef?: React.Ref<ReportEngineHandle>;
 }> = ({
   datasets,
+  relationships = [],
   functions,
   title,
   engineRef,
   onExport,
   onImport,
+  onSaveReport,
   onFontRequest,
 }) => {
   const sheetRef = useRef<SheetPanelHandle>(null);
@@ -46,6 +51,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [cellBindings, setCellBindings] = useState<CellBinding[]>([]);
   const [loopBlocks, setLoopBlocks] = useState<LoopBlock[]>([]);
   const [summaries, setSummaries] = useState<SummaryRow[]>([]);
+  const [params, setParams] = useState<ReportParam[]>([]);
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [reportName, setReportName] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
@@ -146,8 +155,51 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     messageApi.success(`已加载模板：${tpl.label}`);
   }, [messageApi, clearPreviousTemplate, datasets]);
 
+  // ─── 加载报表配置（整体恢复设计态） ───
+  const loadReportConfig = useCallback((config: ReportConfig) => {
+    if (config.template) sheetRef.current?.loadSnapshot(config.template);
+    setReportId(config.id ?? null);
+    setReportName(config.name || '');
+    setCellBindings(config.cellBindings || []);
+    setLoopBlocks(config.loopBlocks || []);
+    setSummaries(config.summaries || []);
+    setParams(config.params || []);
+    setActiveTemplate(null);
+    lastAppliedRef.current = null;
+    messageApi.success(`已打开报表：${config.name || '未命名'}`);
+  }, [messageApi]);
+
+  // ─── 保存报表配置 ───
+  const handleSaveReport = useCallback(async () => {
+    if (!onSaveReport) return;
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) {
+      messageApi.warning('表格为空，无法保存');
+      return;
+    }
+    setSavingReport(true);
+    try {
+      const config: ReportConfig = {
+        id: reportId ?? undefined,
+        name: reportName.trim() || '未命名报表',
+        cellBindings,
+        loopBlocks,
+        summaries,
+        params,
+        template: snapshot,
+      };
+      const id = await onSaveReport(config);
+      if (id) setReportId(id);
+      messageApi.success('报表已保存');
+    } catch (e) {
+      messageApi.error(`保存失败: ${e}`);
+    } finally {
+      setSavingReport(false);
+    }
+  }, [onSaveReport, reportId, reportName, cellBindings, loopBlocks, summaries, params, messageApi]);
+
   // 暴露 ref
-  React.useImperativeHandle(engineRef, () => ({ applyTemplate }), [applyTemplate]);
+  React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
 
   // ─── cellProps：CellBinding → Univer CellProp 映射 ───
   const cellProps: Record<string, CellProp[]> = {};
@@ -395,14 +447,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         ...s,
         cells: s.cells.map((c) => ({ ...c, preview: summaryCellText(c, datasets) })),
       }));
-      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot);
+      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
       messageApi.success('导出成功');
     } catch (e) {
       messageApi.error(`导出失败: ${e}`);
     } finally {
       setExporting(false);
     }
-  }, [onExport, cellBindings, loopBlocks, summaries, datasets, messageApi]);
+  }, [onExport, cellBindings, loopBlocks, summaries, params, datasets, messageApi]);
 
   // ─── 导入 ───
   const handleImport = useCallback(
@@ -430,6 +482,23 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       <div className="re-header">
         <div className="re-header__title">{title ?? '报表设计器'}</div>
         <div className="re-header__actions">
+          {onSaveReport && (
+            <>
+              <Input
+                placeholder="报表名称"
+                value={reportName}
+                onChange={(e) => setReportName(e.target.value)}
+                style={{ width: 160 }}
+              />
+              <Button
+                icon={<SaveOutlined />}
+                loading={savingReport}
+                onClick={handleSaveReport}
+              >
+                保存
+              </Button>
+            </>
+          )}
           <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
             <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
               循环块
@@ -499,7 +568,12 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                     />
                   </Tooltip>
                 </div>
-                <DatasetTree datasets={datasets} />
+                <DataModelPanel
+                  datasets={datasets}
+                  relationships={relationships}
+                  params={params}
+                  onParamsChange={setParams}
+                />
               </div>
             )}
           </ResizablePanel>
@@ -562,6 +636,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                   summaries={summaries}
                   loopBlocks={loopBlocks}
                   datasets={datasets}
+                  params={params}
                   functions={functions}
                   onBindingChange={handleBindingChange}
                   onBindingCreate={handleBindingCreate}

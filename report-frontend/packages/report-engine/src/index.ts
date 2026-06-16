@@ -18,6 +18,10 @@ export type {
   ReportValue,
   // 算子域
   Condition,
+  // 关系域
+  Relationship,
+  // 参数域
+  ReportParam,
   // 渲染域
   CellBinding,
   LoopBlock,
@@ -25,6 +29,8 @@ export type {
   SummaryRow,
   // 模板预设
   TemplatePreset,
+  // 报表配置
+  ReportConfig,
   // 公式目录
   FunctionMeta,
   ExpressionCatalog,

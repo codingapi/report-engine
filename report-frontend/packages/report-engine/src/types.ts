@@ -89,6 +89,29 @@ export interface Condition {
   right: ReportValue | null;
 }
 
+// ─── 关系域 ────────────────────────────────────
+
+/** 跨数据集关系（只读展示，来自后端 DataModel） */
+export interface Relationship {
+  left: { datasetId: string; field: string };
+  right: { datasetId: string; field: string };
+  joinType: JoinType;
+}
+
+// ─── 参数域 ────────────────────────────────────
+
+/** 报表参数（报表级，设计时定义，可在表达式中以 ${name} 引用） */
+export interface ReportParam {
+  id: string;
+  /** 表达式中引用的名字（${name}） */
+  name: string;
+  /** 显示名（可选，缺省用 name） */
+  label?: string;
+  dataType: DataType;
+  /** 默认值（渲染时若外部未传值则用它） */
+  defaultValue?: string;
+}
+
 // ─── 渲染域 ────────────────────────────────────
 
 export interface CellBinding {
@@ -184,24 +207,43 @@ export interface TemplatePreset {
   loopBlocks?: LoopBlock[];
 }
 
+// ─── 报表配置（持久化） ────────────────────────
+
+/** 整张报表配置（保存/加载用） */
+export interface ReportConfig {
+  id?: string;
+  name: string;
+  cellBindings: CellBinding[];
+  loopBlocks: LoopBlock[];
+  summaries: SummaryRow[];
+  params: ReportParam[];
+  /** 模板表格快照 */
+  template: ExcelWorkbook;
+}
+
 // ─── 组件 Props ────────────────────────────────
 
 export interface ReportEngineProps {
   /** 数据集列表（由父组件从 API 获取后传入） */
   datasets: Dataset[];
+  /** 数据关系列表（由父组件从 API 获取后传入，只读展示） */
+  relationships?: Relationship[];
   /** 可用公式目录（聚合 + 函数，由父组件从 API 获取后传入；缺省时构建器用内置聚合） */
   functions?: ExpressionCatalog;
   /** 报表标题（支持 ReactNode，可在标题区域嵌入自定义内容） */
   title?: ReactNode;
-  /** 导出回调：接收配置 + 表格快照 */
+  /** 导出回调：接收配置 + 表格快照 + 报表参数 */
   onExport?: (
     bindings: CellBinding[],
     loops: LoopBlock[],
     summaries: SummaryRow[],
     workbook: ExcelWorkbook,
+    params: ReportParam[],
   ) => void | Promise<void>;
   /** 导入回调：接收文件，返回快照 */
   onImport?: (file: File) => Promise<ExcelWorkbook>;
+  /** 保存报表回调：接收整张报表配置，返回报表 id（用于后续更新） */
+  onSaveReport?: (config: ReportConfig) => Promise<string> | void;
   /** 字体加载回调 */
   onFontRequest?: () => Promise<FontItem[]>;
 }

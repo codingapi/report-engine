@@ -38,6 +38,8 @@ export interface RenderRequest {
   cellBindings: RenderBindingDTO[];
   loopBlocks: unknown[];
   summaries: unknown[];
+  /** 报表参数值（name → value），后端构 ParamContext */
+  params?: Record<string, unknown>;
   template: ExcelWorkbook;
 }
 
@@ -51,4 +53,32 @@ export async function renderReport(request: RenderRequest): Promise<Blob> {
     responseType: 'blob',
   });
   return res.data;
+}
+
+// ============================================================
+// 报表配置持久化（保存 / 加载 / 列表）
+// ============================================================
+
+/** 报表列表项 */
+export interface ReportBrief {
+  id: string;
+  name: string;
+}
+
+/** 保存报表配置（含 id 则更新），返回报表 id */
+export async function saveReportConfig(config: Record<string, unknown>): Promise<string> {
+  const res = await http.post('/report/configs', config);
+  return res.data as string;
+}
+
+/** 加载指定报表的完整配置 */
+export async function loadReportConfig(id: string): Promise<Record<string, unknown>> {
+  const res = await http.get(`/report/configs/${id}`);
+  return res.data;
+}
+
+/** 报表列表（id + name） */
+export async function listReportConfigs(): Promise<ReportBrief[]> {
+  const res = await http.get('/report/configs');
+  return res.data.list;
 }

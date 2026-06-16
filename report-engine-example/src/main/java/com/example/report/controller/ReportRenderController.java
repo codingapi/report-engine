@@ -1,8 +1,12 @@
 package com.example.report.controller;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.relation.Relationship;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 import com.codingapi.report.excel.ExcelExporter;
 import com.codingapi.report.excel.pojo.Workbook;
@@ -21,9 +25,11 @@ import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
+import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,7 +69,8 @@ public class ReportRenderController {
                 .build();
 
         Workbook template = request.template();
-        Workbook result = renderer.render(dataModel, report, new ParamContext(Map.of()), template);
+        Map<String, Object> paramValues = request.params() != null ? request.params() : Map.of();
+        Workbook result = renderer.render(dataModel, report, new ParamContext(paramValues), template);
         byte[] xlsx = new ExcelExporter().export(result);
 
         return ResponseEntity.ok()
@@ -72,6 +79,35 @@ public class ReportRenderController {
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .contentLength(xlsx.length)
                 .body(xlsx);
+    }
+
+    /**
+     * 返回当前报表所用的数据模型：数据集（含字段）+ 数据关系。
+     * 报表参数属报表级配置，由前端管理，不在此返回。
+     */
+    @GetMapping("/datamodel")
+    public SingleResponse<DataModelDTO> datamodel() {
+        List<DatasetInfoDTO> datasets = dataModel.getDatasets().stream()
+                .filter(ds -> ds instanceof TableDataset)
+                .map(ds -> {
+                    TableDataset tds = (TableDataset) ds;
+                    List<DatasetFieldDTO> fields = tds.getFields().stream()
+                            .map(f -> new DatasetFieldDTO(
+                                    f.getName(), f.getAlias(), f.getDataType().name(), f.isPrimaryKey()))
+                            .toList();
+                    return new DatasetInfoDTO(tds.getId(), tds.getAlias(), fields);
+                })
+                .toList();
+
+        List<Relationship> rels = dataModel.getRelationships();
+        List<RelationshipDTO> relationships = (rels == null ? List.<Relationship>of() : rels).stream()
+                .map(r -> new RelationshipDTO(
+                        new FieldRefDTO(r.getLeft().datasetId(), r.getLeft().field()),
+                        new FieldRefDTO(r.getRight().datasetId(), r.getRight().field()),
+                        r.getJoinType() != null ? r.getJoinType().name() : "INNER"))
+                .toList();
+
+        return SingleResponse.of(new DataModelDTO(datasets, relationships));
     }
 
     // ============================================================
@@ -204,6 +240,7 @@ public class ReportRenderController {
             List<BindingDTO> cellBindings,
             List<LoopBlockDTO> loopBlocks,
             List<SummaryRowDTO> summaries,
+            Map<String, Object> params,
             Workbook template) {
     }
 
@@ -254,5 +291,21 @@ public class ReportRenderController {
     }
 
     public record SummaryCellDTO(int column, String kind, String payload, String aggregation, String preview) {
+    }
+
+    // ============================================================
+    // 数据模型 DTO（GET /datamodel）
+    // ============================================================
+
+    public record DataModelDTO(List<DatasetInfoDTO> datasets, List<RelationshipDTO> relationships) {
+    }
+
+    public record DatasetInfoDTO(String id, String alias, List<DatasetFieldDTO> fields) {
+    }
+
+    public record DatasetFieldDTO(String name, String alias, String dataType, boolean primaryKey) {
+    }
+
+    public record RelationshipDTO(FieldRefDTO left, FieldRefDTO right, String joinType) {
     }
 }

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Input, Button, Select, Space, Tooltip } from 'antd';
 import type { InputRef } from 'antd';
-import type { ReportValue, Dataset, LoopBlock, ExpressionCatalog } from '../../types';
+import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog } from '../../types';
 import { findDataset } from '../../types';
 import { templateToString, parseTemplate } from '../../value-text';
 
@@ -9,11 +9,12 @@ interface ExpressionBuilderProps {
   value: ReportValue;
   datasets: Dataset[];
   loopBlocks: LoopBlock[];
+  params?: ReportParam[];
   functions?: ExpressionCatalog;
   onChange: (value: ReportValue) => void;
 }
 
-type InsertMode = 'field' | 'loop' | 'formula' | null;
+type InsertMode = 'field' | 'loop' | 'param' | 'formula' | null;
 
 /** 内置聚合（后端未提供时的兜底） */
 const FALLBACK_AGGS = ['COUNT', 'COUNT_DISTINCT', 'SUM', 'AVG', 'MAX', 'MIN'];
@@ -39,6 +40,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
   value,
   datasets,
   loopBlocks,
+  params = [],
   functions,
   onChange,
 }) => {
@@ -100,11 +102,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         <Button size="small" type={mode === 'loop' ? 'primary' : 'default'}
           disabled={loopBlocks.length === 0}
           onClick={() => setMode(mode === 'loop' ? null : 'loop')}>插入循环变量</Button>
+        <Button size="small" type={mode === 'param' ? 'primary' : 'default'}
+          disabled={params.length === 0}
+          onClick={() => setMode(mode === 'param' ? null : 'param')}>插入参数</Button>
         <Button size="small" type={mode === 'formula' ? 'primary' : 'default'}
           onClick={() => setMode(mode === 'formula' ? null : 'formula')}>插入公式</Button>
-        <Tooltip title="参数体系建设中，敬请期待">
-          <Button size="small" disabled>插入参数</Button>
-        </Tooltip>
       </div>
 
       {mode === 'field' && (
@@ -112,7 +114,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
           <Select size="small" placeholder="数据集" value={fieldDs} onChange={setFieldDs}
             style={{ width: '40%' }} showSearch
             options={datasets.map((d) => ({ value: d.id, label: d.alias || d.id }))} />
-          <Select size="small" placeholder="选字段插入" value={null} disabled={!fieldDs}
+          <Select size="small" placeholder="选字段插入" value={undefined} disabled={!fieldDs}
             style={{ flex: 1, minWidth: 0 }} showSearch
             onChange={(f) => doInsert(`${fieldDs}.${f}`)}
             options={(findDataset(datasets, fieldDs || '')?.fields || []).map((f) => ({
@@ -126,12 +128,21 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
           <Select size="small" placeholder="循环块" value={loopId} onChange={setLoopId}
             style={{ width: '40%' }}
             options={loopBlocks.map((l) => ({ value: l.id, label: l.label || l.id }))} />
-          <Select size="small" placeholder="选字段插入" value={null} disabled={!loopId}
+          <Select size="small" placeholder="选字段插入" value={undefined} disabled={!loopId}
             style={{ flex: 1, minWidth: 0 }} showSearch
             onChange={(f) => doInsert(`${loopId}.${f}`)}
             options={(loopDs?.fields || []).map((f) => ({
               value: f.name, label: f.alias || f.name,
             }))} />
+        </div>
+      )}
+
+      {mode === 'param' && (
+        <div className="re-expr-picker">
+          <Select<string> size="small" placeholder="选参数插入" value={undefined}
+            style={{ flex: 1, minWidth: 0 }} showSearch
+            onChange={(name) => doInsert(name)}
+            options={params.map((p) => ({ value: p.name, label: p.label || p.name }))} />
         </div>
       )}
 
