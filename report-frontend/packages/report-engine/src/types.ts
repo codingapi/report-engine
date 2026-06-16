@@ -148,9 +148,8 @@ export interface LoopBlock {
 
 export interface SummaryCell {
   column: number;
-  kind: 'label' | 'agg';
-  payload: string;
-  aggregation?: Aggregation;
+  /** 值表达式：标签（Literal/Template）或聚合（Aggregate），统一为 ReportValue */
+  value: ReportValue;
   /** 表达式预览（友好文本，导出时附带存储） */
   preview?: string;
 }

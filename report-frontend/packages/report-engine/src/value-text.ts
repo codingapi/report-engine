@@ -77,12 +77,6 @@ export function valueDisplayText(value: ReportValue, datasets: Dataset[], loopBl
   return `\${${exprToDisplay(value, datasets, loopBlocks)}}`;
 }
 
-/** 汇总单元格 → 显示文本：文本格显原文（含 ${group}），聚合格显 ${SUM(别名)} */
-export function summaryCellText(cell: SummaryCell, datasets: Dataset[]): string {
-  if (cell.kind === 'label') return cell.payload || '';
-  return `\${${cell.aggregation || 'SUM'}(${fieldLabel(cell.payload, datasets)})}`;
-}
-
 // ─── Template parts ↔ `${...}` 文本 ────────────
 
 /** Template 节点 → 可逆的 `${...}` 文本（也用作单元格占位） */

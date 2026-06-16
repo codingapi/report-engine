@@ -7,7 +7,7 @@ import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
-import { valueDisplayText, summaryCellText } from '../../value-text';
+import { valueDisplayText } from '../../value-text';
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;
@@ -92,7 +92,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const previewText = summaryRow
     ? (() => {
         const c = summaryRow.cells.find((sc) => sc.column === info.column);
-        return c ? summaryCellText(c, datasets) : '';
+        return c ? valueDisplayText(c.value, datasets, loopBlocks) : '';
       })()
     : binding
       ? valueDisplayText(binding.value, datasets, loopBlocks)
@@ -207,6 +207,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
             summaryRow={summaryRow}
             column={info.column}
             datasets={datasets}
+            loopBlocks={loopBlocks}
+            params={params}
+            functions={functions}
             onChange={(row) => onSummaryRowChange(summaryRow.id, row)}
           />
         ) : binding ? (

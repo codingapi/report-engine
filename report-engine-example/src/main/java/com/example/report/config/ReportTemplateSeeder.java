@@ -380,12 +380,48 @@ public class ReportTemplateSeeder {
         return s;
     }
 
-    private Map<String, Object> labelCell(int column, String payload) {
-        return Map.of("column", column, "kind", "label", "payload", payload);
+    private Map<String, Object> labelCell(int column, String label) {
+        Map<String, Object> value;
+        if (label.contains("${")) {
+            // 构造 Template：解析 ${...} 占位为 NameRef
+            value = buildTemplateValue(label);
+        } else {
+            value = Map.of("type", "Literal", "payload", label);
+        }
+        return Map.of("column", column, "value", value);
     }
 
     private Map<String, Object> aggCell(int column, String payload, String aggregation) {
-        return Map.of("column", column, "kind", "agg", "payload", payload, "aggregation", aggregation);
+        return Map.of("column", column, "value", Map.of(
+                "type", "Aggregate",
+                "aggregation", aggregation,
+                "operand", Map.of("type", "FieldValue", "payload", payload)
+        ));
+    }
+
+    /** 构造 Template Value：支持 ${name} 占位符（编译为 NameRef） */
+    private Map<String, Object> buildTemplateValue(String text) {
+        List<Map<String, Object>> parts = new ArrayList<>();
+        int i = 0;
+        while (i < text.length()) {
+            int start = text.indexOf("${", i);
+            if (start == -1) {
+                parts.add(Map.of("kind", "text", "text", text.substring(i)));
+                break;
+            }
+            if (start > i) {
+                parts.add(Map.of("kind", "text", "text", text.substring(i, start)));
+            }
+            int end = text.indexOf("}", start + 2);
+            String name = text.substring(start + 2, end);
+            parts.add(Map.of("kind", "hole", "value", Map.of("type", "NameRef", "payload", name)));
+            i = end + 1;
+        }
+        // 如果整个字符串就是一个洞，直接返回洞内 Value
+        if (parts.size() == 1 && "hole".equals(parts.get(0).get("kind"))) {
+            return (Map<String, Object>) parts.get(0).get("value");
+        }
+        return Map.of("type", "Template", "parts", parts);
     }
 
     // ─── ExcelWorkbook 构建 ───
