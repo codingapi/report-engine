@@ -215,7 +215,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
             activeKey={activeTab}
             onChange={setActiveTab}
             size="small"
-            type="card"
             className="re-prop-tabs"
             items={bindingTabItems}
           />

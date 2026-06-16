@@ -203,6 +203,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       );
     }
 
+    // 回写汇总行单元格文本（小计/总计在表格中可见）
+    for (const s of config.summaries || []) {
+      for (const c of s.cells) {
+        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, summaryCellText(c, ds));
+      }
+    }
+
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
   }, [messageApi, datasets]);
 

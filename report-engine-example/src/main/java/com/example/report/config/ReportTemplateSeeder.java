@@ -64,7 +64,7 @@ public class ReportTemplateSeeder {
                 binding(2, 1, fieldValue("products", "price"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(null, List.of(
+                summary(3, null, List.of(
                         labelCell(0, "合计"),
                         aggCell(1, "products.price", "SUM")
                 ))
@@ -72,8 +72,9 @@ public class ReportTemplateSeeder {
         config.put("template", buildWorkbook(List.of(
                 cell(0, 0, "商品清单"),
                 cell(1, 0, "商品名"),
-                cell(1, 1, "价格")
-        ), 6, 4));
+                cell(1, 1, "价格"),
+                cell(3, 0, "合计")
+        ), 6, 5));
         exampleIds.add(save(config));
     }
 
@@ -179,11 +180,11 @@ public class ReportTemplateSeeder {
                 binding(2, 3, fieldValue("salary_detail", "salary"), "VERTICAL", "LIST")
         ));
         config.put("summaries", List.of(
-                summary(Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
+                summary(3, Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
                         labelCell(1, "${group}小计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 )),
-                summary(null, List.of(
+                summary(4, null, List.of(
                         labelCell(0, "总计"),
                         aggCell(3, "salary_detail.salary", "SUM")
                 ))
@@ -193,8 +194,10 @@ public class ReportTemplateSeeder {
                 cell(1, 0, "单位"),
                 cell(1, 1, "部门"),
                 cell(1, 2, "姓名"),
-                cell(1, 3, "薪资")
-        ), 8, 4));
+                cell(1, 3, "薪资"),
+                cell(3, 1, "${group}小计"),
+                cell(4, 0, "总计")
+        ), 8, 6));
         exampleIds.add(save(config));
     }
 
@@ -368,10 +371,10 @@ public class ReportTemplateSeeder {
         return b;
     }
 
-    private Map<String, Object> summary(Map<String, Object> groupBy, List<Map<String, Object>> cells) {
+    private Map<String, Object> summary(int row, Map<String, Object> groupBy, List<Map<String, Object>> cells) {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("id", "sum-" + System.nanoTime());
-        s.put("row", 0);
+        s.put("row", row);
         s.put("groupBy", groupBy);
         s.put("cells", cells);
         return s;
