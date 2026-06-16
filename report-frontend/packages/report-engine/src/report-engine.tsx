@@ -17,6 +17,7 @@ import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
+import { useReportIO } from './hooks/use-report-io';
 import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
@@ -73,9 +74,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
-  const [savingReport, setSavingReport] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const lastAppliedRef = useRef<TemplatePreset | null>(null);
 
@@ -85,6 +83,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loopDrawerOpen, setLoopDrawerOpen] = useState(false);
+
+  // ─── 报表 IO（保存/导出/导入） ───
+  const { savingReport, exporting, importing, handleSaveReport, handleExport, handleImport } = useReportIO({
+    sheetRef, datasets, dataModelId,
+    cellBindings, loopBlocks, summaries, params,
+    reportId, reportName, onReportIdChange: setReportId,
+    onSaveReport, onExport, onImport, messageApi,
+  });
 
   // ─── 清空旧模板单元格 ───
   const clearPreviousTemplate = useCallback((sheetId: string) => {
@@ -232,36 +238,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
   }, [messageApi, datasets]);
-
-  // ─── 保存报表配置 ───
-  const handleSaveReport = useCallback(async () => {
-    if (!onSaveReport) return;
-    const snapshot = sheetRef.current?.getSnapshot();
-    if (!snapshot) {
-      messageApi.warning('表格为空，无法保存');
-      return;
-    }
-    setSavingReport(true);
-    try {
-      const config: ReportConfig = {
-        id: reportId ?? undefined,
-        name: reportName,
-        dataModelId,
-        cellBindings,
-        loopBlocks,
-        summaries,
-        params,
-        template: snapshot,
-      };
-      const id = await onSaveReport(config);
-      if (id) setReportId(id);
-      messageApi.success('报表已保存');
-    } catch (e) {
-      messageApi.error(`保存失败: ${e}`);
-    } finally {
-      setSavingReport(false);
-    }
-  }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, messageApi]);
 
   // 暴露 ref
   React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
@@ -513,52 +489,6 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       }
     },
     [messageApi],
-  );
-
-  // ─── 导出 ───
-  const handleExport = useCallback(async () => {
-    if (!onExport) return;
-    const snapshot = sheetRef.current?.getSnapshot();
-    if (!snapshot) {
-      messageApi.warning('表格为空，无法导出');
-      return;
-    }
-    setExporting(true);
-    try {
-      // 导出时附带表达式预览（友好文本），随配置一起存储到后端
-      const bindingsOut = cellBindings.map((b) => ({
-        ...b,
-        preview: valueDisplayText(b.value, datasets, loopBlocks),
-      }));
-      const summariesOut = summaries.map((s) => ({
-        ...s,
-        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks) })),
-      }));
-      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
-      messageApi.success('导出成功');
-    } catch (e) {
-      messageApi.error(`导出失败: ${e}`);
-    } finally {
-      setExporting(false);
-    }
-  }, [onExport, cellBindings, loopBlocks, summaries, params, datasets, messageApi]);
-
-  // ─── 导入 ───
-  const handleImport = useCallback(
-    async (file: File) => {
-      if (!onImport) return;
-      setImporting(true);
-      try {
-        const snapshot = await onImport(file);
-        sheetRef.current?.loadSnapshot(snapshot);
-        messageApi.success('导入成功');
-      } catch (e) {
-        messageApi.error(`导入失败: ${e}`);
-      } finally {
-        setImporting(false);
-      }
-    },
-    [onImport, messageApi],
   );
 
   return (
