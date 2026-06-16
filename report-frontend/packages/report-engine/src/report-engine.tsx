@@ -671,10 +671,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         title="循环块管理"
         extra={<span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>定义模板中需要重复渲染的区域</span>}
         placement="right"
-        width={520}
+        styles={{ wrapper: { width: 520 } }}
         open={loopDrawerOpen}
         onClose={() => setLoopDrawerOpen(false)}
-        destroyOnClose={false}
+        destroyOnHidden={false}
       >
         <LoopBlockManager
           loopBlocks={loopBlocks}
