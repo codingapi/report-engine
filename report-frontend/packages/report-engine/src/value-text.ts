@@ -6,8 +6,17 @@
  * 2. Template 值的可逆编辑：parts 结构 ↔ `${...}` 文本字符串
  */
 
-import type { ReportValue, Dataset, LoopBlock } from './types';
+import type { ReportValue, Dataset, LoopBlock, ReportParam } from './types';
 import { findField, findDataset } from './types';
+
+// ─── 参数名 → 别名 ───────────────────────────
+
+/** 参数名 → 别名（找不到回退参数名） */
+function paramLabel(name: string | undefined, params: ReportParam[]): string {
+  if (!name) return '';
+  const p = params.find((pp) => pp.name === name);
+  return p?.alias || name;
+}
 
 // ─── 字段引用 → 别名 ───────────────────────────
 
@@ -37,9 +46,9 @@ function loopFieldLabel(ref: string | undefined, datasets: Dataset[], loopBlocks
 
 /**
  * 表达式 → `${}` 内部的友好字符串（不含 ${} 包裹）。
- * 数据模型字段显示别名；运行时名字（NameRef/ParamValue）显示名字本身。
+ * 数据模型字段显示别名；参数（NameRef/ParamValue）显示别名。
  */
-function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[]): string {
+function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[], params: ReportParam[] = []): string {
   switch (v.type) {
     case 'Literal':
       return v.payload || '';
@@ -50,11 +59,11 @@ function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBloc
       return loopFieldLabel(v.payload, datasets, loopBlocks);
     case 'NameRef':
     case 'ParamValue':
-      return v.payload || '';
+      return paramLabel(v.payload, params);
     case 'Aggregate':
-      return `${v.aggregation || 'SUM'}(${v.operand ? exprToDisplay(v.operand, datasets, loopBlocks) : ''})`;
+      return `${v.aggregation || 'SUM'}(${v.operand ? exprToDisplay(v.operand, datasets, loopBlocks, params) : ''})`;
     case 'FunctionCall':
-      return `${v.funcName || 'fn'}(${(v.args || []).map((a) => exprToDisplay(a, datasets, loopBlocks)).join(', ')})`;
+      return `${v.funcName || 'fn'}(${(v.args || []).map((a) => exprToDisplay(a, datasets, loopBlocks, params)).join(', ')})`;
     default:
       return '';
   }
@@ -66,15 +75,20 @@ function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBloc
  * - Template：文本段原样 + 每个洞包成 ${友好表达式}
  * - 其余取值/计算类（字段/聚合/函数/名称引用）：整体包成 ${友好表达式}
  */
-export function valueDisplayText(value: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[] = []): string {
+export function valueDisplayText(
+  value: ReportValue,
+  datasets: Dataset[],
+  loopBlocks: LoopBlock[] = [],
+  params: ReportParam[] = [],
+): string {
   if (value.type === 'Literal') return value.payload || '';
   if (value.type === 'Template') {
     if (!value.parts) return '';
     return value.parts
-      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets, loopBlocks)}}`))
+      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets, loopBlocks, params)}}`))
       .join('');
   }
-  return `\${${exprToDisplay(value, datasets, loopBlocks)}}`;
+  return `\${${exprToDisplay(value, datasets, loopBlocks, params)}}`;
 }
 
 // ─── Template parts ↔ `${...}` 文本 ────────────

@@ -178,14 +178,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         row,
         col,
-        valueDisplayText(b.value, datasets, remappedLoops),
+        valueDisplayText(b.value, datasets, remappedLoops, params),
       );
     }
 
     // 回写汇总行（小计/总计）单元格的文本/聚合摘要，使其在表格中可见
     for (const s of tpl.summaries || []) {
       for (const cell of s.cells) {
-        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops));
+        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops, params));
       }
     }
 
@@ -240,20 +240,21 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
     const ds = datasets;
+    const loadedParams = config.params || [];
     for (const b of remappedBindings) {
       const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         actualSheetId,
         row,
         col,
-        valueDisplayText(b.value, ds, remappedLoops),
+        valueDisplayText(b.value, ds, remappedLoops, loadedParams),
       );
     }
 
     // 回写汇总行单元格文本（小计/总计在表格中可见）
     for (const s of migratedSummaries) {
       for (const c of s.cells) {
-        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops));
+        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops, loadedParams));
       }
     }
 
@@ -348,10 +349,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         row,
         col,
-        valueDisplayText(binding.value, datasets, loopBlocks),
+        valueDisplayText(binding.value, datasets, loopBlocks, params),
       );
     },
-    [datasets, loopBlocks],
+    [datasets, loopBlocks, params],
   );
 
   // ─── 属性面板回调 ───
@@ -403,13 +404,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         }
         // 回写当前列文本/聚合摘要
         for (const c of newRow.cells) {
-          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks));
+          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks, params));
         }
         return prev.map((s) => (s.id === id ? newRow : s));
       });
       setActiveTemplate(null);
     },
-    [datasets],
+    [datasets, loopBlocks, params],
   );
 
   const handleSummaryRowDelete = useCallback((id: string) => {

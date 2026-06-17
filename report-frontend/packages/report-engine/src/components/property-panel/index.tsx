@@ -95,10 +95,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const previewText = summaryRow
     ? (() => {
         const c = summaryRow.cells.find((sc) => sc.column === info.column);
-        return c ? valueDisplayText(c.value, datasets, loopBlocks) : '';
+        return c ? valueDisplayText(c.value, datasets, loopBlocks, params) : '';
       })()
     : binding
-      ? valueDisplayText(binding.value, datasets, loopBlocks)
+      ? valueDisplayText(binding.value, datasets, loopBlocks, params)
       : '';
 
   // 位置显示（A1 记法）
