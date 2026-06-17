@@ -90,6 +90,7 @@ export interface Dataset {
  */
 export interface ReportValue {
   type: ValueType;
+  /** 取值/引用的真实 ID（如 "datasetId.field" / 参数名）——权威值，后端按它解析 */
   payload?: string;
   aggregation?: Aggregation;
   operand?: ReportValue;
@@ -147,6 +148,14 @@ export interface CellBinding {
   independent?: boolean;
   /** 表达式预览（友好文本，导出时附带存储；派生自 value，不作为权威来源） */
   preview?: string;
+  /**
+   * 单元格展示文本（设计态：别名友好文本，由 valueDisplayText(value) 正向派生）。
+   * transient——保存时剥离，后端不接收也不存储。两个用途：
+   * ① 写进 Univer 单元格供显示；
+   * ② 作为「回声判别」基准：单元格新文本 === displayText ⇒ 程序回写的回声（忽略）；
+   *    不等 ⇒ 用户手敲（退化为 Literal）。以此替代时序型 isLoadingRef，且不依赖 mutation 同步性。
+   */
+  displayText?: string;
 }
 
 export interface LoopBlock {
@@ -171,6 +180,8 @@ export interface SummaryCell {
   value: ReportValue;
   /** 表达式预览（友好文本，导出时附带存储） */
   preview?: string;
+  /** 单元格展示文本（设计态，transient）。回声判别基准，见 CellBinding.displayText。 */
+  displayText?: string;
 }
 
 export interface SummaryRow {

@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { SheetPanelHandle } from '../components/sheet-panel';
 import type { CellBinding, LoopBlock, SummaryRow, ReportParam, Dataset, ReportConfig, ReportEngineProps } from '../types';
-import { valueDisplayText } from '../value-text';
+import { valueDisplayText, templateToString } from '../value-text';
 
 export interface UseReportIOOptions {
   sheetRef: React.RefObject<SheetPanelHandle>;
@@ -48,15 +48,48 @@ export function useReportIO(opts: UseReportIOOptions) {
     }
     setSavingReport(true);
     try {
+      // 重建模板：用原始 ID（templateToString）替换友好别名（valueDisplayText）
+      // 确保后端能正确解析 LoopFieldValue 等类型
+      const templateOut = {
+        ...snapshot,
+        sheets: snapshot.sheets.map((sheet) => ({
+          ...sheet,
+          cells: sheet.cells.map((cell) => {
+            // 查找对应的 cellBinding
+            const binding = cellBindings.find((b) => {
+              const [, row, col] = b.cellKey.split(':');
+              return parseInt(row) === cell.row && parseInt(col) === cell.col;
+            });
+            if (binding) {
+              return { ...cell, value: templateToString(binding.value) };
+            }
+            // 查找对应的 summaryCell
+            const summary = summaries.find((s) => s.row === cell.row);
+            if (summary) {
+              const summaryCell = summary.cells.find((c) => c.column === cell.col);
+              if (summaryCell) {
+                return { ...cell, value: templateToString(summaryCell.value) };
+              }
+            }
+            // 其他单元格保持原值
+            return cell;
+          }),
+        })),
+      };
+
+      // displayText 是设计态 transient 字段（回声判别/显示用），不持久化 → 保存前剥离
       const config: ReportConfig = {
         id: reportId ?? undefined,
         name: reportName,
         dataModelId,
-        cellBindings,
+        cellBindings: cellBindings.map(({ displayText: _dt, ...b }) => b),
         loopBlocks,
-        summaries,
+        summaries: summaries.map((s) => ({
+          ...s,
+          cells: s.cells.map(({ displayText: _dt, ...c }) => c),
+        })),
         params,
-        template: snapshot,
+        template: templateOut,
       };
       const id = await onSaveReport(config);
       if (id) onReportIdChange(id);
@@ -87,7 +120,37 @@ export function useReportIO(opts: UseReportIOOptions) {
         ...s,
         cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks, params) })),
       }));
-      await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
+
+      // 重建模板：用原始 ID（templateToString）替换友好别名（valueDisplayText）
+      // 确保后端能正确解析 LoopFieldValue 等类型
+      const templateOut = {
+        ...snapshot,
+        sheets: snapshot.sheets.map((sheet) => ({
+          ...sheet,
+          cells: sheet.cells.map((cell) => {
+            // 查找对应的 cellBinding
+            const binding = cellBindings.find((b) => {
+              const [, row, col] = b.cellKey.split(':');
+              return parseInt(row) === cell.row && parseInt(col) === cell.col;
+            });
+            if (binding) {
+              return { ...cell, value: templateToString(binding.value) };
+            }
+            // 查找对应的 summaryCell
+            const summary = summaries.find((s) => s.row === cell.row);
+            if (summary) {
+              const summaryCell = summary.cells.find((c) => c.column === cell.col);
+              if (summaryCell) {
+                return { ...cell, value: templateToString(summaryCell.value) };
+              }
+            }
+            // 其他单元格保持原值
+            return cell;
+          }),
+        })),
+      };
+
+      await onExport(bindingsOut, loopBlocks, summariesOut, templateOut, params);
       messageApi.success('导出成功');
     } catch (e) {
       messageApi.error(`导出失败: ${e}`);
