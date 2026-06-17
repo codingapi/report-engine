@@ -168,6 +168,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 conditions={binding.conditions}
                 datasets={datasets}
                 loopBlocks={loopBlocks}
+                params={params}
                 onChange={(conditions) => updateBinding({ conditions })}
               />
             </div>

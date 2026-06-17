@@ -4,7 +4,7 @@ import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
-  BlockOutlined,
+  BlockOutlined, QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { Group, Panel as ResizablePanel, Separator, usePanelRef } from 'react-resizable-panels';
 import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig, CellRange, MenuGroupDef } from '@coding-report/report-univer';
@@ -744,9 +744,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <ResizablePanel
             id="right-panel"
             panelRef={rightPanelRef}
-            defaultSize="25%"
-            minSize="320px"
-            maxSize="35%"
+            defaultSize="30%"
+            minSize="360px"
+            maxSize="40%"
             collapsible
             collapsedSize="36px"
             onResize={(_size, _id, _prev) => {
@@ -786,8 +786,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
       {/* 循环块管理抽屉 */}
       <Drawer
-        title="循环块管理"
-        extra={<span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>定义模板中需要重复渲染的区域</span>}
+        title={
+          <span>
+            循环块管理
+            <Tooltip
+              title="循环块用于定义模板中需要重复渲染的区域，按驱动数据集的行数（或分组数）复制多次。块内单元格通过「循环字段」引用当前迭代行的字段。新增循环块请在表格中选中区域，右键选择「设为循环块」。"
+            >
+              <QuestionCircleOutlined style={{ marginLeft: 6, color: 'rgba(0,0,0,0.45)', cursor: 'pointer', fontSize: 14 }} />
+            </Tooltip>
+          </span>
+        }
         placement="right"
         styles={{ wrapper: { width: 520 } }}
         open={loopDrawerOpen}
@@ -797,6 +805,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         <LoopBlockManager
           loopBlocks={loopBlocks}
           datasets={datasets}
+          params={params}
           onChange={setLoopBlocks}
         />
       </Drawer>

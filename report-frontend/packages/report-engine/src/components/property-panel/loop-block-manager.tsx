@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import type { LoopBlock, Dataset } from '../../types';
+import type { LoopBlock, Dataset, ReportParam } from '../../types';
 import { describeRange } from '../../utils/excel-cell';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 import SectionLabel from './section-label';
@@ -10,6 +10,7 @@ import ConditionEditor from './condition-editor';
 interface LoopBlockManagerProps {
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
+  params?: ReportParam[];
   onChange: (loopBlocks: LoopBlock[]) => void;
 }
 
@@ -23,9 +24,10 @@ const LoopBlockForm: React.FC<{
   lb: LoopBlock;
   datasets: Dataset[];
   allLoops: LoopBlock[];
+  params?: ReportParam[];
   onUpdate: (patch: Partial<LoopBlock>) => void;
   onDelete: () => void;
-}> = ({ lb, datasets, allLoops, onUpdate, onDelete }) => {
+}> = ({ lb, datasets, allLoops, params, onUpdate, onDelete }) => {
   return (
     <div className="re-prop-loop-item__body">
       {/* 名称 */}
@@ -100,6 +102,7 @@ const LoopBlockForm: React.FC<{
         conditions={lb.source.filters}
         datasets={datasets}
         loopBlocks={allLoops}
+        params={params}
         onChange={(filters) => onUpdate({ source: { ...lb.source, filters } })}
       />
 
@@ -124,6 +127,7 @@ const LoopBlockForm: React.FC<{
 const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
   loopBlocks,
   datasets,
+  params,
   onChange,
 }) => {
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
@@ -144,19 +148,6 @@ const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
 
   return (
     <div>
-      {/* 功能说明 */}
-      <div className="re-loop-intro">
-        <p>
-          循环块用于定义模板中需要<strong>重复渲染</strong>的区域。渲染时，该区域会按驱动数据集的行数（或分组数）复制多次。
-        </p>
-        <p>
-          块内单元格通过<strong>循环字段</strong>引用当前迭代行的字段（属性面板中选「循环字段」即可）。
-        </p>
-        <p>
-          新增循环块请在<strong>表格中选中区域</strong>，右键选择「设为循环块」。
-        </p>
-      </div>
-
       {loopBlocks.length > 0 ? (
         <Tabs
           type="card"
@@ -171,6 +162,7 @@ const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
                 lb={lb}
                 datasets={datasets}
                 allLoops={loopBlocks}
+                params={params}
                 onUpdate={(patch) => handleUpdate(i, patch)}
                 onDelete={() => handleDelete(i)}
               />

@@ -288,33 +288,15 @@
 .re-prop-exp-section { margin-bottom: var(--re-spacing-lg); }
 .re-prop-exp-section__label {
   font-size: var(--re-font-size-base); color: var(--re-color-text); font-weight: 500; margin-bottom: var(--re-spacing-xs);
-}
-.re-prop-exp-section__hint {
-  font-size: var(--re-font-size-sm); color: var(--re-color-text-tertiary); margin-bottom: var(--re-spacing-sm); line-height: 1.5;
+  display: flex; align-items: center; gap: var(--re-spacing-xs);
 }
 
 /* ─── 条件编辑器 ─── */
-.re-prop-cond-list { display: flex; flex-direction: column; gap: 6px; }
-.re-prop-cond-row { display: flex; gap: var(--re-spacing-sm); align-items: center; }
-.re-prop-cond-row .re-prop-cond-left { flex: 2; min-width: 0; }
-.re-prop-cond-row .re-prop-cond-op { flex: 0 0 80px; }
-.re-prop-cond-row .re-prop-cond-right { flex: 2; min-width: 0; }
-.re-prop-cond-row .re-prop-cond-del { flex: 0 0 auto; }
 .re-prop-cond-empty {
   padding: var(--re-spacing-lg) 0; text-align: center; font-size: var(--re-font-size-base); color: var(--re-color-text-quaternary);
 }
 
 /* ─── 循环块管理 ─── */
-.re-loop-intro {
-  padding: 10px var(--re-spacing-lg); background: #f6f8fa; border-radius: var(--re-radius-lg);
-  margin-bottom: var(--re-spacing-lg); font-size: var(--re-font-size-base); color: #555; line-height: 1.7;
-}
-.re-loop-intro p { margin: 0 0 var(--re-spacing-sm); }
-.re-loop-intro p:last-child { margin-bottom: 0; }
-.re-loop-intro code {
-  background: #e8ecf0; padding: 1px 5px; border-radius: 3px;
-  font-size: var(--re-font-size-sm); color: var(--re-color-code-pink);
-}
 .re-loop-label {
   display: flex; align-items: center; gap: var(--re-spacing-sm);
   font-size: var(--re-font-size-sm); color: #555; margin-bottom: var(--re-spacing-sm); font-weight: 500;
