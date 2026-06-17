@@ -196,7 +196,6 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
 
   return (
     <div className="re-expr-builder">
-      <div className="re-expr-label">内容表达式</div>
       <Input.TextArea
         ref={taRef}
         value={text}

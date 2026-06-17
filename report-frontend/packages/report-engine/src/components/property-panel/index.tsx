@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Popconfirm, Badge, Tabs, Empty } from 'antd';
+import { Button, Popconfirm, Badge, Tabs, Empty, Form } from 'antd';
 import { PlusOutlined, DeleteOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
@@ -122,15 +122,19 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 <div className="re-prop-preview__label">预览</div>
                 <code>{previewText || '（未配置）'}</code>
               </div>
-              <ExpressionBuilder
-                key={cellKey}
-                value={binding.value}
-                datasets={datasets}
-                loopBlocks={loopBlocks}
-                params={params}
-                functions={functions}
-                onChange={(value) => updateBinding({ value })}
-              />
+              <Form layout="vertical" size="small">
+                <Form.Item label="本格内容" tooltip="当前单元格显示什么：文本、字段、聚合、或混合表达式。支持 ${...} 模板语法。">
+                  <ExpressionBuilder
+                    key={cellKey}
+                    value={binding.value}
+                    datasets={datasets}
+                    loopBlocks={loopBlocks}
+                    params={params}
+                    functions={functions}
+                    onChange={(value) => updateBinding({ value })}
+                  />
+                </Form.Item>
+              </Form>
             </div>
           ),
         },
