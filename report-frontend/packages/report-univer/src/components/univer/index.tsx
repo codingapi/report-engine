@@ -27,6 +27,9 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
         const onFieldDropRef = useRef(props.onFieldDrop);
         onFieldDropRef.current = props.onFieldDrop;
 
+        const onCellValueChangeRef = useRef(props.onCellValueChange);
+        onCellValueChangeRef.current = props.onCellValueChange;
+
         // 用 ref 保存最新的属性存储（供 cell-selection 回调查找）
         const cellPropsRef = useRef(props.cellProps);
         cellPropsRef.current = props.cellProps;
@@ -128,11 +131,37 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 () => onFieldDropRef.current,
             );
 
+            // 监听单元格值变更（用户编辑后同步到外部状态）
+            const cellChangeDisposable = univerAPI.addEvent(
+                univerAPI.Event.CommandExecuted,
+                (event: { id: string; params?: { subUnitId?: string; cellValue?: Record<string, Record<string, { v?: unknown }>> } }) => {
+                    if (event.id !== 'sheet.mutation.set-range-values') return;
+                    if (!onCellValueChangeRef.current) return;
+                    const p = event.params;
+                    if (!p?.cellValue) return;
+                    const sheetId = p.subUnitId || '';
+                    const changes: Array<{ sheetId: string; row: number; col: number; value: string }> = [];
+                    for (const [rowStr, cols] of Object.entries(p.cellValue)) {
+                        const row = Number(rowStr);
+                        if (Number.isNaN(row)) continue;
+                        for (const [colStr, cell] of Object.entries(cols as Record<string, { v?: unknown }>)) {
+                            const col = Number(colStr);
+                            if (Number.isNaN(col)) continue;
+                            const raw = cell?.v;
+                            const value = raw == null ? '' : String(raw);
+                            changes.push({ sheetId, row, col, value });
+                        }
+                    }
+                    if (changes.length > 0) onCellValueChangeRef.current(changes);
+                },
+            );
+
             // 延迟通知父组件，确保 useImperativeHandle 已执行、ref 可用
             setTimeout(() => props.onReady?.(), 0);
 
             return () => {
                 cleanupDragDrop();
+                cellChangeDisposable?.dispose();
                 highlightManagerRef.current?.dispose();
                 highlightManagerRef.current = null;
                 dispose();

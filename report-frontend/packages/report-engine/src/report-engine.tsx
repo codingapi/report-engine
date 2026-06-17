@@ -528,6 +528,39 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [messageApi],
   );
 
+  // ─── 单元格值变更 → 同步到汇总行的 SummaryCell.value ───
+  const handleCellValueChange = useCallback(
+    (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
+      setSummaries((prev) => {
+        let updated = false;
+        const next = prev.map((s) => {
+          // 找出落在本汇总行的变更
+          const matching = changes.filter((c) => c.row === s.row && c.col >= s.fromColumn && c.col <= s.toColumn);
+          if (matching.length === 0) return s;
+          const cells = [...s.cells];
+          for (const c of matching) {
+            const idx = cells.findIndex((sc) => sc.column === c.col);
+            const newValue = parseTemplate(c.value);
+            if (idx >= 0) {
+              // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
+              // 避免覆盖用户通过属性面板设置的聚合表达式
+              const existing = cells[idx];
+              if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
+                cells[idx] = { ...existing, value: newValue };
+              }
+            } else {
+              cells.push({ column: c.col, value: newValue });
+            }
+          }
+          updated = true;
+          return { ...s, cells };
+        });
+        return updated ? next : prev;
+      });
+    },
+    [],
+  );
+
   return (
     <div className="re">
       {messageContextHolder}
@@ -636,6 +669,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               contextMenuGroups={contextMenuGroups}
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
+              onCellValueChange={handleCellValueChange}
               onFontRequest={onFontRequest}
               onReady={() => console.log('[ReportEngine] Univer ready, sheetId:', sheetRef.current?.getActiveSheetId())}
             />

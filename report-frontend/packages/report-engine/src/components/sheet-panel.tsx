@@ -34,6 +34,7 @@ interface SheetPanelProps {
   contextMenuGroups?: MenuGroupDef[];
   onCellSelect?: (info: SheetCellSelectInfo) => void;
   onFieldDrop?: (info: FieldDropInfo, handle: CellHandle) => void;
+  onCellValueChange?: UniverSheetProps['onCellValueChange'];
   onFontRequest?: () => Promise<FontItem[]>;
   onReady?: () => void;
 }
@@ -42,7 +43,7 @@ interface SheetPanelProps {
  * Univer 电子表格封装：转发 ref 句柄，简化 props 传递。
  */
 const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
-  ({ cellProps, loopBlocks, highlightCells, contextMenuGroups, onCellSelect, onFieldDrop, onFontRequest, onReady }, ref) => {
+  ({ cellProps, loopBlocks, highlightCells, contextMenuGroups, onCellSelect, onFieldDrop, onCellValueChange, onFontRequest, onReady }, ref) => {
     const univerRef = useRef<UniverSheetHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -74,6 +75,7 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
         contextMenuGroups={contextMenuGroups}
         onCellSelect={handleCellSelect}
         onFieldDrop={onFieldDrop}
+        onCellValueChange={onCellValueChange}
         onFontRequest={onFontRequest}
         onReady={onReady}
       />

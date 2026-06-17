@@ -59,6 +59,14 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
     /** 字段拖入回调（含操作句柄） */
     onFieldDrop?: (info: FieldDropInfo, handle: CellHandle) => void;
 
+    /** 单元格值变更回调（用户编辑完成后触发） */
+    onCellValueChange?: (changes: Array<{
+        sheetId: string;
+        row: number;
+        col: number;
+        value: string;
+    }>) => void;
+
     // ─── 消息 ───
 
     // ─── 只读模式 ───
