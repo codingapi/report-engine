@@ -20,16 +20,23 @@ function paramLabel(name: string | undefined, params: ReportParam[]): string {
 
 // ─── 字段引用 → 别名 ───────────────────────────
 
-/** "datasetId.field" → 字段别名（找不到回退字段名 / 原串） */
+/** "datasetId.field" → "数据集别名.字段别名"（如 员工信息.工号） */
 function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
   if (!ref) return '';
   const f = findField(datasets, ref);
-  if (f) return f.alias || f.name;
+  if (f) {
+    const dot = ref.indexOf('.');
+    const dsId = dot === -1 ? '' : ref.slice(0, dot);
+    const ds = findDataset(datasets, dsId);
+    const dsLabel = ds?.alias || dsId;
+    const fLabel = f.alias || f.name;
+    return `${dsLabel}.${fLabel}`;
+  }
   const dot = ref.indexOf('.');
   return dot === -1 ? ref : ref.slice(dot + 1);
 }
 
-/** "loopId.field" → "循环块名称.字段别名"（如 员工循环.姓名） */
+/** "loopId.field" → "循环块标签.字段别名"（如 员工循环.姓名） */
 function loopFieldLabel(ref: string | undefined, datasets: Dataset[], loopBlocks: LoopBlock[]): string {
   if (!ref) return '';
   const dot = ref.indexOf('.');
@@ -137,16 +144,16 @@ const AGG_RE = /^(COUNT_DISTINCT|COUNT|SUM|AVG|MAX|MIN)\(([^)]*)\)$/;
  * - 整串单个洞、无文本 → 直接返回洞内 Value（FieldValue / Aggregate / …）
  * - 文本 + 洞混合 → Template
  *
- * 洞内表达式：`${name}`→NameRef、`${d.field}`→FieldValue、`${SUM(d.field)}`→Aggregate
+ * 洞内表达式：`${name}`→NameRef、`${d.field}`→FieldValue、`${loop.field}`→LoopFieldValue、`${SUM(d.field)}`→Aggregate
  */
-export function parseTemplate(str: string): ReportValue {
+export function parseTemplate(str: string, loopBlocks: LoopBlock[] = []): ReportValue {
   const parts: NonNullable<ReportValue['parts']> = [];
   let last = 0;
   let m: RegExpExecArray | null;
   HOLE_RE.lastIndex = 0;
   while ((m = HOLE_RE.exec(str)) !== null) {
     if (m.index > last) parts.push({ kind: 'text', text: str.slice(last, m.index) });
-    parts.push({ kind: 'hole', value: parseExpr(m[1].trim()) });
+    parts.push({ kind: 'hole', value: parseExpr(m[1].trim(), loopBlocks) });
     last = m.index + m[0].length;
   }
   if (last < str.length) parts.push({ kind: 'text', text: str.slice(last) });
@@ -163,11 +170,20 @@ export function parseTemplate(str: string): ReportValue {
 }
 
 /** 洞内表达式源码 → Value 节点 */
-function parseExpr(expr: string): ReportValue {
+function parseExpr(expr: string, loopBlocks: LoopBlock[] = []): ReportValue {
   const agg = AGG_RE.exec(expr);
   if (agg) {
-    return { type: 'Aggregate', aggregation: agg[1] as ReportValue['aggregation'], operand: parseExpr(agg[2].trim()) };
+    return { type: 'Aggregate', aggregation: agg[1] as ReportValue['aggregation'], operand: parseExpr(agg[2].trim(), loopBlocks) };
   }
-  if (expr.includes('.')) return { type: 'FieldValue', payload: expr };
+  if (expr.includes('.')) {
+    // 检查是否是循环块字段引用
+    const dotIndex = expr.indexOf('.');
+    const prefix = expr.slice(0, dotIndex);
+    const isLoopBlock = loopBlocks.some((lb) => lb.id === prefix);
+    if (isLoopBlock) {
+      return { type: 'LoopFieldValue', payload: expr };
+    }
+    return { type: 'FieldValue', payload: expr };
+  }
   return { type: 'NameRef', payload: expr };
 }

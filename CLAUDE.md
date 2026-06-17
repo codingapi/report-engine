@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Surgical Changes** — Touch only what you must. Don't "improve" adjacent code. Remove only orphans YOUR changes created.
 4. **Goal-Driven Execution** — Define success criteria. Transform tasks into verifiable goals. Loop until verified.
 5. **代码提交纪律** — 完成修改后不要立即 git commit/push，等用户确认后再提交。先展示变更摘要。
+6. **优先使用 antd 组件** — 凡引入 antd 的前端项目，开发组件时先检查 antd 是否已有可直接使用的组件（如 Empty、List、Tag、Descriptions、Steps 等）。优先用 antd 原生组件实现，不自造轮子；仅当 antd 确实无法满足需求时才自行封装。
 
 ## Project Overview
 
@@ -293,3 +294,5 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - **模板行高/列宽带出**：`buildWorkbook` 会从模板 sheet 带出 `defaultRowHeight/defaultColumnWidth/columns/rows`（早期版本会丢弃）；行高随带扩展按同一位移规则跟随
 - **汇总行样式继承**：`summaryOut` 给汇总单元格设置 `source`（指向模板"汇总声明行"），使汇总行渲染时通过 `place()` 继承模板样式（边框/字体随汇总滚动到输出位置）
 - **单元格变更同步（report-univer）**：监听 `set-range-values` mutation 同步内容到汇总行时，**必须用 `'v' in cell` 判定**是否真有值变更——边框/填充等纯样式 mutation 只带 `s` 不带 `v`，若误读为空字符串会把已设内容同步清空（删除内容时 Univer 会显式带 `v: null`，仍判定为真，不受影响）
+- **展示/真实值分轨（前端 report-engine）**：单元格「显示别名、传输真实 ID」。`value.payload` 是真实 ID（权威，用于传输/导出）；`CellBinding`/`SummaryCell.displayText` 是别名展示文本（**transient**，由 `valueDisplayText(value)` 正向派生，用于①写进单元格显示 ②回声判别）。**后端完全不接收、不存储 `displayText`**（与需同步五处的渲染契约字段不同），保存出口（`use-report-io` 的 `handleSaveReport` / `getReportConfig`）剥离。展示永远由 `value` **正向**派生，**绝不反解 `displayText` → `value`**——别名→ID 是多对一（可重名），反向有歧义
+- **回声判别替代 isLoadingRef（`handleCellValueChange`）**：往单元格写显示文本会触发 `set-range-values` mutation，需区分「程序回写」与「用户手敲」。用 `displayText` 作基准：新文本 `=== displayText` ⇒ 回声，忽略；`=== ''` ⇒ 清空，移除绑定；否则用户手敲 → 纯文本/模板格退化为 `Literal`（**不反解别名、不构造引用洞**），字段/聚合/参数等引用格保护不覆盖（改表达式走属性面板/拖拽）。基于数据基准而非时序标志，不依赖 mutation 是否同步派发

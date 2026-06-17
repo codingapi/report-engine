@@ -1029,14 +1029,19 @@ public class ReportRenderer {
             return cached;
         }
         Dataset ds = dm.getDatasets().stream()
-                .filter(d -> d.getId().equals(datasetId)).findFirst().orElseThrow();
+                .filter(d -> d.getId().equals(datasetId)).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "数据集不存在: " + datasetId + "，可用数据集: " +
+                        dm.getDatasets().stream().map(Dataset::getId).toList()));
 
         RawTable result;
         if (ds instanceof UnionDataset u) {
             result = extractUnion(u);
         } else if (ds instanceof TableDataset t) {
             DataSource src = dm.getDatasources().stream()
-                    .filter(s -> s.getId().equals(t.getDatasourceId())).findFirst().orElseThrow();
+                    .filter(s -> s.getId().equals(t.getDatasourceId())).findFirst()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "数据源不存在: " + t.getDatasourceId() + " (数据集: " + datasetId + ")"));
             DataExtractor extractor = extractors.stream()
                     .filter(e -> e.supports(src.getType())).findFirst()
                     .orElseThrow(() -> new IllegalStateException("无提取器支持类型: " + src.getType()));

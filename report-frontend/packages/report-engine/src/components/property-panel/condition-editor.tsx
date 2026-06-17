@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Tag } from 'antd';
+import { Button, Tag, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { Condition, Dataset, LoopBlock, CompareOperator, ReportParam } from '../../types';
 import { OPERATOR_LABELS } from '../../types';
@@ -32,15 +32,48 @@ function resolveParamName(payload: string | undefined, params: ReportParam[]): s
   return param?.alias || payload;
 }
 
+/** 解析 LoopFieldValue payload (loopId.fieldName) 为友好显示文本 */
+function resolveLoopFieldValue(
+  payload: string | undefined,
+  loopBlocks: LoopBlock[],
+  datasets: Dataset[]
+): string {
+  if (!payload) return '(未选)';
+  const dotIndex = payload.indexOf('.');
+  if (dotIndex === -1) return payload;
+
+  const loopId = payload.substring(0, dotIndex);
+  const fieldName = payload.substring(dotIndex + 1);
+
+  const loop = loopBlocks.find((l) => l.id === loopId);
+  if (!loop) return payload;
+
+  const loopLabel = loop.label || loopId;
+
+  // 查找循环块对应的数据集和字段别名
+  const dataset = datasets.find((d) => d.id === loop.source.datasetId);
+  if (!dataset) return `${loopLabel}.${fieldName}`;
+
+  const field = dataset.fields?.find((f) => f.name === fieldName);
+  const fieldLabel = field?.alias || fieldName;
+
+  return `${loopLabel}.${fieldLabel}`;
+}
+
 /** 简短描述一个条件值 */
-function describeValue(cond: Condition, datasets: Dataset[], params: ReportParam[]): { left: string; op: string; right: string } {
+function describeValue(
+  cond: Condition,
+  datasets: Dataset[],
+  loopBlocks: LoopBlock[],
+  params: ReportParam[]
+): { left: string; op: string; right: string } {
   const describeOne = (v: Condition['left'] | null | undefined): string => {
     if (!v) return '';
     switch (v.type) {
       case 'FieldValue':
         return resolveFieldValue(v.payload, datasets);
       case 'LoopFieldValue':
-        return `循环.${v.payload}`;
+        return resolveLoopFieldValue(v.payload, loopBlocks, datasets);
       case 'ParamValue':
         return `参数:${resolveParamName(v.payload, params)}`;
       default:
@@ -94,7 +127,7 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
       {conditions.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {conditions.map((cond) => {
-            const { left, op, right } = describeValue(cond, datasets, params);
+            const { left, op, right } = describeValue(cond, datasets, loopBlocks, params);
             return (
               <div
                 key={cond.id}
@@ -131,7 +164,7 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
           })}
         </div>
       ) : (
-        <div className="re-prop-cond-empty">暂无过滤条件</div>
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无过滤条件" style={{ margin: '16px 0' }} />
       )}
 
       <Button

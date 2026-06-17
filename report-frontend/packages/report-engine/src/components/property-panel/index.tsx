@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Popconfirm, Badge, Tabs } from 'antd';
+import { Button, Popconfirm, Badge, Tabs, Empty, Form } from 'antd';
 import { PlusOutlined, DeleteOutlined, MenuFoldOutlined } from '@ant-design/icons';
 import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
 import type { SheetCellSelectInfo } from '../sheet-panel';
@@ -71,7 +71,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           <span>属性面板</span>
         </div>
         <div className="re-panel__content">
-          <div className="re-prop-empty">选择一个单元格查看属性</div>
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择一个单元格查看属性" style={{ margin: '32px 0' }} />
         </div>
       </div>
     );
@@ -122,15 +122,19 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 <div className="re-prop-preview__label">预览</div>
                 <code>{previewText || '（未配置）'}</code>
               </div>
-              <ExpressionBuilder
-                key={cellKey}
-                value={binding.value}
-                datasets={datasets}
-                loopBlocks={loopBlocks}
-                params={params}
-                functions={functions}
-                onChange={(value) => updateBinding({ value })}
-              />
+              <Form layout="vertical" size="small">
+                <Form.Item label="本格内容" tooltip="当前单元格显示什么：文本、字段、聚合、或混合表达式。支持 ${...} 模板语法。">
+                  <ExpressionBuilder
+                    key={cellKey}
+                    value={binding.value}
+                    datasets={datasets}
+                    loopBlocks={loopBlocks}
+                    params={params}
+                    functions={functions}
+                    onChange={(value) => updateBinding({ value })}
+                  />
+                </Form.Item>
+              </Form>
             </div>
           ),
         },
@@ -156,10 +160,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           key: 'condition',
           label: (
             <span>
-              条件
-              {binding.conditions.length > 0 && (
-                <Badge count={binding.conditions.length} size="small" style={{ marginLeft: 4 }} />
-              )}
+              条件{binding.conditions.length > 0 && `(${binding.conditions.length})`}
             </span>
           ),
           children: (
@@ -207,7 +208,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
               else if (binding) onBindingDelete(cellKey);
             }}
             okText={summaryRow ? '取消汇总' : '清除'}
-            cancelText="取消"
           >
             <Button size="small" danger icon={<DeleteOutlined />}>
               清空
@@ -239,10 +239,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           />
         ) : (
           /* ── 空白单元格 ── */
-          <div className="re-prop-unbound">
-            <div className="re-prop-unbound__hint">
-              未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。
-            </div>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。"
+            style={{ margin: '24px 0' }}
+          >
             <Button
               type="dashed"
               icon={<PlusOutlined />}
@@ -251,7 +252,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
             >
               创建绑定
             </Button>
-          </div>
+          </Empty>
         )}
       </div>
     </div>

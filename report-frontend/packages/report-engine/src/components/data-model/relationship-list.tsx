@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Empty, Tag, Tree, Divider } from 'antd';
+import { Empty, Tag, Tree, Divider, List } from 'antd';
 import { SwapOutlined, KeyOutlined } from '@ant-design/icons';
 import type { Relationship, Dataset, DataSourceType } from '../../types';
 import { findDataset, dataTypeLabel } from '../../types';
@@ -205,16 +205,28 @@ function RelationshipItems({
   };
 
   return (
-    <div className="re-rel-list">
-      {relationships.map((r, i) => (
-        <div key={i} className="re-rel-item">
-          <span className="re-rel-endpoint">{endpoint(r.left)}</span>
-          <SwapOutlined className="re-rel-icon" />
-          <span className="re-rel-endpoint">{endpoint(r.right)}</span>
+    <List
+      size="small"
+      dataSource={relationships}
+      split={false}
+      renderItem={(r, i) => (
+        <List.Item
+          key={i}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '6px 10px', marginBottom: 6,
+            background: 'var(--re-color-bg-subtle)', border: '1px solid var(--re-color-border-light)',
+            borderRadius: 'var(--re-radius-base)', fontSize: 12,
+            borderBottom: '1px solid var(--re-color-border-light)',
+          }}
+        >
+          <span style={{ wordBreak: 'break-all' }}>{endpoint(r.left)}</span>
+          <SwapOutlined style={{ color: 'var(--re-color-primary)', flexShrink: 0 }} />
+          <span style={{ wordBreak: 'break-all' }}>{endpoint(r.right)}</span>
           <Tag color="blue" style={{ marginLeft: 'auto' }}>{r.joinType}</Tag>
-        </div>
-      ))}
-    </div>
+        </List.Item>
+      )}
+    />
   );
 }
 

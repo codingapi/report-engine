@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Select, Radio } from 'antd';
+import { Form, Select, Radio, Alert, Space } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
 import { findDataset } from '../../types';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 import { valueDisplayText } from '../../value-text';
-import SectionLabel from './section-label';
 import ExpressionBuilder from './expression-builder';
 
 interface SummaryRowEditorProps {
@@ -72,83 +71,74 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
         </div>
       )}
 
-      {/* 汇总范围（列区间） */}
-      <div className="re-prop-exp-section">
-        <SectionLabel
-          text="汇总范围"
-          hint="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。"
-        />
-        <Radio.Group
-          size="small"
-          value={isGroup ? 'group' : 'total'}
-          onChange={(e) =>
-            onChange({
-              ...summaryRow,
-              groupBy:
-                e.target.value === 'group'
-                  ? { datasetId: datasets[0]?.id || '', field: '' }
-                  : null,
-            })
-          }
-          optionType="button"
-          buttonStyle="solid"
-        >
-          <Radio.Button value="total">总计</Radio.Button>
-          <Radio.Button value="group">分组小计</Radio.Button>
-        </Radio.Group>
+      <Form layout="vertical" size="small">
+        <Form.Item label="汇总范围" tooltip="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。">
+          <Radio.Group
+            value={isGroup ? 'group' : 'total'}
+            onChange={(e) =>
+              onChange({
+                ...summaryRow,
+                groupBy:
+                  e.target.value === 'group'
+                    ? { datasetId: datasets[0]?.id || '', field: '' }
+                    : null,
+              })
+            }
+            optionType="button"
+            buttonStyle="solid"
+          >
+            <Radio.Button value="total">总计</Radio.Button>
+            <Radio.Button value="group">分组小计</Radio.Button>
+          </Radio.Group>
 
-        {isGroup && (
-          <div className="re-prop-field-cascade" style={{ marginTop: 8 }}>
-            <Select
-              size="small"
-              value={summaryRow.groupBy!.datasetId || undefined}
-              onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
-              placeholder="数据集"
-              options={datasetOptions(datasets)}
-              showSearch
-            />
-            <Select
-              size="small"
-              value={summaryRow.groupBy!.field || undefined}
-              onChange={(field) => onChange({ ...summaryRow, groupBy: { ...summaryRow.groupBy!, field } })}
-              placeholder="分组字段"
-              disabled={!summaryRow.groupBy!.datasetId}
-              options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
-              showSearch
-            />
-          </div>
-        )}
-      </div>
+          {isGroup && (
+            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+              <Select
+                value={summaryRow.groupBy!.datasetId || undefined}
+                onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
+                placeholder="数据集"
+                options={datasetOptions(datasets)}
+                showSearch
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <Select
+                value={summaryRow.groupBy!.field || undefined}
+                onChange={(field) => onChange({ ...summaryRow, groupBy: { ...summaryRow.groupBy!, field } })}
+                placeholder="分组字段"
+                disabled={!summaryRow.groupBy!.datasetId}
+                options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
+                showSearch
+                style={{ flex: 1, minWidth: 0 }}
+              />
+            </Space.Compact>
+          )}
+        </Form.Item>
 
-      {/* 本格内容 */}
-      <div className="re-prop-exp-section">
-        <SectionLabel
-          text="本格内容"
-          hint="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。"
-        />
+        <Form.Item label="本格内容" tooltip="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
+          {cell && (
+            <>
+              <ExpressionBuilder
+                key={`${summaryRow.id}-${column}`}
+                value={cell.value}
+                datasets={datasets}
+                loopBlocks={loopBlocks}
+                params={params}
+                functions={functions}
+                onChange={setCellValue}
+              />
 
-        {cell && (
-          <>
-            {/* 表达式编辑器 */}
-            <ExpressionBuilder
-              key={`${summaryRow.id}-${column}`}
-              value={cell.value}
-              datasets={datasets}
-              loopBlocks={loopBlocks}
-              params={params}
-              functions={functions}
-              onChange={setCellValue}
-            />
-
-            {/* 分组小计提示 */}
-            {isGroup && (
-              <div className="re-prop-group-hint">
-                可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              {isGroup && (
+                <Alert
+                  type="info"
+                  showIcon={false}
+                  message={<>可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）</>}
+                  style={{ marginTop: 8, fontSize: 12 }}
+                />
+              )}
+            </>
+          )}
+        </Form.Item>
+      </Form>
     </div>
   );
 };

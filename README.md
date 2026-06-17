@@ -15,7 +15,8 @@
 
 前端 (React 18 + TypeScript + pnpm monorepo)
 ├── packages/report-univer    Univer 电子表格 React 封装（字体管理、快照导入导出）
-├── packages/report-engine    报表设计器组件库（三栏布局）
+├── packages/report-api       后端 API 客户端（axios 实例 + SingleResponse/MultiResponse 自动解包）
+├── packages/report-engine    报表设计器组件库（三栏布局，纯 UI 不直接调 API）
 └── apps/app-pc               演示应用
 ```
 
@@ -24,6 +25,17 @@
 - **后端**：Spring Boot 3.5 / Apache POI 5.x / Jackson / Lombok
 - **前端**：React 18 / Univer 0.25 / Ant Design 6 / Rslib + Rsbuild
 - **数据契约**：前后端共享 `ExcelWorkbook` JSON 结构（Java POJO ↔ TypeScript 类型一一对应）
+
+### 框架扩展点（report-engine-framework）
+
+核心框架纯 Java、不依赖 Spring，可单独发布；模板层（视觉呈现）与语义层（取数/计算）完全分离。四类能力统一用 `supports()` + 注册表范式扩展，新增无需改动调用方，未注册者**显式抛异常**：
+
+| 扩展什么 | 怎么扩展 |
+|---|---|
+| 新数据源类型（DB/API/…） | 实现 `DataExtractor`，注册到 `ReportRenderer` 的 extractors 列表 |
+| 新比较算子（LIKE/IN/BETWEEN…） | 实现 `ConditionPredicate`，登记到注册表 |
+| 新聚合方式（COUNT_TRUE…） | 实现 `Aggregator`，登记到注册表 |
+| 新表达式函数（round/concat/if…） | 实现 `ValueFunction`，登记到注册表 |
 
 ## 当前进度
 
@@ -93,7 +105,7 @@ cd report-frontend
 # 安装依赖
 pnpm install
 
-# 构建库包（report-univer → report-engine）
+# 构建库包（report-univer → report-api → report-engine）
 pnpm build
 
 # 启动演示应用

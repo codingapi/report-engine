@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, Divider, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Divider, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
@@ -155,43 +155,45 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       return makeCellKey(sheetId, row, col);
     };
 
-    const remappedBindings = tpl.bindings.map((b) => ({
-      ...b,
-      cellKey: remapKey(b.cellKey)!,
-      parentCell: remapKey(b.parentCell),
-      conditions: b.conditions.map((c) => ({
-        ...c,
-        left: c.left,
-        right: c.right,
-      })),
-    }));
-
     const remappedLoops = (tpl.loopBlocks || []).map((lb) => ({
       ...lb,
       sheetId,
     }));
 
-    // 回写所有绑定的显示文本，让数据区字段/聚合配置在表格中可见
+    // 绑定附带 displayText（别名展示文本）：既写进单元格供显示，也作为回声判别基准
+    const remappedBindings = tpl.bindings.map((b) => {
+      const value = b.value;
+      return {
+        ...b,
+        cellKey: remapKey(b.cellKey)!,
+        parentCell: remapKey(b.parentCell),
+        conditions: b.conditions.map((c) => ({ ...c, left: c.left, right: c.right })),
+        displayText: valueDisplayText(value, datasets, remappedLoops, params),
+      };
+    });
+
+    const remappedSummaries = (tpl.summaries || []).map((s) => ({
+      ...s,
+      cells: s.cells.map((cell) => ({
+        ...cell,
+        displayText: valueDisplayText(cell.value, datasets, remappedLoops, params),
+      })),
+    }));
+
+    // 回写显示文本（与 displayText 一致 → handleCellValueChange 比对后判为回声，跳过）
     for (const b of remappedBindings) {
       const { row, col } = parseCellKey(b.cellKey);
-      sheetRef.current?.setCellValue(
-        sheetId,
-        row,
-        col,
-        valueDisplayText(b.value, datasets, remappedLoops, params),
-      );
+      sheetRef.current?.setCellValue(sheetId, row, col, b.displayText ?? '');
     }
-
-    // 回写汇总行（小计/总计）单元格的文本/聚合摘要，使其在表格中可见
-    for (const s of tpl.summaries || []) {
+    for (const s of remappedSummaries) {
       for (const cell of s.cells) {
-        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops, params));
+        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, cell.displayText ?? '');
       }
     }
 
     setCellBindings(remappedBindings);
     setLoopBlocks(remappedLoops);
-    setSummaries(tpl.summaries || []);
+    setSummaries(remappedSummaries);
     lastAppliedRef.current = tpl;
 
     messageApi.success(`已加载模板：${tpl.label}`);
@@ -216,17 +218,24 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     const configLoops = config.loopBlocks || [];
     const remappedLoops = configLoops.map((lb) => ({ ...lb, sheetId: actualSheetId }));
+    const loadedParams = config.params || [];
+    const ds = datasets;
 
+    // 绑定附带 displayText（别名展示文本）：写进单元格供显示 + 回声判别基准
     const remappedBindings = (config.cellBindings || []).map((b) => ({
       ...b,
       cellKey: remapKey(b.cellKey)!,
       parentCell: remapKey(b.parentCell),
+      displayText: valueDisplayText(b.value, ds, remappedLoops, loadedParams),
     }));
 
-    // 迁移汇总行：旧格式（kind/payload）→ 新格式（value: ReportValue）
+    // 迁移汇总行：旧格式（kind/payload）→ 新格式（value: ReportValue），并附带 displayText
     const migratedSummaries: SummaryRow[] = (config.summaries || []).map((s: LegacySummaryRow) => ({
       ...s,
-      cells: (s.cells || []).map(migrateSummaryCell),
+      cells: (s.cells || []).map((c) => {
+        const cell = migrateSummaryCell(c);
+        return { ...cell, displayText: valueDisplayText(cell.value, ds, remappedLoops, loadedParams) };
+      }),
     }));
 
     setReportId(config.id ?? null);
@@ -234,27 +243,18 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     setCellBindings(remappedBindings);
     setLoopBlocks(remappedLoops);
     setSummaries(migratedSummaries);
-    setParams(config.params || []);
+    setParams(loadedParams);
     setActiveTemplate(null);
     lastAppliedRef.current = null;
 
-    // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
-    const ds = datasets;
-    const loadedParams = config.params || [];
+    // 回写显示文本（与 displayText 一致 → handleCellValueChange 判为回声，跳过）
     for (const b of remappedBindings) {
       const { row, col } = parseCellKey(b.cellKey);
-      sheetRef.current?.setCellValue(
-        actualSheetId,
-        row,
-        col,
-        valueDisplayText(b.value, ds, remappedLoops, loadedParams),
-      );
+      sheetRef.current?.setCellValue(actualSheetId, row, col, b.displayText ?? '');
     }
-
-    // 回写汇总行单元格文本（小计/总计在表格中可见）
     for (const s of migratedSummaries) {
       for (const c of s.cells) {
-        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops, loadedParams));
+        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, c.displayText ?? '');
       }
     }
 
@@ -269,9 +269,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       id: reportId ?? undefined,
       name: reportName,
       dataModelId,
-      cellBindings,
+      // displayText 为设计态 transient 字段，对外配置剥离
+      cellBindings: cellBindings.map(({ displayText: _dt, ...b }) => b),
       loopBlocks,
-      summaries,
+      summaries: summaries.map((s) => ({
+        ...s,
+        cells: s.cells.map(({ displayText: _dt, ...c }) => c),
+      })),
       params,
       template: snapshot,
     };
@@ -340,42 +344,32 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     setSelectedCell(info);
   }, []);
 
-  // ─── 将绑定值回写为单元格显示文本（设计态占位） ───
-  const writeBindingText = useCallback(
-    (cellKey: string, binding: CellBinding) => {
-      if (cellKey.split(':').length !== 3) return;
-      const { sheetId, row, col } = parseCellKey(cellKey);
-      sheetRef.current?.setCellValue(
-        sheetId,
-        row,
-        col,
-        valueDisplayText(binding.value, datasets, loopBlocks, params),
-      );
-    },
-    [datasets, loopBlocks, params],
-  );
-
   // ─── 属性面板回调 ───
+  // 改绑定 → 算出新 displayText 一并写进 binding（回声基准）+ 回写单元格（写的就是 displayText，故被判为回声跳过）
   const handleBindingChange = useCallback(
     (cellKey: string, newBinding: CellBinding) => {
-      setCellBindings((prev) =>
-        prev.map((b) => (b.cellKey === cellKey ? newBinding : b)),
-      );
-      writeBindingText(cellKey, newBinding);
+      const displayText = valueDisplayText(newBinding.value, datasets, loopBlocks, params);
+      const withText = { ...newBinding, displayText };
+      setCellBindings((prev) => prev.map((b) => (b.cellKey === cellKey ? withText : b)));
+      if (cellKey.split(':').length === 3) {
+        const { sheetId, row, col } = parseCellKey(cellKey);
+        sheetRef.current?.setCellValue(sheetId, row, col, displayText);
+      }
       setActiveTemplate(null);
     },
-    [writeBindingText],
+    [datasets, loopBlocks, params],
   );
 
   const handleBindingCreate = useCallback((cellKey: string) => {
     const defaultBinding: CellBinding = {
       cellKey,
-      value: { type: 'FieldValue', payload: '' },
+      value: { type: 'Literal', payload: '' },
       expansion: 'VERTICAL',
       expandMode: 'LIST',
       mergeRepeated: false,
       parentCell: null,
       conditions: [],
+      displayText: '',
     };
     setCellBindings((prev) => [
       ...prev.filter((b) => b.cellKey !== cellKey),
@@ -402,11 +396,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
             if (!keep.has(c.column)) sheetRef.current?.setCellValue(sheetId, oldRow.row, c.column, '');
           }
         }
-        // 回写当前列文本/聚合摘要
-        for (const c of newRow.cells) {
-          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks, params));
+        // 每个汇总格附带 displayText（回声基准）+ 回写单元格
+        const cellsWithText = newRow.cells.map((c) => ({
+          ...c,
+          displayText: valueDisplayText(c.value, datasets, loopBlocks, params),
+        }));
+        for (const c of cellsWithText) {
+          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, c.displayText);
         }
-        return prev.map((s) => (s.id === id ? newRow : s));
+        const rowWithText = { ...newRow, cells: cellsWithText };
+        return prev.map((s) => (s.id === id ? rowWithText : s));
       });
       setActiveTemplate(null);
     },
@@ -504,16 +503,20 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         // 参数拖入
         if (data.type === 'report-param') {
           const paramAlias = data.paramAlias || data.paramName;
-          handle.setValue(`\${${paramAlias}}`);
+          const value: ReportValue = { type: 'NameRef', payload: data.paramName };
+          // displayText 走统一的 valueDisplayText，与其它路径一致（回声基准）
+          const displayText = valueDisplayText(value, datasets, loopBlocks, params);
+          handle.setValue(displayText);
 
           const binding: CellBinding = {
             cellKey: ck,
-            value: { type: 'NameRef', payload: data.paramName },
+            value,
             expansion: 'NONE',
             expandMode: 'LIST',
             mergeRepeated: false,
             parentCell: null,
             conditions: [],
+            displayText,
           };
 
           setCellBindings((prev) => {
@@ -530,17 +533,19 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         if (data.datasetId && data.field) {
           const fieldRef = `${data.datasetId}.${data.field}`;
           const fieldAlias = data.alias || data.field;
-
-          handle.setValue(`\${${fieldAlias}}`);
+          const value: ReportValue = { type: 'FieldValue', payload: fieldRef };
+          const displayText = valueDisplayText(value, datasets, loopBlocks, params);
+          handle.setValue(displayText);
 
           const binding: CellBinding = {
             cellKey: ck,
-            value: { type: 'FieldValue', payload: fieldRef },
+            value,
             expansion: 'VERTICAL',
             expandMode: 'LIST',
             mergeRepeated: false,
             parentCell: null,
             conditions: [],
+            displayText,
           };
 
           setCellBindings((prev) => {
@@ -555,51 +560,74 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         // 非 JSON 拖拽数据，忽略
       }
     },
-    [messageApi],
+    [messageApi, datasets, loopBlocks, params],
   );
 
-  // ─── 单元格值变更 → 清空被删除的绑定 + 同步汇总行 ───
+  // ─── 单元格值变更 → 回声判别（程序回写 vs 用户手敲） ───
+  // 用 displayText 作基准区分两类来源，替代时序型 isLoadingRef：
+  //   新文本 === binding.displayText  ⇒ 程序回写（加载/属性面板/拖拽）产生的回声 → 忽略
+  //   新文本 === ''                   ⇒ 用户清空 → 移除绑定
+  //   其它                            ⇒ 用户手敲 → 纯文本/模板格退化为 Literal；引用格保护不覆盖
+  // 手敲一律按字面文本处理，绝不把别名反解回字段引用（消除别名重名歧义）。
   const handleCellValueChange = useCallback(
     (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
-      // 内容被清空的单元格 → 移除对应的 CellBinding
-      const clearedKeys = new Set(
-        changes.filter((c) => c.value === '').map((c) => `${c.sheetId}:${c.row}:${c.col}`),
-      );
-      if (clearedKeys.size > 0) {
-        setCellBindings((prev) => prev.filter((b) => !clearedKeys.has(b.cellKey)));
-      }
+      // 同步普通 CellBinding
+      setCellBindings((prev) => {
+        let changed = false;
+        const next: CellBinding[] = [];
+        for (const b of prev) {
+          const { sheetId, row, col } = parseCellKey(b.cellKey);
+          const change = changes.find((c) => c.sheetId === sheetId && c.row === row && c.col === col);
+          if (!change || change.value === (b.displayText ?? '')) {
+            next.push(b); // 无变更 / 回声 → 保持
+            continue;
+          }
+          if (change.value === '') {
+            changed = true; // 用户清空 → 移除
+            continue;
+          }
+          // 用户手敲
+          if (b.value.type === 'Literal' || b.value.type === 'Template') {
+            changed = true;
+            next.push({ ...b, value: { type: 'Literal', payload: change.value }, displayText: change.value });
+          } else {
+            next.push(b); // 引用格（字段/聚合/参数）保护：改表达式请走属性面板
+          }
+        }
+        return changed ? next : prev;
+      });
 
-      // 同步到汇总行的 SummaryCell.value
+      // 同步汇总行 SummaryCell
       setSummaries((prev) => {
-        let updated = false;
+        let changed = false;
         const next = prev.map((s) => {
-          // 找出落在本汇总行的变更
           const matching = changes.filter((c) => c.row === s.row && c.col >= s.fromColumn && c.col <= s.toColumn);
           if (matching.length === 0) return s;
+          let cellsChanged = false;
           const cells = [...s.cells];
           for (const c of matching) {
             const idx = cells.findIndex((sc) => sc.column === c.col);
+            const existing = idx >= 0 ? cells[idx] : null;
+            if (existing && c.value === (existing.displayText ?? '')) continue; // 回声
             if (c.value === '') {
-              // 内容被清空 → 移除对应 SummaryCell
-              if (idx >= 0) cells.splice(idx, 1);
+              if (idx >= 0) { cells.splice(idx, 1); cellsChanged = true; } // 清空 → 移除
+              continue;
+            }
+            // 用户手敲
+            if (existing) {
+              if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
+                cells[idx] = { ...existing, value: { type: 'Literal', payload: c.value }, displayText: c.value };
+                cellsChanged = true;
+              } // 聚合等引用格保护
             } else {
-              const newValue = parseTemplate(c.value);
-              if (idx >= 0) {
-                // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
-                // 避免覆盖用户通过属性面板设置的聚合表达式
-                const existing = cells[idx];
-                if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
-                  cells[idx] = { ...existing, value: newValue };
-                }
-              } else {
-                cells.push({ column: c.col, value: newValue });
-              }
+              cells.push({ column: c.col, value: { type: 'Literal', payload: c.value }, displayText: c.value });
+              cellsChanged = true;
             }
           }
-          updated = true;
-          return { ...s, cells };
+          if (cellsChanged) { changed = true; return { ...s, cells }; }
+          return s;
         });
-        return updated ? next : prev;
+        return changed ? next : prev;
       });
     },
     [],
@@ -648,11 +676,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               </Button>
             </Upload>
           )}
-          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
-            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
-              循环块
-            </Button>
-          </Badge>
+          <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
+            循环块{loopBlocks.length > 0 && `(${loopBlocks.length})`}
+          </Button>
           {onExport && (
             <Button
               icon={<ExportOutlined />}
@@ -786,6 +812,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
       {/* 循环块管理抽屉 */}
       <Drawer
+        className="re-drawer"
         title={
           <span>
             循环块管理

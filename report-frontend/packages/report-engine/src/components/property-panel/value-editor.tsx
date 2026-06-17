@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Select, Input, Button } from 'antd';
+import { Select, Input, Button, Empty, Typography, Form, Space } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type {
   ReportValue,
@@ -23,6 +23,10 @@ interface ValueEditorProps {
   loopBlocks?: LoopBlock[];
   onChange: (newValue: ReportValue) => void;
   compact?: boolean;
+  /** 裸模式：不渲染内层 Form.Item / label，用于已在外层 Form.Item 包裹的场景（如条件弹窗） */
+  bare?: boolean;
+  /** 限制可选的值类型（用于条件场景等需要限制类型选择的场景） */
+  types?: ValueType[];
 }
 
 // ─── 空值工厂 ────────────────────────────────
@@ -65,6 +69,8 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
   loopBlocks = [],
   onChange,
   compact = false,
+  bare = false,
+  types,
 }) => {
   const handleTypeChange = useCallback(
     (newType: ValueType) => {
@@ -84,16 +90,18 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
 
   // ─── 类型选择器 ───
   const typeSelector = !compact && (
-    <div className="re-prop-value-type">
+    <div className="re-prop-value-type" style={bare ? { marginBottom: 4 } : undefined}>
       <Select
         size={size}
         value={value.type}
         onChange={handleTypeChange}
         style={{ width: '100%' }}
-        options={Object.entries(VALUE_TYPE_LABELS).map(([v, l]) => ({
-          value: v,
-          label: l,
-        }))}
+        options={Object.entries(VALUE_TYPE_LABELS)
+          .filter(([v]) => !types || types.includes(v as ValueType))
+          .map(([v, l]) => ({
+            value: v,
+            label: l,
+          }))}
       />
     </div>
   );
@@ -112,14 +120,14 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
             placeholder="输入固定文本"
           />
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>文本值</label>{input}</div>;
+        if (compact || bare) return input;
+        return <Form.Item label="文本值">{input}</Form.Item>;
       }
 
       case 'FieldValue': {
         const { datasetId } = parseFieldRef(value.payload);
         const input = (
-          <div className="re-prop-field-cascade">
+          <Space.Compact style={{ width: '100%' }}>
             <Select
               size={size}
               value={datasetId || undefined}
@@ -127,6 +135,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               placeholder="数据集"
               options={datasetOptions(datasets)}
               showSearch
+              style={{ flex: 1, minWidth: 0 }}
             />
             <Select
               size={size}
@@ -136,11 +145,12 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               options={fieldOptions(datasets, datasetId, true)}
               showSearch
               disabled={!datasetId}
+              style={{ flex: 1, minWidth: 0 }}
             />
-          </div>
+          </Space.Compact>
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>数据字段</label>{input}</div>;
+        if (compact || bare) return input;
+        return <Form.Item label="数据字段">{input}</Form.Item>;
       }
 
       case 'ParamValue': {
@@ -152,8 +162,8 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
             placeholder="报表参数名称"
           />
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>参数名</label>{input}</div>;
+        if (compact || bare) return input;
+        return <Form.Item label="参数名">{input}</Form.Item>;
       }
 
       case 'LoopFieldValue': {
@@ -162,7 +172,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
         const loop = loopBlocks.find((l) => l.id === loopId);
         const loopDs = loop ? findDataset(datasets, loop.source.datasetId) : null;
         const input = (
-          <div className="re-prop-field-cascade">
+          <Space.Compact style={{ width: '100%' }}>
             <Select
               size={size}
               value={loopId || undefined}
@@ -171,6 +181,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               options={loopBlocks.map((l) => ({ value: l.id, label: l.label || l.id }))}
               showSearch
               notFoundContent="无循环块（请在表格选区右键创建）"
+              style={{ flex: 1, minWidth: 0 }}
             />
             <Select
               size={size}
@@ -183,11 +194,12 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                 label: f.alias || f.name,
               }))}
               showSearch
+              style={{ flex: 1, minWidth: 0 }}
             />
-          </div>
+          </Space.Compact>
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>循环字段</label>{input}</div>;
+        if (compact || bare) return input;
+        return <Form.Item label="循环字段">{input}</Form.Item>;
       }
 
       case 'NameRef': {
@@ -199,8 +211,8 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
             placeholder="运行时名称"
           />
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>名称引用</label>{input}</div>;
+        if (compact || bare) return input;
+        return <Form.Item label="名称引用">{input}</Form.Item>;
       }
 
       case 'Template': {
@@ -213,21 +225,86 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
             placeholder={'${name}的薪资单 / 合计 ${SUM(d.salary)} 元'}
           />
         );
-        if (compact) return input;
+        if (compact || bare) return input;
         return (
-          <div className="re-prop-value-form">
-            <label>文本模板</label>
+          <Form.Item
+            label="文本模板"
+            extra={'用 ${name} 引用运行时名称、${数据集.字段} 引用字段、${SUM(数据集.字段)} 插入聚合'}
+          >
             {input}
-            <div style={{ fontSize: 11, color: '#999', lineHeight: 1.5 }}>
-              {'用 ${name} 引用运行时名称、${数据集.字段} 引用字段、${SUM(数据集.字段)} 插入聚合'}
-            </div>
-          </div>
+          </Form.Item>
         );
       }
 
       case 'Aggregate': {
+        // compact/bare 模式：扁平化渲染三个 Select，避免嵌套 Space.Compact 导致宽度问题
+        if (compact || bare) {
+          const operand = value.operand || { type: 'FieldValue', payload: '' };
+          const operandType = operand.type;
+
+          // 如果是 FieldValue 类型，直接渲染数据集和字段选择器
+          if (operandType === 'FieldValue') {
+            const { datasetId } = parseFieldRef(operand.payload);
+            return (
+              <Space.Compact style={{ width: '100%' }}>
+                <Select
+                  size={size}
+                  value={value.aggregation || 'SUM'}
+                  onChange={(agg: Aggregation) => update({ aggregation: agg })}
+                  options={Object.entries(AGG_LABELS)
+                    .filter(([k]) => k !== 'NONE')
+                    .map(([v, l]) => ({ value: v, label: l }))}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <Select
+                  size={size}
+                  value={datasetId || undefined}
+                  onChange={(dsId) => update({ operand: { type: 'FieldValue', payload: `${dsId}.` } })}
+                  placeholder="数据集"
+                  options={datasetOptions(datasets)}
+                  showSearch
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <Select
+                  size={size}
+                  value={operand.payload || undefined}
+                  onChange={(ref) => update({ operand: { type: 'FieldValue', payload: ref } })}
+                  placeholder="字段"
+                  options={fieldOptions(datasets, datasetId, true)}
+                  showSearch
+                  disabled={!datasetId}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+              </Space.Compact>
+            );
+          }
+
+          // 其他类型的操作数，回退到递归渲染
+          return (
+            <Space.Compact style={{ width: '100%' }}>
+              <Select
+                size={size}
+                value={value.aggregation || 'SUM'}
+                onChange={(agg: Aggregation) => update({ aggregation: agg })}
+                options={Object.entries(AGG_LABELS)
+                  .filter(([k]) => k !== 'NONE')
+                  .map(([v, l]) => ({ value: v, label: l }))}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <ValueEditor
+                value={operand}
+                datasets={datasets}
+                loopBlocks={loopBlocks}
+                onChange={(newOperand) => update({ operand: newOperand })}
+                compact
+              />
+            </Space.Compact>
+          );
+        }
+
+        // 正常模式：使用 Form.Item 包装
         const input = (
-          <div className="re-prop-agg-row">
+          <Space.Compact style={{ width: '100%' }}>
             <Select
               size={size}
               value={value.aggregation || 'SUM'}
@@ -235,6 +312,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               options={Object.entries(AGG_LABELS)
                 .filter(([k]) => k !== 'NONE')
                 .map(([v, l]) => ({ value: v, label: l }))}
+              style={{ width: '40%' }}
             />
             <ValueEditor
               value={value.operand || { type: 'FieldValue', payload: '' }}
@@ -243,89 +321,143 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               onChange={(operand) => update({ operand })}
               compact
             />
-          </div>
+          </Space.Compact>
         );
-        if (compact) return input;
-        return <div className="re-prop-value-form"><label>聚合方式</label>{input}</div>;
+        return <Form.Item label="聚合方式">{input}</Form.Item>;
       }
 
       case 'FunctionCall': {
         const args = value.args || [];
         if (compact) {
           return (
-            <div className="re-prop-field-cascade">
+            <Space.Compact style={{ width: '100%' }}>
               <Input
                 size={size}
                 value={value.funcName || ''}
                 onChange={(e) => update({ funcName: e.target.value })}
                 placeholder="函数名"
+                style={{ flex: 1, minWidth: 0 }}
               />
               <Input
                 size={size}
                 value={args.map((a) => a.payload || '').join(', ')}
                 readOnly
                 placeholder="参数"
+                style={{ flex: 1, minWidth: 0 }}
               />
-            </div>
+            </Space.Compact>
+          );
+        }
+        if (bare) {
+          return (
+            <>
+              <Input
+                size={size}
+                value={value.funcName || ''}
+                onChange={(e) => update({ funcName: e.target.value })}
+                placeholder="函数名称（如 format、date）"
+                style={{ marginBottom: 4 }}
+              />
+              <div className="re-prop-func-args">
+                {args.map((arg, i) => (
+                  <div key={i} className="re-prop-func-arg-row">
+                    <ValueEditor
+                      value={arg}
+                      datasets={datasets}
+                      loopBlocks={loopBlocks}
+                      onChange={(newArg) => {
+                        const newArgs = [...args];
+                        newArgs[i] = newArg;
+                        update({ args: newArgs });
+                      }}
+                      compact
+                    />
+                    <MinusCircleOutlined
+                      style={{ color: '#999', cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => {
+                        const newArgs = args.filter((_, j) => j !== i);
+                        update({ args: newArgs });
+                      }}
+                    />
+                  </div>
+                ))}
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    const newArgs = [...args, { type: 'Literal' as const, payload: '' }];
+                    update({ args: newArgs });
+                  }}
+                  style={{ padding: 0 }}
+                >
+                  添加参数
+                </Button>
+              </div>
+            </>
           );
         }
         return (
-          <div className="re-prop-value-form">
-            <label>函数名</label>
-            <Input
-              size={size}
-              value={value.funcName || ''}
-              onChange={(e) => update({ funcName: e.target.value })}
-              placeholder="函数名称（如 format、date）"
-            />
-            <label>
-              参数列表
-              <Button
-                type="link"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  const newArgs = [...args, { type: 'Literal' as const, payload: '' }];
-                  update({ args: newArgs });
-                }}
-                style={{ float: 'right', padding: 0 }}
-              >
-                添加
-              </Button>
-            </label>
-            <div className="re-prop-func-args">
-              {args.map((arg, i) => (
-                <div key={i} className="re-prop-func-arg-row">
-                  <ValueEditor
-                    value={arg}
-                    datasets={datasets}
-                    loopBlocks={loopBlocks}
-                    onChange={(newArg) => {
-                      const newArgs = [...args];
-                      newArgs[i] = newArg;
-                      update({ args: newArgs });
-                    }}
-                    compact
-                  />
-                  <MinusCircleOutlined
-                    style={{ color: '#999', cursor: 'pointer', flexShrink: 0 }}
-                    onClick={() => {
-                      const newArgs = args.filter((_, j) => j !== i);
-                      update({ args: newArgs });
-                    }}
-                  />
-                </div>
-              ))}
-              {args.length === 0 && (
-                <div style={{ fontSize: 12, color: '#bbb' }}>暂无参数</div>
-              )}
-            </div>
-          </div>
+          <>
+            <Form.Item label="函数名">
+              <Input
+                size={size}
+                value={value.funcName || ''}
+                onChange={(e) => update({ funcName: e.target.value })}
+                placeholder="函数名称（如 format、date）"
+              />
+            </Form.Item>
+            <Form.Item
+              label="参数列表"
+              extra={
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    const newArgs = [...args, { type: 'Literal' as const, payload: '' }];
+                    update({ args: newArgs });
+                  }}
+                  style={{ padding: 0 }}
+                >
+                  添加
+                </Button>
+              }
+            >
+              <div className="re-prop-func-args">
+                {args.map((arg, i) => (
+                  <div key={i} className="re-prop-func-arg-row">
+                    <ValueEditor
+                      value={arg}
+                      datasets={datasets}
+                      loopBlocks={loopBlocks}
+                      onChange={(newArg) => {
+                        const newArgs = [...args];
+                        newArgs[i] = newArg;
+                        update({ args: newArgs });
+                      }}
+                      compact
+                    />
+                    <MinusCircleOutlined
+                      style={{ color: '#999', cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => {
+                        const newArgs = args.filter((_, j) => j !== i);
+                        update({ args: newArgs });
+                      }}
+                    />
+                  </div>
+                ))}
+                {args.length === 0 && (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无参数" style={{ margin: '8px 0' }} />
+                )}
+              </div>
+            </Form.Item>
+          </>
         );
       }
 
       default:
-        return <div style={{ fontSize: 12, color: '#999' }}>不支持的类型</div>;
+        return <Typography.Text type="secondary" style={{ fontSize: 12 }}>不支持的类型</Typography.Text>;
     }
   })();
 

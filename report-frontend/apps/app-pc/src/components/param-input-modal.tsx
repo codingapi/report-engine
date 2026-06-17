@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Switch } from 'antd';
+import { useState } from 'react';
+import { Modal, Form, Input, InputNumber, Switch, message } from 'antd';
 import type { ReportParam } from '@coding-report/report-engine';
 
 interface ParamInputModalProps {
@@ -9,74 +9,82 @@ interface ParamInputModalProps {
   onCancel: () => void;
 }
 
-/** 导出/预览前的参数输入弹窗：为每个参数提供输入控件，无默认值的标记必填。 */
+/** 导出/预览前的参数输入弹窗 */
 const ParamInputModal: React.FC<ParamInputModalProps> = ({
   params,
   open,
   onConfirm,
   onCancel,
 }) => {
-  const [form] = Form.useForm();
+  const [values, setValues] = useState<Record<string, unknown>>({});
 
-  useEffect(() => {
+  // 打开时预填默认值
+  useState(() => {
     if (open) {
-      // 预填默认值
-      const initialValues: Record<string, unknown> = {};
+      const init: Record<string, unknown> = {};
       for (const p of params) {
         if (p.defaultValue != null && p.defaultValue !== '') {
-          initialValues[p.name] =
+          init[p.name] =
             p.dataType === 'NUMBER' ? Number(p.defaultValue) :
             p.dataType === 'BOOLEAN' ? p.defaultValue === 'true' :
             p.defaultValue;
         }
       }
-      form.setFieldsValue(initialValues);
+      setValues(init);
     }
-  }, [open, params, form]);
+  });
 
-  const handleOk = async () => {
-    const values = await form.validateFields();
+  const update = (name: string, val: unknown) =>
+    setValues((prev) => ({ ...prev, [name]: val }));
+
+  const handleOk = () => {
+    for (const p of params) {
+      if (!p.defaultValue) {
+        const v = values[p.name];
+        if (v == null || v === '') {
+          message.error(`请输入${p.alias || p.name}`);
+          return;
+        }
+      }
+    }
     onConfirm(values);
   };
 
   const renderField = (param: ReportParam) => {
     const isRequired = !param.defaultValue;
+    const label = param.alias || param.name;
 
     switch (param.dataType) {
       case 'NUMBER':
         return (
-          <Form.Item
-            key={param.name}
-            name={param.name}
-            label={param.alias || param.name}
-            rules={isRequired ? [{ required: true, message: `请输入${param.alias || param.name}` }] : []}
-          >
-            <InputNumber style={{ width: '100%' }} placeholder={isRequired ? '必填' : '可选'} />
+          <Form.Item key={param.name} label={label} required={isRequired}>
+            <InputNumber
+              style={{ width: '100%' }}
+              value={values[param.name] as number | undefined}
+              onChange={(v) => update(param.name, v)}
+              placeholder={isRequired ? '必填' : '可选'}
+            />
           </Form.Item>
         );
 
       case 'BOOLEAN':
         return (
-          <Form.Item
-            key={param.name}
-            name={param.name}
-            label={param.alias || param.name}
-            valuePropName="checked"
-          >
-            <Switch />
+          <Form.Item key={param.name} label={label}>
+            <Switch
+              checked={!!values[param.name]}
+              onChange={(v) => update(param.name, v)}
+            />
           </Form.Item>
         );
 
       default:
-        // STRING / DATE / DATETIME
         return (
-          <Form.Item
-            key={param.name}
-            name={param.name}
-            label={param.alias || param.name}
-            rules={isRequired ? [{ required: true, message: `请输入${param.alias || param.name}` }] : []}
-          >
-            <Input placeholder={isRequired ? '必填' : '可选'} />
+          <Form.Item key={param.name} label={label} required={isRequired}>
+            <Input
+              value={(values[param.name] as string) || ''}
+              onChange={(e) => update(param.name, e.target.value)}
+              placeholder={isRequired ? '必填' : '可选'}
+            />
           </Form.Item>
         );
     }
@@ -90,10 +98,8 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({
       onCancel={onCancel}
       destroyOnHidden
       width={480}
-      okText="确认并导出"
-      cancelText="取消"
     >
-      <Form form={form} layout="vertical" autoComplete="off">
+      <Form layout="vertical" size="small">
         {params.map(renderField)}
       </Form>
     </Modal>

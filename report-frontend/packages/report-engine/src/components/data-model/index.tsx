@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Badge } from 'antd';
+import { Tabs } from 'antd';
 import type { Dataset, Relationship, ReportParam } from '../../types';
 import DatasetTree from '../dataset-tree';
 import RelationshipList from './relationship-list';
@@ -32,32 +32,17 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
           items={[
             {
               key: 'datasets',
-              label: (
-                <span>
-                  数据集
-                  <Badge count={datasets.length} showZero size="small" style={{ marginLeft: 4 }} />
-                </span>
-              ),
+              label: `数据集(${datasets.length})`,
               children: <DatasetTree datasets={datasets} relationships={relationships} />,
             },
             {
               key: 'relations',
-              label: (
-                <span>
-                  数据关系
-                  <Badge count={relationships.length} showZero size="small" style={{ marginLeft: 4 }} />
-                </span>
-              ),
+              label: `数据关系(${relationships.length})`,
               children: <RelationshipList relationships={relationships} datasets={datasets} />,
             },
             {
               key: 'params',
-              label: (
-                <span>
-                  报表参数
-                  <Badge count={params.length} showZero size="small" style={{ marginLeft: 4 }} />
-                </span>
-              ),
+              label: `报表参数(${params.length})`,
               children: <ParamManager params={params} onChange={onParamsChange} />,
             },
           ]}

@@ -1,6 +1,6 @@
 /* ─── 主题变量（默认值） ─── */
-/* 使用方可通过覆盖 .re 上的变量定制主题 */
-.re {
+/* 使用方可通过覆盖 .re 或 .re-drawer 上的变量定制主题 */
+.re, .re-drawer {
   /* 字体大小 */
   --re-font-size-xs: 10px;
   --re-font-size-sm: 12px;
@@ -49,11 +49,15 @@
   --re-radius-lg: 6px;
 
   /* 面板尺寸 */
-  --re-expr-panel-height: 280px;
+  --re-expr-panel-height: 420px;
 
   /* 按钮尺寸 */
   --re-header-btn-width: 112px;
+
 }
+
+/* ─── antd Form.Item 间距收紧 ─── */
+.re .ant-form-item { margin-bottom: 12px; }
 
 /* ─── 根容器 ─── */
 .re { display: flex; flex-direction: column; height: 100vh; }
@@ -145,10 +149,6 @@
 
 /* ─── 右面板属性 ─── */
 .re-prop-panel { padding: var(--re-spacing-lg); }
-.re-prop-empty {
-  display: flex; align-items: center; justify-content: center;
-  height: 100%; min-height: 200px; color: var(--re-color-text-tertiary); font-size: var(--re-font-size-base);
-}
 .re-prop-cell-info {
   padding: var(--re-spacing-md) 10px; background: var(--re-color-bg-muted); border-radius: var(--re-radius-base);
   margin-bottom: var(--re-spacing-md); font-size: var(--re-font-size-base);
@@ -180,24 +180,8 @@
   display: inline-block; margin-top: var(--re-spacing-xs);
 }
 
-/* ─── 未绑定状态 ─── */
-.re-prop-unbound { padding: var(--re-spacing-lg) 0; }
-.re-prop-unbound__hint {
-  font-size: var(--re-font-size-base); color: var(--re-color-text-tertiary); margin-bottom: var(--re-spacing-md); line-height: 1.6;
-}
-
-
 /* ─── 值表达式编辑器 ─── */
 .re-prop-value-type { margin-bottom: var(--re-spacing-md); }
-.re-prop-value-form { display: flex; flex-direction: column; gap: 6px; }
-.re-prop-value-form label {
-  font-size: var(--re-font-size-base); color: var(--re-color-text-secondary); margin-bottom: var(--re-spacing-xs);
-}
-.re-prop-field-cascade { display: flex; gap: var(--re-spacing-sm); }
-.re-prop-field-cascade > * { flex: 1; min-width: 0; }
-.re-prop-agg-row { display: flex; gap: var(--re-spacing-sm); align-items: flex-start; }
-.re-prop-agg-row > :first-child { flex: 0 0 40%; }
-.re-prop-agg-row > :last-child { flex: 1; min-width: 0; }
 .re-prop-func-args { display: flex; flex-direction: column; gap: var(--re-spacing-sm); }
 .re-prop-func-arg-row { display: flex; gap: var(--re-spacing-sm); align-items: center; }
 .re-prop-func-arg-row > :first-child { flex: 1; min-width: 0; }
@@ -208,14 +192,6 @@
 .re-dm-tabs .ant-tabs-nav { margin-bottom: var(--re-spacing-md); }
 
 /* 数据关系列表 */
-.re-rel-list { display: flex; flex-direction: column; gap: 6px; }
-.re-rel-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: var(--re-spacing-md) 10px; background: var(--re-color-bg-subtle); border: 1px solid var(--re-color-border-light); border-radius: var(--re-radius-base);
-  font-size: var(--re-font-size-sm);
-}
-.re-rel-endpoint { color: var(--re-color-text); word-break: break-all; }
-.re-rel-icon { color: var(--re-color-primary); flex-shrink: 0; }
 
 /* 报表参数管理 */
 .re-param-manager { padding: 0; }
@@ -238,79 +214,66 @@
   height: var(--re-expr-panel-height); overflow: hidden;
 }
 
-/* 一级分类菜单 */
-.re-expr-categories {
-  flex: 0 0 80px; background: var(--re-color-bg-subtle); border-right: 1px solid var(--re-color-border);
-  padding: var(--re-spacing-sm) 0; overflow-y: auto;
+/* 一级菜单区域 */
+.re-expr-panel > .ant-menu-inline {
+  flex: 0 0 120px;
+  border-right: 1px solid var(--re-color-border-light) !important;
+  background: var(--re-color-bg-subtle) !important;
+  padding: 0 !important;
 }
-.re-expr-category {
-  padding: var(--re-spacing-md) var(--re-spacing-lg); font-size: var(--re-font-size-base); color: var(--re-color-text);
-  cursor: pointer; border-left: 3px solid transparent;
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item {
+  margin: 0 !important;
+  padding: 0 var(--re-spacing-lg) !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--re-color-border-light);
+  height: 40px !important;
+  line-height: 40px !important;
   transition: all 0.2s;
 }
-.re-expr-category:hover { background: var(--re-color-bg-hover); }
-.re-expr-category--active {
-  background: var(--re-color-primary-bg); color: var(--re-color-primary); border-left-color: var(--re-color-primary); font-weight: 500;
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item::after {
+  content: '›';
+  position: absolute;
+  right: 12px;
+  font-size: 18px;
+  color: var(--re-color-text-tertiary);
+  transition: transform 0.2s;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item:hover {
+  background: var(--re-color-bg-hover) !important;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item:hover::after {
+  transform: translateX(2px);
+  color: var(--re-color-primary);
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item-selected {
+  background: var(--re-color-bg) !important;
+  font-weight: 500;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item-selected::after {
+  content: '✓';
+  color: var(--re-color-primary);
+  font-size: 14px;
 }
 
 /* 二级选择区 */
 .re-expr-selector {
   flex: 1; display: flex; flex-direction: column; min-width: 0;
   padding: var(--re-spacing-md);
+  background: var(--re-color-bg);
 }
 .re-expr-selector > .ant-input-affix-wrapper { margin-bottom: var(--re-spacing-md); }
 
-.re-expr-list {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--re-spacing-xs);
-  max-height: var(--re-expr-panel-height);
-}
-.re-expr-empty {
-  padding: 20px; text-align: center; font-size: var(--re-font-size-base); color: var(--re-color-text-quaternary);
-}
-
-.re-expr-item {
-  padding: 6px var(--re-spacing-md); border-radius: var(--re-radius-base); cursor: pointer;
-  transition: background 0.15s;
-}
-.re-expr-item:hover { background: var(--re-color-bg-muted); }
-.re-expr-item__label {
-  font-size: var(--re-font-size-base); color: var(--re-color-text); font-weight: 500;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.re-expr-item__desc {
-  font-size: var(--re-font-size-sm); color: var(--re-color-text-tertiary); margin-top: var(--re-spacing-xs);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* ─── 分组小计 ${group} 提示 ─── */
-.re-prop-group-hint {
-  margin-top: var(--re-spacing-sm); font-size: var(--re-font-size-sm); color: var(--re-color-text-tertiary); line-height: 1.6;
-}
-.re-prop-group-hint code {
-  background: var(--re-color-bg-hover); padding: 0 var(--re-spacing-sm); border-radius: var(--re-radius-sm); color: var(--re-color-code-pink);
-}
-
 /* ─── 扩展设置编辑器 ─── */
-.re-prop-exp-section { margin-bottom: var(--re-spacing-lg); }
-.re-prop-exp-section__label {
-  font-size: var(--re-font-size-base); color: var(--re-color-text); font-weight: 500; margin-bottom: var(--re-spacing-xs);
-  display: flex; align-items: center; gap: var(--re-spacing-xs);
-}
 
 /* ─── 条件编辑器 ─── */
-.re-prop-cond-empty {
-  padding: var(--re-spacing-lg) 0; text-align: center; font-size: var(--re-font-size-base); color: var(--re-color-text-quaternary);
-}
 
 /* ─── 循环块管理 ─── */
-.re-loop-label {
-  display: flex; align-items: center; gap: var(--re-spacing-sm);
-  font-size: var(--re-font-size-sm); color: #555; margin-bottom: var(--re-spacing-sm); font-weight: 500;
-}
-.re-loop-label__hint {
-  font-size: var(--re-font-size-sm); color: var(--re-color-text-quaternary); cursor: help;
-}
-.re-loop-label__hint:hover { color: var(--re-color-primary); }
 .re-prop-loop-list { display: flex; flex-direction: column; gap: var(--re-spacing-lg); margin-bottom: var(--re-spacing-lg); }
 .re-prop-loop-item {
   border: 1px solid var(--re-color-border); border-radius: var(--re-radius-lg); overflow: hidden;
@@ -319,12 +282,11 @@
   display: flex; align-items: flex-start; gap: var(--re-spacing-md);
   padding: 10px var(--re-spacing-lg); background: var(--re-color-bg-subtle); border-bottom: 1px solid var(--re-color-border-light);
 }
-.re-prop-loop-item__body { padding: 10px var(--re-spacing-lg); }
+.re-prop-loop-item__body { padding: var(--re-spacing-lg); }
 
 /* ─── 小计 / 总计管理 ─── */
 .re-prop-summary-cells { display: flex; flex-direction: column; gap: 6px; }
 .re-prop-summary-cell-row { display: flex; gap: var(--re-spacing-sm); align-items: center; }
-.re-prop-summary-cell-row > .re-prop-field-cascade { gap: var(--re-spacing-sm); }
 
 /* ─── 隐藏 Univer 公式 UI ─── */
 [data-u-comp="sheets-formula-editor"],
