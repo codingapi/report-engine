@@ -1,5 +1,5 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { Input } from 'antd';
+import { Input, Menu, List, Empty } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { InputRef } from 'antd';
 import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '../../types';
@@ -206,20 +206,19 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
 
       <div className="re-expr-panel">
         {/* 一级菜单 */}
-        <div className="re-expr-categories">
-          {availableCategories.map((cat) => (
-            <div
-              key={cat.key}
-              className={`re-expr-category ${category === cat.key ? 're-expr-category--active' : ''}`}
-              onClick={() => {
-                setCategory(category === cat.key ? null : cat.key);
-                setSearch('');
-              }}
-            >
-              {cat.label}
-            </div>
-          ))}
-        </div>
+        <Menu
+          mode="inline"
+          selectedKeys={category ? [category] : []}
+          onClick={({ key }) => {
+            setCategory(key === category ? null : (key as Category));
+            setSearch('');
+          }}
+          items={availableCategories.map((cat) => ({
+            key: cat.key,
+            label: cat.label,
+          }))}
+          style={{ flex: '0 0 100px', borderRight: 'none' }}
+        />
 
         {/* 二级选择区 */}
         {category && (
@@ -232,22 +231,25 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
               onChange={(e) => setSearch(e.target.value)}
               allowClear
             />
-            <div className="re-expr-list">
-              {secondLevelItems.length === 0 ? (
-                <div className="re-expr-empty">无匹配项</div>
-              ) : (
-                secondLevelItems.map((item, idx) => (
-                  <div
-                    key={`${item.expr}-${idx}`}
-                    className="re-expr-item"
-                    onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
-                  >
-                    <div className="re-expr-item__label">{item.label}</div>
-                    <div className="re-expr-item__desc">{item.desc}</div>
-                  </div>
-                ))
+            <List
+              size="small"
+              dataSource={secondLevelItems}
+              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配项" /> }}
+              style={{ flex: 1, overflowY: 'auto', maxHeight: 'var(--re-expr-panel-height, 200px)' }}
+              split={false}
+              renderItem={(item, idx) => (
+                <List.Item
+                  key={`${item.expr}-${idx}`}
+                  onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
+                  style={{ cursor: 'pointer', borderRadius: 'var(--re-radius-base)', padding: '6px 12px', marginBottom: 2 }}
+                >
+                  <List.Item.Meta
+                    title={<span style={{ fontWeight: 500 }}>{item.label}</span>}
+                    description={item.desc}
+                  />
+                </List.Item>
               )}
-            </div>
+            />
           </div>
         )}
       </div>

@@ -370,7 +370,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const handleBindingCreate = useCallback((cellKey: string) => {
     const defaultBinding: CellBinding = {
       cellKey,
-      value: { type: 'FieldValue', payload: '' },
+      value: { type: 'Literal', payload: '' },
       expansion: 'VERTICAL',
       expandMode: 'LIST',
       mergeRepeated: false,

@@ -27,6 +27,7 @@ export const DefaultLoopBlockPanel: React.FC<LoopBlockComponentProps> = ({
                     {block.label || `循环块 ${block.id}`}
                 </span>
                 <button
+                    type="button"
                     onClick={onDelete}
                     style={{
                         background: 'none',

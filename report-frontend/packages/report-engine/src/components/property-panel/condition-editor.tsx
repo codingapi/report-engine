@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Tag } from 'antd';
+import { Button, Tag, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { Condition, Dataset, LoopBlock, CompareOperator, ReportParam } from '../../types';
 import { OPERATOR_LABELS } from '../../types';
@@ -131,7 +131,7 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
           })}
         </div>
       ) : (
-        <div className="re-prop-cond-empty">暂无过滤条件</div>
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无过滤条件" style={{ margin: '16px 0' }} />
       )}
 
       <Button

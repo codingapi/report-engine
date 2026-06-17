@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Select, Input, Button } from 'antd';
+import { Select, Input, Button, Empty, Typography } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type {
   ReportValue,
@@ -57,6 +57,13 @@ function parseFieldRef(payload: string | undefined): { datasetId: string; field:
   return { datasetId: payload.slice(0, dot), field: payload.slice(dot + 1) };
 }
 
+/** 字段标签（替代 raw <label>） */
+const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Typography.Text style={{ fontSize: 12, fontWeight: 500 }}>
+    {children}
+  </Typography.Text>
+);
+
 // ─── 组件 ────────────────────────────────────
 
 const ValueEditor: React.FC<ValueEditorProps> = ({
@@ -113,7 +120,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           />
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>文本值</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>文本值</FieldLabel>{input}</div>;
       }
 
       case 'FieldValue': {
@@ -140,7 +147,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           </div>
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>数据字段</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>数据字段</FieldLabel>{input}</div>;
       }
 
       case 'ParamValue': {
@@ -153,7 +160,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           />
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>参数名</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>参数名</FieldLabel>{input}</div>;
       }
 
       case 'LoopFieldValue': {
@@ -187,7 +194,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           </div>
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>循环字段</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>循环字段</FieldLabel>{input}</div>;
       }
 
       case 'NameRef': {
@@ -200,7 +207,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           />
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>名称引用</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>名称引用</FieldLabel>{input}</div>;
       }
 
       case 'Template': {
@@ -216,11 +223,11 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
         if (compact) return input;
         return (
           <div className="re-prop-value-form">
-            <label>文本模板</label>
+            <FieldLabel>文本模板</FieldLabel>
             {input}
-            <div style={{ fontSize: 11, color: '#999', lineHeight: 1.5 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
               {'用 ${name} 引用运行时名称、${数据集.字段} 引用字段、${SUM(数据集.字段)} 插入聚合'}
-            </div>
+            </Typography.Text>
           </div>
         );
       }
@@ -246,7 +253,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
           </div>
         );
         if (compact) return input;
-        return <div className="re-prop-value-form"><label>聚合方式</label>{input}</div>;
+        return <div className="re-prop-value-form"><FieldLabel>聚合方式</FieldLabel>{input}</div>;
       }
 
       case 'FunctionCall': {
@@ -271,15 +278,15 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
         }
         return (
           <div className="re-prop-value-form">
-            <label>函数名</label>
+            <FieldLabel>函数名</FieldLabel>
             <Input
               size={size}
               value={value.funcName || ''}
               onChange={(e) => update({ funcName: e.target.value })}
               placeholder="函数名称（如 format、date）"
             />
-            <label>
-              参数列表
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <FieldLabel>参数列表</FieldLabel>
               <Button
                 type="link"
                 size="small"
@@ -288,11 +295,11 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                   const newArgs = [...args, { type: 'Literal' as const, payload: '' }];
                   update({ args: newArgs });
                 }}
-                style={{ float: 'right', padding: 0 }}
+                style={{ padding: 0 }}
               >
                 添加
               </Button>
-            </label>
+            </div>
             <div className="re-prop-func-args">
               {args.map((arg, i) => (
                 <div key={i} className="re-prop-func-arg-row">
@@ -317,7 +324,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                 </div>
               ))}
               {args.length === 0 && (
-                <div style={{ fontSize: 12, color: '#bbb' }}>暂无参数</div>
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无参数" style={{ margin: '8px 0' }} />
               )}
             </div>
           </div>
@@ -325,7 +332,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
       }
 
       default:
-        return <div style={{ fontSize: 12, color: '#999' }}>不支持的类型</div>;
+        return <Typography.Text type="secondary" style={{ fontSize: 12 }}>不支持的类型</Typography.Text>;
     }
   })();
 

@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Surgical Changes** — Touch only what you must. Don't "improve" adjacent code. Remove only orphans YOUR changes created.
 4. **Goal-Driven Execution** — Define success criteria. Transform tasks into verifiable goals. Loop until verified.
 5. **代码提交纪律** — 完成修改后不要立即 git commit/push，等用户确认后再提交。先展示变更摘要。
+6. **优先使用 antd 组件** — 凡引入 antd 的前端项目，开发组件时先检查 antd 是否已有可直接使用的组件（如 Empty、List、Tag、Descriptions、Steps 等）。优先用 antd 原生组件实现，不自造轮子；仅当 antd 确实无法满足需求时才自行封装。
 
 ## Project Overview
 

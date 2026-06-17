@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Input, Select, Popconfirm, Empty, Tabs } from 'antd';
+import { Form, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { LoopBlock, Dataset, ReportParam } from '../../types';
 import { describeRange } from '../../utils/excel-cell';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
-import SectionLabel from './section-label';
 import ConditionEditor from './condition-editor';
 
 interface LoopBlockManagerProps {
@@ -28,73 +27,53 @@ const LoopBlockForm: React.FC<{
   onUpdate: (patch: Partial<LoopBlock>) => void;
 }> = ({ lb, datasets, allLoops, params, onUpdate }) => {
   return (
-    <div className="re-prop-loop-item__body">
-      {/* 名称 */}
-      <div className="re-form-field">
-        <SectionLabel text="循环块名称" hint="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）" />
+    <Form layout="vertical" size="small" className="re-prop-loop-item__body">
+      <Form.Item label="循环块名称" tooltip="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）">
         <Input
-          size="small"
           value={lb.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="输入名称，如：员工薪资条"
         />
-      </div>
+      </Form.Item>
 
-      {/* 模板区域（由右键选区确定，只读） */}
-      <div className="re-form-field">
-        <SectionLabel text="模板区域" hint="循环块在表格中覆盖的矩形区域，由创建时选中的区域决定。" />
+      <Form.Item label="模板区域" tooltip="循环块在表格中覆盖的矩形区域，由创建时选中的区域决定。">
         <Input
-          size="small"
           value={describeRegion(lb)}
           readOnly
           style={{ background: '#f5f5f5' }}
         />
-      </div>
+      </Form.Item>
 
-      {/* 驱动数据集 */}
-      <div className="re-form-field">
-        <SectionLabel text="驱动数据集" hint="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。" />
+      <Form.Item label="驱动数据集" tooltip="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。">
         <Select
-          size="small"
           value={lb.source.datasetId || undefined}
           onChange={(dsId) => onUpdate({ source: { ...lb.source, datasetId: dsId } })}
           placeholder="选择驱动数据集"
-          style={{ width: '100%' }}
           options={datasetOptions(datasets)}
         />
-      </div>
+      </Form.Item>
 
-      {/* 分组字段 */}
-      <div className="re-form-field">
-        <SectionLabel text="分组字段" hint="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。" />
+      <Form.Item label="分组字段" tooltip="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。">
         <Select
-          size="small"
           mode="multiple"
           value={lb.source.groupBy}
           onChange={(groupBy) => onUpdate({ source: { ...lb.source, groupBy } })}
           placeholder="不分组（逐行迭代）"
-          style={{ width: '100%' }}
           options={fieldOptions(datasets, lb.source.datasetId)}
         />
-      </div>
+      </Form.Item>
 
-      {/* 排序字段 */}
-      <div className="re-form-field">
-        <SectionLabel text="排序字段" hint="控制循环迭代的输出顺序，可多选。" />
+      <Form.Item label="排序字段" tooltip="控制循环迭代的输出顺序，可多选。">
         <Select
-          size="small"
           mode="multiple"
           value={lb.source.orderBy}
           onChange={(orderBy) => onUpdate({ source: { ...lb.source, orderBy } })}
           placeholder="不排序（按原始顺序）"
-          style={{ width: '100%' }}
           options={fieldOptions(datasets, lb.source.datasetId)}
         />
-      </div>
+      </Form.Item>
 
-      {/* 过滤条件 */}
-      <div className="re-form-field">
-        <SectionLabel text="过滤条件" hint="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。" />
+      <Form.Item label="过滤条件" tooltip="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。">
         <ConditionEditor
           conditions={lb.source.filters}
           datasets={datasets}
@@ -102,8 +81,8 @@ const LoopBlockForm: React.FC<{
           params={params}
           onChange={(filters) => onUpdate({ source: { ...lb.source, filters } })}
         />
-      </div>
-    </div>
+      </Form.Item>
+    </Form>
   );
 };
 
@@ -151,7 +130,6 @@ const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
                   }}
                   onCancel={(e) => e?.stopPropagation()}
                   okText="删除"
-                  cancelText="取消"
                 >
                   <DeleteOutlined
                     style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}

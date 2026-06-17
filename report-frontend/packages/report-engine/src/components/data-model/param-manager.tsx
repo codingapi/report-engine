@@ -92,7 +92,6 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
                   title="删除此参数？"
                   onConfirm={() => remove(p.id)}
                   okText="删除"
-                  cancelText="取消"
                 >
                   <Button type="text" size="small" danger icon={<DeleteOutlined />} />
                 </Popconfirm>,
