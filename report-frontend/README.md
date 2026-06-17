@@ -8,6 +8,7 @@
 report-frontend/
 ├── packages/
 │   ├── report-univer/     # @coding-report/report-univer — Univer 封装层
+│   ├── report-api/        # @coding-report/report-api — 后端 API 客户端
 │   └── report-engine/     # @coding-report/report-engine — 报表设计器组件库
 └── apps/
     └── app-pc/            # @report-example/app-pc — 演示应用
@@ -16,10 +17,10 @@ report-frontend/
 ### 包依赖关系
 
 ```
-app-pc → report-engine → report-univer → @univerjs/* v0.25
+app-pc → report-engine / report-api → report-univer → @univerjs/* v0.25
 ```
 
-构建顺序：report-univer → report-engine（`pnpm build` 脚本已处理）。
+构建顺序：report-univer → report-api → report-engine（`pnpm build` 脚本已处理）。
 
 ## 快速开始
 
@@ -48,6 +49,10 @@ Univer 电子表格的 React 封装层，提供：
 - 循环块高亮、右键菜单、字段拖拽
 
 库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力。
+
+### @coding-report/report-api
+
+后端 API 客户端：axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `listExampleReports` / `renderReport` / `exportExcel` / `importExcel` / `fetchFonts` 等。
 
 ### @coding-report/report-engine
 
