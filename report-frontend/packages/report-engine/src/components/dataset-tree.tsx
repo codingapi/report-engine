@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Tree, Tag } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
 import type { Dataset, DatasetField, Relationship, DataSourceType } from '../types';
+import { dataTypeLabel } from '../types';
 
 interface DatasetTreeProps {
   datasets: Dataset[];
@@ -111,7 +112,7 @@ function buildFieldNode(
         }}
       >
         <span style={{ marginRight: 4 }}>{f.alias || f.name}</span>
-        <span className="re-field-type">{f.dataType}</span>
+        <span className="re-field-type">{dataTypeLabel(f.dataType)}</span>
         {f.primaryKey && <KeyOutlined className="re-field-pk" style={{ marginLeft: 4 }} />}
         {relations &&
           relations.map((rel, i) => (

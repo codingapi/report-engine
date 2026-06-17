@@ -1,0 +1,124 @@
+import { useEffect, useState } from 'react';
+import { Modal, Select } from 'antd';
+import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '../../types';
+import { OPERATOR_LABELS, genId } from '../../types';
+import ValueEditor from './value-editor';
+
+/** 不需要右值的运算符 */
+const NO_RIGHT_OPS: CompareOperator[] = ['IS_NULL', 'IS_NOT_NULL'];
+
+interface ConditionModalProps {
+  open: boolean;
+  editingCondition: Condition | null;
+  datasets: Dataset[];
+  loopBlocks?: LoopBlock[];
+  onClose: () => void;
+  onConfirm: (condition: Condition) => void;
+}
+
+/** 条件添加/编辑弹窗 */
+const ConditionModal: React.FC<ConditionModalProps> = ({
+  open,
+  editingCondition,
+  datasets,
+  loopBlocks = [],
+  onClose,
+  onConfirm,
+}) => {
+  const isEdit = editingCondition !== null;
+
+  // 临时状态
+  const [left, setLeft] = useState<ReportValue>({ type: 'FieldValue', payload: '' });
+  const [operator, setOperator] = useState<CompareOperator>('EQ');
+  const [right, setRight] = useState<ReportValue | null>({ type: 'Literal', payload: '' });
+
+  useEffect(() => {
+    if (open) {
+      if (editingCondition) {
+        setLeft(editingCondition.left);
+        setOperator(editingCondition.operator);
+        setRight(editingCondition.right);
+      } else {
+        setLeft({ type: 'FieldValue', payload: '' });
+        setOperator('EQ');
+        setRight({ type: 'Literal', payload: '' });
+      }
+    }
+  }, [open, editingCondition]);
+
+  const hideRight = NO_RIGHT_OPS.includes(operator);
+
+  const handleOperatorChange = (op: CompareOperator) => {
+    setOperator(op);
+    if (NO_RIGHT_OPS.includes(op)) {
+      setRight(null);
+    } else if (!right) {
+      setRight({ type: 'Literal', payload: '' });
+    }
+  };
+
+  const handleOk = () => {
+    const condition: Condition = {
+      id: editingCondition?.id ?? genId(),
+      left,
+      operator,
+      right,
+    };
+    onConfirm(condition);
+  };
+
+  return (
+    <Modal
+      title={isEdit ? '编辑条件' : '添加条件'}
+      open={open}
+      onOk={handleOk}
+      onCancel={onClose}
+      destroyOnHidden
+      width={560}
+      okText="确定"
+      cancelText="取消"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* 左值 */}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>左值（字段）</div>
+          <ValueEditor
+            value={left}
+            datasets={datasets}
+            loopBlocks={loopBlocks}
+            onChange={setLeft}
+          />
+        </div>
+
+        {/* 运算符 */}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>运算符</div>
+          <Select
+            value={operator}
+            onChange={handleOperatorChange}
+            style={{ width: '100%' }}
+            options={Object.entries(OPERATOR_LABELS).map(([v, l]) => ({
+              value: v,
+              label: l,
+            }))}
+          />
+        </div>
+
+        {/* 右值 */}
+        {!hideRight && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>右值</div>
+            <ValueEditor
+              value={right || { type: 'Literal', payload: '' }}
+              datasets={datasets}
+              loopBlocks={loopBlocks}
+              onChange={setRight}
+            />
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
+export default ConditionModal;

@@ -68,7 +68,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
       {cell && (
         <div className="re-prop-preview">
           <div className="re-prop-preview__label">预览</div>
-          <code>{valueDisplayText(cell.value, datasets, loopBlocks) || '（空）'}</code>
+          <code>{valueDisplayText(cell.value, datasets, loopBlocks, params) || '（空）'}</code>
         </div>
       )}
 

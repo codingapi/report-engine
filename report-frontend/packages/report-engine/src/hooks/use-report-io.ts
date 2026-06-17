@@ -81,11 +81,11 @@ export function useReportIO(opts: UseReportIOOptions) {
       // 导出时附带表达式预览（友好文本），随配置一起存储到后端
       const bindingsOut = cellBindings.map((b) => ({
         ...b,
-        preview: valueDisplayText(b.value, datasets, loopBlocks),
+        preview: valueDisplayText(b.value, datasets, loopBlocks, params),
       }));
       const summariesOut = summaries.map((s) => ({
         ...s,
-        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks) })),
+        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks, params) })),
       }));
       await onExport(bindingsOut, loopBlocks, summariesOut, snapshot, params);
       messageApi.success('导出成功');

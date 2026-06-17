@@ -1,5 +1,6 @@
 import React from 'react';
-import { Radio, Select, Switch } from 'antd';
+import { Radio, Select, Switch, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { CellBinding, Expansion, ExpandMode } from '../../types';
 import { EXPANSION_LABELS } from '../../types';
 import { parseCellKey, cellA1 } from '../../utils/excel-cell';
@@ -22,6 +23,16 @@ function cellKeyLabel(key: string): string {
   return cellA1(row, col);
 }
 
+/** 带 tooltip 的字段标签 */
+const FieldLabel: React.FC<{ text: string; hint: string }> = ({ text, hint }) => (
+  <div className="re-prop-exp-section__label">
+    <span>{text}</span>
+    <Tooltip title={hint}>
+      <QuestionCircleOutlined style={{ marginLeft: 4, color: 'rgba(0,0,0,0.45)', cursor: 'help', fontSize: 12 }} />
+    </Tooltip>
+  </div>
+);
+
 const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
   expansion,
   expandMode,
@@ -43,8 +54,7 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
     <div>
       {/* 扩展方向 */}
       <div className="re-prop-exp-section">
-        <div className="re-prop-exp-section__label">扩展方向</div>
-        <div className="re-prop-exp-section__hint">数据从该单元格开始，沿指定方向依次铺开</div>
+        <FieldLabel text="扩展方向" hint="数据从该单元格开始，沿指定方向依次铺开" />
         <Radio.Group
           size="small"
           value={expansion}
@@ -69,8 +79,7 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
       {/* 扩展模式 */}
       {expansion !== 'NONE' && (
         <div className="re-prop-exp-section">
-          <div className="re-prop-exp-section__label">扩展模式</div>
-          <div className="re-prop-exp-section__hint">明细：每行输出一条记录；分组：相同值只保留一行</div>
+          <FieldLabel text="扩展模式" hint="明细：每行输出一条记录；分组：相同值只保留一行" />
           <Radio.Group
             size="small"
             value={expandMode}
@@ -95,41 +104,31 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
       {/* 合并重复值 */}
       {expansion !== 'NONE' && expandMode === 'GROUP' && (
         <div className="re-prop-exp-section">
-          <div className="re-prop-exp-section__label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>合并重复值</span>
-            <Switch
-              size="small"
-              checked={mergeRepeated}
-              onChange={(checked) => onChange({ mergeRepeated: checked })}
-            />
-          </div>
-          <div className="re-prop-exp-section__hint">
-            相邻相同值合并为一个跨行/跨列单元格（多级分组表头常用）
-          </div>
+          <FieldLabel text="合并重复值" hint="相邻相同值合并为一个跨行/跨列单元格（多级分组表头常用）" />
+          <Switch
+            size="small"
+            checked={mergeRepeated}
+            onChange={(checked) => onChange({ mergeRepeated: checked })}
+          />
         </div>
       )}
 
       {/* 独立纵向带 */}
       {expansion === 'VERTICAL' && (
         <div className="re-prop-exp-section">
-          <div className="re-prop-exp-section__label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>独立纵向带</span>
-            <Switch
-              size="small"
-              checked={independent}
-              onChange={(checked) => onChange({ independent: checked })}
-            />
-          </div>
-          <div className="re-prop-exp-section__hint">
-            开启后本列不与同源列对齐，从本格起独立向下展开（交错排版）。注意：独立列无法再与其它列做跨列聚合/跨列汇总/主从合并。
-          </div>
+          <FieldLabel text="独立纵向带" hint="开启后本列不与同源列对齐，从本格起独立向下展开（交错排版）。注意：独立列无法再与其它列做跨列聚合/跨列汇总/主从合并。" />
+          <Switch
+            size="small"
+            checked={independent}
+            onChange={(checked) => onChange({ independent: checked })}
+          />
         </div>
       )}
 
       {/* 父格 */}
       {expansion !== 'NONE' && (
         <div className="re-prop-exp-section">
-          <div className="re-prop-exp-section__label">父格</div>
+          <FieldLabel text="父格" hint="多级分组时指定对齐参照格（父格变化时本行重置）。留空表示顶层，无父格依赖。" />
           <Select
             size="small"
             value={parentCell ?? undefined}
@@ -141,9 +140,6 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
             showSearch
             notFoundContent="无其他已绑定单元格"
           />
-          <div className="re-prop-exp-section__hint" style={{ marginTop: 4 }}>
-            多级分组时指定对齐参照格（父格变化时本行重置）。留空表示顶层，无父格依赖。
-          </div>
         </div>
       )}
     </div>

@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Badge, Divider, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
-  BlockOutlined,
+  BlockOutlined, QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { Group, Panel as ResizablePanel, Separator, usePanelRef } from 'react-resizable-panels';
 import type { CellProp, FieldDropInfo, CellHandle, LoopBlockConfig, CellRange, MenuGroupDef } from '@coding-report/report-univer';
@@ -178,14 +178,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         row,
         col,
-        valueDisplayText(b.value, datasets, remappedLoops),
+        valueDisplayText(b.value, datasets, remappedLoops, params),
       );
     }
 
     // 回写汇总行（小计/总计）单元格的文本/聚合摘要，使其在表格中可见
     for (const s of tpl.summaries || []) {
       for (const cell of s.cells) {
-        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops));
+        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, valueDisplayText(cell.value, datasets, remappedLoops, params));
       }
     }
 
@@ -240,20 +240,21 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
     // 回写所有绑定的显示文本（数据区字段/聚合配置在表格中可见）
     const ds = datasets;
+    const loadedParams = config.params || [];
     for (const b of remappedBindings) {
       const { row, col } = parseCellKey(b.cellKey);
       sheetRef.current?.setCellValue(
         actualSheetId,
         row,
         col,
-        valueDisplayText(b.value, ds, remappedLoops),
+        valueDisplayText(b.value, ds, remappedLoops, loadedParams),
       );
     }
 
     // 回写汇总行单元格文本（小计/总计在表格中可见）
     for (const s of migratedSummaries) {
       for (const c of s.cells) {
-        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops));
+        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, valueDisplayText(c.value, ds, remappedLoops, loadedParams));
       }
     }
 
@@ -348,10 +349,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         sheetId,
         row,
         col,
-        valueDisplayText(binding.value, datasets, loopBlocks),
+        valueDisplayText(binding.value, datasets, loopBlocks, params),
       );
     },
-    [datasets, loopBlocks],
+    [datasets, loopBlocks, params],
   );
 
   // ─── 属性面板回调 ───
@@ -403,13 +404,13 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         }
         // 回写当前列文本/聚合摘要
         for (const c of newRow.cells) {
-          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks));
+          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, valueDisplayText(c.value, datasets, loopBlocks, params));
         }
         return prev.map((s) => (s.id === id ? newRow : s));
       });
       setActiveTemplate(null);
     },
-    [datasets],
+    [datasets, loopBlocks, params],
   );
 
   const handleSummaryRowDelete = useCallback((id: string) => {
@@ -473,7 +474,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     () => [
       {
         id: 'report-engine-menu',
-        title: '报表',
+        title: '报表配置',
         items: [
           {
             id: 'set-loop-block',
@@ -493,16 +494,44 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [handleCreateLoopFromRange, handleCreateSummaryFromRange],
   );
 
-  // ─── 字段拖入 → 创建 CellBinding ───
+  // ─── 字段/参数拖入 → 创建 CellBinding ───
   const handleFieldDrop = useCallback(
     (info: FieldDropInfo, handle: CellHandle) => {
       try {
         const data = JSON.parse(info.data);
-        if (data.datasetId && data.field) {
-          const ck = `${info.sheetId}:${info.row}:${info.column}`;
-          const fieldRef = `${data.datasetId}.${data.field}`;
+        const ck = `${info.sheetId}:${info.row}:${info.column}`;
 
-          handle.setValue(data.alias || data.field);
+        // 参数拖入
+        if (data.type === 'report-param') {
+          const paramAlias = data.paramAlias || data.paramName;
+          handle.setValue(`\${${paramAlias}}`);
+
+          const binding: CellBinding = {
+            cellKey: ck,
+            value: { type: 'NameRef', payload: data.paramName },
+            expansion: 'NONE',
+            expandMode: 'LIST',
+            mergeRepeated: false,
+            parentCell: null,
+            conditions: [],
+          };
+
+          setCellBindings((prev) => {
+            const filtered = prev.filter((b) => b.cellKey !== ck);
+            return [...filtered, binding];
+          });
+          setActiveTemplate(null);
+
+          messageApi.success(`已绑定参数 ${paramAlias}`);
+          return;
+        }
+
+        // 字段拖入
+        if (data.datasetId && data.field) {
+          const fieldRef = `${data.datasetId}.${data.field}`;
+          const fieldAlias = data.alias || data.field;
+
+          handle.setValue(`\${${fieldAlias}}`);
 
           const binding: CellBinding = {
             cellKey: ck,
@@ -520,7 +549,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           });
           setActiveTemplate(null);
 
-          messageApi.success(`已绑定 ${data.alias || data.field}`);
+          messageApi.success(`已绑定 ${fieldAlias}`);
         }
       } catch {
         // 非 JSON 拖拽数据，忽略
@@ -529,9 +558,18 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [messageApi],
   );
 
-  // ─── 单元格值变更 → 同步到汇总行的 SummaryCell.value ───
+  // ─── 单元格值变更 → 清空被删除的绑定 + 同步汇总行 ───
   const handleCellValueChange = useCallback(
     (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
+      // 内容被清空的单元格 → 移除对应的 CellBinding
+      const clearedKeys = new Set(
+        changes.filter((c) => c.value === '').map((c) => `${c.sheetId}:${c.row}:${c.col}`),
+      );
+      if (clearedKeys.size > 0) {
+        setCellBindings((prev) => prev.filter((b) => !clearedKeys.has(b.cellKey)));
+      }
+
+      // 同步到汇总行的 SummaryCell.value
       setSummaries((prev) => {
         let updated = false;
         const next = prev.map((s) => {
@@ -541,16 +579,21 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           const cells = [...s.cells];
           for (const c of matching) {
             const idx = cells.findIndex((sc) => sc.column === c.col);
-            const newValue = parseTemplate(c.value);
-            if (idx >= 0) {
-              // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
-              // 避免覆盖用户通过属性面板设置的聚合表达式
-              const existing = cells[idx];
-              if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
-                cells[idx] = { ...existing, value: newValue };
-              }
+            if (c.value === '') {
+              // 内容被清空 → 移除对应 SummaryCell
+              if (idx >= 0) cells.splice(idx, 1);
             } else {
-              cells.push({ column: c.col, value: newValue });
+              const newValue = parseTemplate(c.value);
+              if (idx >= 0) {
+                // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
+                // 避免覆盖用户通过属性面板设置的聚合表达式
+                const existing = cells[idx];
+                if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
+                  cells[idx] = { ...existing, value: newValue };
+                }
+              } else {
+                cells.push({ column: c.col, value: newValue });
+              }
             }
           }
           updated = true;
@@ -562,6 +605,25 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [],
   );
 
+  // ─── 选区清除（清除内容/格式/全部）→ 移除对应绑定 ───
+  const handleSelectionClear = useCallback((cellKeys: string[]) => {
+    const keys = new Set(cellKeys);
+    // 提取 row:col 用于匹配汇总行单元格（汇总行无 sheetId）
+    const rowColKeys = new Set(
+      cellKeys.map((k) => {
+        const parts = k.split(':');
+        return `${parts[1]}:${parts[2]}`;
+      }),
+    );
+    setCellBindings((prev) => prev.filter((b) => !keys.has(b.cellKey)));
+    setSummaries((prev) =>
+      prev.map((s) => ({
+        ...s,
+        cells: s.cells.filter((c) => !rowColKeys.has(`${s.row}:${c.column}`)),
+      })),
+    );
+  }, []);
+
   return (
     <div className="re">
       {messageContextHolder}
@@ -571,20 +633,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
           {extraActions}
-          {onSaveReport && (
-            <Button
-              icon={<SaveOutlined />}
-              loading={savingReport}
-              onClick={handleSaveReport}
-            >
-              保存
-            </Button>
-          )}
-          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
-            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
-              循环块
-            </Button>
-          </Badge>
+          {extraActions && <Divider type="vertical" />}
           {onImport && (
             <Upload
               accept=".xlsx,.xls"
@@ -599,14 +648,27 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               </Button>
             </Upload>
           )}
+          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
+            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
+              循环块
+            </Button>
+          </Badge>
           {onExport && (
             <Button
-              type="primary"
               icon={<ExportOutlined />}
               loading={exporting}
               onClick={handleExport}
             >
               导出报表
+            </Button>
+          )}
+          {onSaveReport && (
+            <Button
+              icon={<SaveOutlined />}
+              loading={savingReport}
+              onClick={handleSaveReport}
+            >
+              保存
             </Button>
           )}
         </div>
@@ -618,9 +680,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <ResizablePanel
             id="left-panel"
             panelRef={leftPanelRef}
-            defaultSize="20%"
-            minSize="280px"
-            maxSize="35%"
+            defaultSize="25%"
+            minSize="320px"
+            maxSize="40%"
             collapsible
             collapsedSize="36px"
             onResize={(_size, _id, _prev) => {
@@ -671,6 +733,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
               onCellValueChange={handleCellValueChange}
+              onSelectionClear={handleSelectionClear}
               onFontRequest={onFontRequest}
               onReady={() => console.log('[ReportEngine] Univer ready, sheetId:', sheetRef.current?.getActiveSheetId())}
             />
@@ -681,9 +744,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <ResizablePanel
             id="right-panel"
             panelRef={rightPanelRef}
-            defaultSize="20%"
-            minSize="280px"
-            maxSize="35%"
+            defaultSize="30%"
+            minSize="360px"
+            maxSize="40%"
             collapsible
             collapsedSize="36px"
             onResize={(_size, _id, _prev) => {
@@ -723,8 +786,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
       {/* 循环块管理抽屉 */}
       <Drawer
-        title="循环块管理"
-        extra={<span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>定义模板中需要重复渲染的区域</span>}
+        title={
+          <span>
+            循环块管理
+            <Tooltip
+              title="循环块用于定义模板中需要重复渲染的区域，按驱动数据集的行数（或分组数）复制多次。块内单元格通过「循环字段」引用当前迭代行的字段。新增循环块请在表格中选中区域，右键选择「设为循环块」。"
+            >
+              <QuestionCircleOutlined style={{ marginLeft: 6, color: 'rgba(0,0,0,0.45)', cursor: 'pointer', fontSize: 14 }} />
+            </Tooltip>
+          </span>
+        }
         placement="right"
         styles={{ wrapper: { width: 520 } }}
         open={loopDrawerOpen}
@@ -734,6 +805,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         <LoopBlockManager
           loopBlocks={loopBlocks}
           datasets={datasets}
+          params={params}
           onChange={setLoopBlocks}
         />
       </Drawer>

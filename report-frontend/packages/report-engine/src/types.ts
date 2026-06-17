@@ -20,6 +20,20 @@ export type ParamSourceType = 'External' | 'Cell' | 'Constant';
 
 // ─── 标签映射 ──────────────────────────────────
 
+export const DATA_TYPE_LABELS: Record<DataType, string> = {
+  STRING: '字符串', NUMBER: '数字', DATE: '日期',
+  DATETIME: '日期时间', BOOLEAN: '布尔值', JSON: 'JSON',
+};
+
+/** DataType → 中文标签（找不到回退原始值） */
+export function dataTypeLabel(dt: DataType | string): string {
+  return DATA_TYPE_LABELS[dt as DataType] ?? dt;
+}
+
+/** Select 组件 options（参数弹窗等表单复用） */
+export const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> =
+  Object.entries(DATA_TYPE_LABELS).map(([value, label]) => ({ value: value as DataType, label }));
+
 export const AGG_LABELS: Record<Aggregation, string> = {
   NONE: '不聚合', COUNT: '计数', COUNT_DISTINCT: '去重计数',
   SUM: '求和', AVG: '平均值', MAX: '最大值', MIN: '最小值',
@@ -109,10 +123,10 @@ export interface ReportParam {
   id: string;
   /** 表达式中引用的名字（${name}） */
   name: string;
-  /** 显示名（可选，缺省用 name） */
-  label?: string;
+  /** 别名/中文名称（可选，缺省用 name；在表达式选择界面展示） */
+  alias?: string;
   dataType: DataType;
-  /** 默认值（渲染时若外部未传值则用它） */
+  /** 默认值（渲染时若外部未传值则用它；无默认值则导出/预览时必须传入） */
   defaultValue?: string;
 }
 

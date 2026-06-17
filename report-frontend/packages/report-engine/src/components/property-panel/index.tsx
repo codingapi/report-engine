@@ -95,10 +95,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const previewText = summaryRow
     ? (() => {
         const c = summaryRow.cells.find((sc) => sc.column === info.column);
-        return c ? valueDisplayText(c.value, datasets, loopBlocks) : '';
+        return c ? valueDisplayText(c.value, datasets, loopBlocks, params) : '';
       })()
     : binding
-      ? valueDisplayText(binding.value, datasets, loopBlocks)
+      ? valueDisplayText(binding.value, datasets, loopBlocks, params)
       : '';
 
   // 位置显示（A1 记法）
@@ -168,6 +168,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 conditions={binding.conditions}
                 datasets={datasets}
                 loopBlocks={loopBlocks}
+                params={params}
                 onChange={(conditions) => updateBinding({ conditions })}
               />
             </div>
@@ -240,7 +241,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           /* ── 空白单元格 ── */
           <div className="re-prop-unbound">
             <div className="re-prop-unbound__hint">
-              此单元格未配置。可绑定数据字段；如需汇总行（小计/总计），在表格中框选同一行的单元格后右键「设为汇总行」。
+              未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。
             </div>
             <Button
               type="dashed"

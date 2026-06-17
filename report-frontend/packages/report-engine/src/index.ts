@@ -39,6 +39,9 @@ export type {
 } from './types';
 
 export {
+  DATA_TYPE_LABELS,
+  dataTypeLabel,
+  DATA_TYPE_OPTIONS,
   AGG_LABELS,
   EXPANSION_LABELS,
   OPERATOR_LABELS,

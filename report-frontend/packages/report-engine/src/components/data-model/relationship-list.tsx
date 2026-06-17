@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Empty, Tag, Tree, Divider } from 'antd';
 import { SwapOutlined, KeyOutlined } from '@ant-design/icons';
 import type { Relationship, Dataset, DataSourceType } from '../../types';
-import { findDataset } from '../../types';
+import { findDataset, dataTypeLabel } from '../../types';
 
 interface RelationshipListProps {
   relationships: Relationship[];
@@ -163,7 +163,7 @@ function buildGroupedTreeData(
               }}
             >
               <span style={{ marginRight: 4 }}>{f.alias || f.name}</span>
-              <span className="re-field-type">{f.dataType}</span>
+              <span className="re-field-type">{dataTypeLabel(f.dataType)}</span>
               {f.primaryKey && <KeyOutlined className="re-field-pk" style={{ marginLeft: 4 }} />}
               {relations &&
                 relations.map((rel, i) => (

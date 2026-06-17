@@ -43,6 +43,8 @@ import lombok.Data;
 public class Parameter {
     /** 参数名，被 {@link com.codingapi.report.expression.Value.ParamValue} 引用（如 {@code :deptId}） */
     private String name;
+    /** 别名/中文名称（可选），用于前端参数面板和表达式选择界面的友好展示 */
+    private String alias;
     /** 数据类型，决定前端参数面板的输入控件和后端值转换 */
     private DataType dataType;
     /** 值的来源（External/Cell/Constant），决定何时、从哪取值 */
