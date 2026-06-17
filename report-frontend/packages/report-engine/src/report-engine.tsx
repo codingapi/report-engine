@@ -60,6 +60,8 @@ export interface ReportEngineHandle {
   applyTemplate: (template: TemplatePreset) => void;
   /** 加载报表配置，整体恢复设计态 */
   loadReportConfig: (config: ReportConfig) => void;
+  /** 获取当前完整报表配置（外部调试/持久化用），表格为空时返回 null */
+  getReportConfig: () => ReportConfig | null;
 }
 
 /**
@@ -80,6 +82,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   onImport,
   onSaveReport,
   onFontRequest,
+  extraActions,
 }) => {
   const sheetRef = useRef<SheetPanelHandle>(null);
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -257,8 +260,24 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
   }, [messageApi, datasets]);
 
+  // 获取当前完整报表配置（外部按需调用）
+  const getReportConfig = useCallback((): ReportConfig | null => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) return null;
+    return {
+      id: reportId ?? undefined,
+      name: reportName,
+      dataModelId,
+      cellBindings,
+      loopBlocks,
+      summaries,
+      params,
+      template: snapshot,
+    };
+  }, [reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params]);
+
   // 暴露 ref
-  React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
+  React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig, getReportConfig }), [applyTemplate, loadReportConfig, getReportConfig]);
 
   // ─── cellProps：CellBinding → Univer CellProp 映射 ───
   const cellProps: Record<string, CellProp[]> = {};
@@ -517,6 +536,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       <div className="re-header">
         <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
+          {extraActions}
           {onSaveReport && (
             <Button
               icon={<SaveOutlined />}

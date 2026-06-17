@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Spin } from 'antd';
+import { Spin, Button, message } from 'antd';
+import { PrinterOutlined } from '@ant-design/icons';
 import { ReportEngine } from '@coding-report/report-engine';
 import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship, ReportValue } from '@coding-report/report-engine';
@@ -76,6 +77,16 @@ const EnginePage = () => {
   const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
   const engineRef = useRef<ReportEngineHandle>(null);
+
+  const handlePrintConfig = () => {
+    const config = engineRef.current?.getReportConfig();
+    if (!config) {
+      message.warning('表格为空，无配置可打印');
+      return;
+    }
+    console.log('[ReportConfig object]', config);
+    console.log('[ReportConfig JSON]\n', JSON.stringify(config, null, 2));
+  };
 
   // 加载公式目录
   useEffect(() => {
@@ -184,6 +195,11 @@ const EnginePage = () => {
       onExport={handleExport}
       onSaveReport={handleSaveReport}
       onFontRequest={fetchFonts}
+      extraActions={
+        <Button icon={<PrinterOutlined />} onClick={handlePrintConfig}>
+          打印配置
+        </Button>
+      }
     />
   );
 };
