@@ -147,7 +147,12 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                         for (const [colStr, cell] of Object.entries(cols as Record<string, { v?: unknown }>)) {
                             const col = Number(colStr);
                             if (Number.isNaN(col)) continue;
-                            const raw = cell?.v;
+                            // 仅当 mutation 真正携带值字段 v 时才视为内容变更。
+                            // 边框/填充等纯样式操作只带 s（样式）不带 v，若误读为空字符串，
+                            // 会把汇总行等已设内容同步清空（本格内容消失）。
+                            // 真正的删除内容操作 Univer 会显式带 v: null，'v' in cell 仍为真，不受影响。
+                            if (!cell || !('v' in cell)) continue;
+                            const raw = cell.v;
                             const value = raw == null ? '' : String(raw);
                             changes.push({ sheetId, row, col, value });
                         }
