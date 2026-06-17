@@ -7,19 +7,10 @@ import {
   HolderOutlined,
 } from '@ant-design/icons';
 import type { ReportParam } from '../../types';
-import { genId } from '../../types';
+import { genId, dataTypeLabel } from '../../types';
 import ParamModal from './param-modal';
 
 const { Text } = Typography;
-
-const DATA_TYPE_LABELS: Record<string, string> = {
-  STRING: '字符串',
-  NUMBER: '数字',
-  DATE: '日期',
-  DATETIME: '日期时间',
-  BOOLEAN: '布尔值',
-  JSON: 'JSON',
-};
 
 interface ParamManagerProps {
   params: ReportParam[];
@@ -129,7 +120,7 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
                 description={
                   <span>
                     <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
-                      {DATA_TYPE_LABELS[p.dataType] || p.dataType}
+                      {dataTypeLabel(p.dataType)}
                     </Tag>
                     {p.defaultValue ? (
                       <Text type="secondary" style={{ fontSize: 11 }}>

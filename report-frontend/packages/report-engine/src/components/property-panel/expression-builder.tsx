@@ -3,7 +3,7 @@ import { Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { InputRef } from 'antd';
 import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '../../types';
-import { findDataset } from '../../types';
+import { findDataset, dataTypeLabel } from '../../types';
 import { templateToString, parseTemplate } from '../../value-text';
 import { matchWithPinyin } from '../../pinyin';
 
@@ -116,7 +116,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         for (const f of ds.fields) {
           const fLabel = f.alias || f.name;
           const displayLabel = `${dsLabel}.${fLabel}`;
-          const desc = `${ds.id}.${f.name}`;
+          const desc = `${ds.id}.${f.name} · ${dataTypeLabel(f.dataType)}`;
           if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
             continue;
           }
@@ -135,7 +135,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         for (const f of ds.fields) {
           const fLabel = f.alias || f.name;
           const displayLabel = `${lbLabel}.${fLabel}`;
-          const desc = `${lb.id}.${f.name}`;
+          const desc = `${lb.id}.${f.name} · ${dataTypeLabel(f.dataType)}`;
           if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
             continue;
           }
@@ -155,7 +155,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         .map((p) => ({
           expr: p.name,
           label: p.alias || p.name,
-          desc: `\${${p.name}}`,
+          desc: `\${${p.name}} · ${dataTypeLabel(p.dataType)}`,
         }));
     }
 

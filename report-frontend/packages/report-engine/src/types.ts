@@ -20,6 +20,20 @@ export type ParamSourceType = 'External' | 'Cell' | 'Constant';
 
 // ─── 标签映射 ──────────────────────────────────
 
+export const DATA_TYPE_LABELS: Record<DataType, string> = {
+  STRING: '字符串', NUMBER: '数字', DATE: '日期',
+  DATETIME: '日期时间', BOOLEAN: '布尔值', JSON: 'JSON',
+};
+
+/** DataType → 中文标签（找不到回退原始值） */
+export function dataTypeLabel(dt: DataType | string): string {
+  return DATA_TYPE_LABELS[dt as DataType] ?? dt;
+}
+
+/** Select 组件 options（参数弹窗等表单复用） */
+export const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> =
+  Object.entries(DATA_TYPE_LABELS).map(([value, label]) => ({ value: value as DataType, label }));
+
 export const AGG_LABELS: Record<Aggregation, string> = {
   NONE: '不聚合', COUNT: '计数', COUNT_DISTINCT: '去重计数',
   SUM: '求和', AVG: '平均值', MAX: '最大值', MIN: '最小值',

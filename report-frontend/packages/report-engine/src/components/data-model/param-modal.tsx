@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, Select } from 'antd';
-import type { ReportParam, DataType } from '../../types';
+import type { ReportParam } from '../../types';
+import { DATA_TYPE_OPTIONS } from '../../types';
 
 interface ParamModalProps {
   open: boolean;
@@ -11,14 +12,6 @@ interface ParamModalProps {
   onClose: () => void;
   onConfirm: (param: ReportParam) => void;
 }
-
-const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> = [
-  { value: 'STRING', label: '字符串' },
-  { value: 'NUMBER', label: '数字' },
-  { value: 'DATE', label: '日期' },
-  { value: 'DATETIME', label: '日期时间' },
-  { value: 'BOOLEAN', label: '布尔值' },
-];
 
 /** 参数添加/编辑弹窗：四字段表单（name / alias / dataType / defaultValue）。 */
 const ParamModal: React.FC<ParamModalProps> = ({
