@@ -828,6 +828,90 @@ class ReportScenarioTest {
         assertEquals("橙子", text(sheet, 2, 0));
     }
 
+    @Test
+    @DisplayName("带声明格错位：name@(0,0) 与 price@(11,1) 同源对齐成一条带，B12 占位不残留")
+    void bandDeclCellsAtDifferentRowsAlignAndNoStalePlaceholder() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // name 声明在 (0,0)，price 声明在 (11,1)（用户随意拖放，行不一致）
+        CellBinding nameCol = listCol(new CellRef("sheet1", 0, 0), new FieldRef("d_prod", "name"));
+        CellBinding priceCol = listCol(new CellRef("sheet1", 11, 1), new FieldRef("d_prod", "price"));
+        Report report = report("r_misaligned", dm, List.of(nameCol, priceCol), List.of(), List.of());
+
+        // 模板：两个声明格各带占位文字
+        Workbook template = new Workbook();
+        Sheet tplSheet = new Sheet();
+        tplSheet.setId("sheet1");
+        tplSheet.setName("Sheet1");
+        tplSheet.setCells(List.of(
+                textProto(0, 0, "商品名"),
+                textProto(11, 1, "价格")));
+        template.setSheets(List.of(tplSheet));
+
+        Workbook workbook = renderer.render(dm, report, new ParamContext(Map.of()), template);
+        Sheet sheet = workbook.getSheets().get(0);
+
+        // 同源字段对齐成一条带，从 bandBase=min(0,11)=0 起逐行：name@col0 / price@col1 同行
+        assertEquals("苹果", text(sheet, 0, 0));
+        assertEquals(5.0, number(sheet, 0, 1), 0.0001);
+        assertEquals("香蕉", text(sheet, 1, 0));
+        assertEquals(3.0, number(sheet, 1, 1), 0.0001);
+        assertEquals("橙子", text(sheet, 2, 0));
+
+        // price 声明格 (11,1) 的占位文字"价格"不应残留（数据只到 row2，未覆盖 row11）
+        assertNull(findCell(sheet, 11, 1), "price 声明格 B12 的占位文字应被清除，不残留");
+    }
+
+    @Test
+    @DisplayName("显式独立带：name@(0,0) 对齐带 + price@(2,2) 独立带，各自从声明行展开互不对齐")
+    void explicitIndependentBandStaggers() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // name 普通对齐带，从 row0 起
+        CellBinding nameCol = listCol(new CellRef("sheet1", 0, 0), new FieldRef("d_prod", "name"));
+        // price 显式独立带，从它自己的声明行 row2 起，不与 name 对齐
+        CellBinding priceCol = CellBinding.builder()
+                .cell(new CellRef("sheet1", 2, 2)).value(new Value.FieldValue(new FieldRef("d_prod", "price")))
+                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).independent(true).build();
+        Report report = report("r_indep_explicit", dm, List.of(nameCol, priceCol), List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "independent-explicit");
+
+        // name 从 row0：苹果/香蕉/橙子
+        assertEquals("苹果", text(sheet, 0, 0));
+        assertEquals("香蕉", text(sheet, 1, 0));
+        assertEquals("橙子", text(sheet, 2, 0));
+        // price 独立带从 row2（声明行），与 name 错位：row2=5, row3=3, row4=4
+        assertEquals(5.0, number(sheet, 2, 2), 0.0001);
+        assertEquals(3.0, number(sheet, 3, 2), 0.0001);
+        assertEquals(4.0, number(sheet, 4, 2), 0.0001);
+        // price 不应出现在 row0/row1（证明没被拉到对齐带的基准行 0）
+        assertNull(findCell(sheet, 0, 2), "独立带 price 不应对齐到 row0");
+        assertNull(findCell(sheet, 1, 2), "独立带 price 不应对齐到 row1");
+    }
+
+    private static Cell textProto(int row, int col, String value) {
+        Cell c = new Cell();
+        c.setRow(row);
+        c.setCol(col);
+        c.setValue(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode(value));
+        return c;
+    }
+
     // ============================================================
     // ---- 公共构造 / 运行 / 断言辅助 ----
     // ============================================================

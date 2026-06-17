@@ -144,6 +144,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 expandMode={binding.expandMode}
                 mergeRepeated={binding.mergeRepeated}
                 parentCell={binding.parentCell}
+                independent={binding.independent ?? false}
                 cellBindings={cellBindings}
                 currentCellKey={cellKey}
                 onChange={(patch) => updateBinding(patch)}

@@ -9,9 +9,10 @@ interface ExpansionEditorProps {
   expandMode: ExpandMode;
   mergeRepeated: boolean;
   parentCell: string | null;
+  independent: boolean;
   cellBindings: CellBinding[];
   currentCellKey: string;
-  onChange: (patch: Partial<Pick<CellBinding, 'expansion' | 'expandMode' | 'mergeRepeated' | 'parentCell'>>) => void;
+  onChange: (patch: Partial<Pick<CellBinding, 'expansion' | 'expandMode' | 'mergeRepeated' | 'parentCell' | 'independent'>>) => void;
 }
 
 /** 将 cellKey "sheetId:row:col" 转为简短显示 */
@@ -26,6 +27,7 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
   expandMode,
   mergeRepeated,
   parentCell,
+  independent,
   cellBindings,
   currentCellKey,
   onChange,
@@ -103,6 +105,23 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
           </div>
           <div className="re-prop-exp-section__hint">
             相邻相同值合并为一个跨行/跨列单元格（多级分组表头常用）
+          </div>
+        </div>
+      )}
+
+      {/* 独立纵向带 */}
+      {expansion === 'VERTICAL' && (
+        <div className="re-prop-exp-section">
+          <div className="re-prop-exp-section__label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>独立纵向带</span>
+            <Switch
+              size="small"
+              checked={independent}
+              onChange={(checked) => onChange({ independent: checked })}
+            />
+          </div>
+          <div className="re-prop-exp-section__hint">
+            开启后本列不与同源列对齐，从本格起独立向下展开（交错排版）。注意：独立列无法再与其它列做跨列聚合/跨列汇总/主从合并。
           </div>
         </div>
       )}

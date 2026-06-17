@@ -167,17 +167,21 @@ public class ReportRenderer {
         List<CellBinding> band = new ArrayList<>();
         List<CellBinding> singles = new ArrayList<>();
         List<CellBinding> dataCells = new ArrayList<>();
+        // 独立纵向带：显式标记的列，从自己的声明行独立展开，不与同源列对齐
+        List<CellBinding> independentCells = new ArrayList<>();
         for (CellBinding b : report.getCellBindings()) {
             if (inAnyLoop(report, b.getCell())) {
                 continue;
             }
             (b.getExpansion() == Expansion.VERTICAL ? band : singles).add(b);
-            if (referencesData(b)) {
+            if (b.isIndependent() && b.getExpansion() == Expansion.VERTICAL && referencesData(b)) {
+                independentCells.add(b);
+            } else if (referencesData(b)) {
                 dataCells.add(b);
             }
         }
 
-        // 2. 按数据集连通性分组
+        // 2. 按数据集连通性分组（仅对齐带；独立带单独处理）
         List<List<CellBinding>> groups = groupByConnectivity(dataCells);
 
         // 3. 每组独立渲染纵向带
@@ -241,6 +245,19 @@ public class ReportRenderer {
             int insertion = Math.max(0, n - (1 + designSummaryRows));
             globalShift = Math.max(globalShift, insertion);
             bandRecords.add(new int[]{groupBandBase, insertion});
+        }
+
+        // 3a-独立带：显式标记的独立列，按声明行分组，各自从自己的声明行起独立向下展开。
+        //   它们是"绝对锚定"的覆盖层：固定在声明行，不随对齐带扩展而下移，也不参与下方内容的位移、
+        //   汇总与模板 merge 下移（故不加入 bandRecords / globalShift / footprint）。
+        for (List<CellBinding> indepGroup : groupIndependentByRow(independentCells)) {
+            RawTable combined = buildCombinedTable(indepGroup);
+            RawTable filtered = Operators.filter(combined, collectConditions(indepGroup), ctx, engine);
+            int indepBase = Integer.MAX_VALUE;
+            for (CellBinding b : indepGroup) {
+                indepBase = Math.min(indepBase, b.getCell().row());
+            }
+            renderBand(indepGroup, List.of(), filtered, indepBase, ctx, canvas);
         }
 
         // 3b. 下移模板 merge：纵向带扩展后，带下方和汇总行的模板合并区域需要跟随下移
@@ -329,6 +346,17 @@ public class ReportRenderer {
             }
         }
 
+        // 3e. 清理带声明格的残留占位文本：带统一从 bandBase 起逐行填充，
+        //     若某绑定的声明格本身不落在输出范围内（如声明在 B12，但带从第 0 行展开，
+        //     数据行数不足以覆盖到第 12 行），其设计期占位文本不会被数据覆盖 →
+        //     必须清除，否则导出会残留一个孤立的字段占位（如 B12 处多出的"性别"）。
+        for (CellBinding b : band) {
+            String k = key(b.getCell().row(), b.getCell().column());
+            if (!canvas.dynamic.contains(k)) {
+                canvas.cells.remove(k);
+            }
+        }
+
         final int shift = globalShift;
         final int base = globalBandBase;
         final RawTable evalTable = firstGroupFiltered;
@@ -378,6 +406,19 @@ public class ReportRenderer {
      * <p>两个数据集如果在 DataModel 的 Relationship 图中连通（直接或间接），
      * 则归入同一组，渲染时走 JOIN 同行迭代；不连通的各自独立渲染。
      */
+    /**
+     * 独立带按声明行分组：同一声明行的独立列归一组（彼此对齐成一条小带），不同声明行各自成组。
+     * <p>这样既支持"单列从某行独立展开"，也支持"同一行的若干独立列对齐成一段并列子表"。
+     */
+    private List<List<CellBinding>> groupIndependentByRow(List<CellBinding> cells) {
+        if (cells.isEmpty()) return List.of();
+        Map<Integer, List<CellBinding>> byRow = new LinkedHashMap<>();
+        for (CellBinding b : cells) {
+            byRow.computeIfAbsent(b.getCell().row(), k -> new ArrayList<>()).add(b);
+        }
+        return new ArrayList<>(byRow.values());
+    }
+
     private List<List<CellBinding>> groupByConnectivity(List<CellBinding> dataCells) {
         if (dataCells.isEmpty()) return List.of();
 

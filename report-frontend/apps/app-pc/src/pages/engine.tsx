@@ -44,6 +44,7 @@ function toBindingDTO(binding: CellBinding): RenderBindingDTO {
       operator: c.operator,
       right: c.right ? toValueDTO(c.right) : null,
     })),
+    independent: binding.independent ?? false,
     preview: binding.preview,
   };
 }

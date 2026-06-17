@@ -30,6 +30,8 @@ export interface RenderBindingDTO {
   mergeRepeated: boolean;
   parentCell: string | null;
   conditions: RenderConditionDTO[];
+  /** 独立纵向带：true 时本列从自己的声明行独立展开，不与同源列对齐 */
+  independent?: boolean;
   /** 表达式预览（友好文本，后端仅存储不渲染） */
   preview?: string;
 }

@@ -291,6 +291,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         expandMode: b.expandMode,
         mergeRepeated: b.mergeRepeated,
         parentCell: b.parentCell,
+        independent: b.independent ?? false,
         conditionsCount: b.conditions.length,
       },
     }];

@@ -126,6 +126,11 @@ export interface CellBinding {
   mergeRepeated: boolean;
   parentCell: string | null;
   conditions: Condition[];
+  /**
+   * 独立纵向带（默认 false）。true 时本列不与同源列对齐，从自己的声明行起独立向下展开（交错排版）。
+   * 代价：与其它列无法再做跨列聚合/跨列汇总/主从合并。
+   */
+  independent?: boolean;
   /** 表达式预览（友好文本，导出时附带存储；派生自 value，不作为权威来源） */
   preview?: string;
 }

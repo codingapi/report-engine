@@ -153,7 +153,15 @@ function buildGroupedTreeData(
         return {
           key: `grouped-${fieldKey}`,
           title: (
-            <span>
+            <span
+              className="re-field-drag"
+              draggable
+              onDragStart={(e) => {
+                const data = { datasetId: ds.id, field: f.name, alias: f.alias || f.name };
+                e.dataTransfer.setData('text/plain', JSON.stringify(data));
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+            >
               <span style={{ marginRight: 4 }}>{f.alias || f.name}</span>
               <span className="re-field-type">{f.dataType}</span>
               {f.primaryKey && <KeyOutlined className="re-field-pk" style={{ marginLeft: 4 }} />}
