@@ -130,7 +130,83 @@ public class ExcelExporter {
                         m.getStartCol() + m.getColSpan() - 1
                 ));
             }
+            // 合并区边框补全：锚点格的边框需铺到整个合并区周边，否则只在左上角画出残缺边框
+            for (Merge m : dto.getMerges()) {
+                applyMergeBorders(wb, sheet, dto, m, styleCache);
+            }
         }
+    }
+
+    /**
+     * 把合并区锚点格（左上格）的边框铺满整个合并区域：
+     * <p>POI 中合并单元格只有左上格的样式生效，若边框只设在锚点格上，Excel 仅在该格四周描边，
+     * 视觉上合并区边框残缺。此方法按位置把锚点边框分配到周边各格——顶边铺到首行各格、
+     * 底边铺到末行各格、左/右边铺到首/末列各格——并保留 RGB 颜色与锚点的字体/填充。
+     */
+    private void applyMergeBorders(XSSFWorkbook wb, org.apache.poi.ss.usermodel.Sheet sheet,
+                                   Sheet dto, Merge m, Map<String, CellStyle> styleCache) {
+        int r1 = m.getStartRow();
+        int r2 = m.getStartRow() + m.getRowSpan() - 1;
+        int c1 = m.getStartCol();
+        int c2 = m.getStartCol() + m.getColSpan() - 1;
+        if (r1 == r2 && c1 == c2) {
+            return; // 非真正的合并（1x1）
+        }
+        Cell anchor = findCell(dto, r1, c1);
+        if (anchor == null || anchor.getStyle() == null || anchor.getStyle().getBorders() == null) {
+            return;
+        }
+        Borders bd = anchor.getStyle().getBorders();
+        if (bd.getTop() == null && bd.getBottom() == null && bd.getLeft() == null && bd.getRight() == null) {
+            return;
+        }
+        for (int r = r1; r <= r2; r++) {
+            for (int c = c1; c <= c2; c++) {
+                Borders edges = new Borders();
+                if (r == r1) edges.setTop(bd.getTop());
+                if (r == r2) edges.setBottom(bd.getBottom());
+                if (c == c1) edges.setLeft(bd.getLeft());
+                if (c == c2) edges.setRight(bd.getRight());
+                if (edges.getTop() == null && edges.getBottom() == null
+                        && edges.getLeft() == null && edges.getRight() == null) {
+                    continue; // 内部格无周边边框
+                }
+                Style cellStyle = styleWithBorders(anchor.getStyle(), edges);
+                org.apache.poi.ss.usermodel.Row row = getOrCreateRow(sheet, r);
+                org.apache.poi.ss.usermodel.Cell cell = row.getCell(c);
+                if (cell == null) {
+                    cell = row.createCell(c);
+                }
+                cell.setCellStyle(buildCellStyle(wb, cellStyle, styleCache));
+            }
+        }
+    }
+
+    /** 复制一个 Style，但只保留指定的周边边框（字体/对齐/填充等其余样式保留，内部边框去除） */
+    private static Style styleWithBorders(Style base, Borders edges) {
+        Style s = new Style();
+        s.setFont(base.getFont());
+        s.setAlign(base.getAlign());
+        s.setValign(base.getValign());
+        s.setWrap(base.getWrap());
+        s.setRotation(base.getRotation());
+        s.setFill(base.getFill());
+        s.setNumberFormat(base.getNumberFormat());
+        s.setPadding(base.getPadding());
+        s.setBorders(edges);
+        return s;
+    }
+
+    private static Cell findCell(Sheet dto, int row, int col) {
+        if (dto.getCells() == null) {
+            return null;
+        }
+        for (Cell c : dto.getCells()) {
+            if (c.getRow() == row && c.getCol() == col) {
+                return c;
+            }
+        }
+        return null;
     }
 
     private void buildCell(XSSFWorkbook wb, org.apache.poi.ss.usermodel.Sheet sheet, Cell dto, Map<String, CellStyle> styleCache) {

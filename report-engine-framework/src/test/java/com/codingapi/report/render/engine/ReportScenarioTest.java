@@ -778,6 +778,56 @@ class ReportScenarioTest {
                 "原 row 1 的 merge 不应再存在（避免数据区内出现多余合并）");
     }
 
+    @Test
+    @DisplayName("静态页脚下移：band(row0)+汇总(row1)+静态'你好'(row2)，3 条数据后页脚应落 row4 不丢失")
+    void staticFooterFollowsBandExpansion() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // band 在 row 0：name/price（VERTICAL LIST）
+        CellBinding nameCol = listCol(new CellRef("sheet1", 0, 0), new FieldRef("d_prod", "name"));
+        CellBinding priceCol = listCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "price"));
+        // 汇总在设计 row 1：合计 + SUM(price)
+        SummaryRow total = SummaryRow.builder().row(1).groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
+                SummaryCell.label(0, "合计"),
+                SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
+        Report report = report("r_footer", dm, List.of(nameCol, priceCol),
+                List.of(), List.of(), List.of(total));
+
+        // 模板：仅静态页脚"你好"在 row 2（无任何绑定）
+        Workbook template = new Workbook();
+        Sheet tplSheet = new Sheet();
+        tplSheet.setId("sheet1");
+        tplSheet.setName("Sheet1");
+        Cell footer = new Cell();
+        footer.setRow(2);
+        footer.setCol(0);
+        footer.setValue(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.textNode("你好"));
+        tplSheet.setCells(List.of(footer));
+        template.setSheets(List.of(tplSheet));
+
+        Workbook workbook = renderer.render(dm, report, new ParamContext(Map.of()), template);
+        Sheet sheet = workbook.getSheets().get(0);
+
+        // 数据 3 行：row 0/1/2
+        assertEquals("苹果", text(sheet, 0, 0));
+        assertEquals("香蕉", text(sheet, 1, 0));
+        assertEquals("橙子", text(sheet, 2, 0));
+        // 汇总落 row 3（band 扩展插入 2 行：3 数据 - 1 声明行）
+        assertEquals("合计", text(sheet, 3, 0));
+        assertEquals(12.0, number(sheet, 3, 1), 0.0001);
+        // 静态页脚"你好"应下移到 row 4（汇总下方），而非被数据覆盖丢失
+        assertEquals("你好", text(sheet, 4, 0));
+        // 原 row 2 此时是数据"橙子"，不应仍是"你好"
+        assertEquals("橙子", text(sheet, 2, 0));
+    }
+
     // ============================================================
     // ---- 公共构造 / 运行 / 断言辅助 ----
     // ============================================================
