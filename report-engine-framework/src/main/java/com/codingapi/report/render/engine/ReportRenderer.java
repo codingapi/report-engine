@@ -1,7 +1,9 @@
 package com.codingapi.report.render.engine;
 
 import com.codingapi.report.excel.pojo.Cell;
+import com.codingapi.report.excel.pojo.Column;
 import com.codingapi.report.excel.pojo.Merge;
+import com.codingapi.report.excel.pojo.Row;
 import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
@@ -182,12 +184,16 @@ public class ReportRenderer {
         int globalShift = 0;
         int globalBandBase = Integer.MAX_VALUE;
         RawTable firstGroupFiltered = null;
-        // 记录每条带的基准行和扩展行数，用于后续下移模板 merge
+        // 记录每条带的基准行和"净插入行数"，用于后续下移模板 merge / 静态格
         List<int[]> bandRecords = new ArrayList<>();
         // 模板原始 merge 数量（renderBand 会追加新 merge，只对模板 merge 做下移）
         int templateMergeCount = canvas.merges.size();
         // 汇总行位置：模板行号 → 输出行号（用于精确下移跟随汇总的模板 merge）
         Map<Integer, Integer> summaryOutputRows = new HashMap<>();
+        // 所有带占据的设计行下沿（带声明行 + 汇总声明行的最大值），其下方的静态格才需要下移
+        int footprintBottom = Integer.MIN_VALUE;
+        // 所有汇总声明行的集合：这些行由汇总自身渲染，静态格不在此处搬运
+        Set<Integer> summaryDesignRows = new HashSet<>();
 
         for (List<CellBinding> group : groups) {
             // 组内 band cells
@@ -216,10 +222,25 @@ public class ReportRenderer {
 
             // 渲染带：只把"列落在本带"的汇总行交给本带，避免并列报表互相串扰
             List<SummaryRow> groupSummaries = summariesForBand(report.getSummaries(), groupBand);
+            // 统计本带占用的"汇总声明行"：每个声明行只算一行设计行，不计入插入量
+            int maxDesignRow = groupBandBase;
+            int designSummaryRows = 0;
+            Set<Integer> seenSdRows = new HashSet<>();
+            for (SummaryRow s : groupSummaries) {
+                if (s.getRow() != null && seenSdRows.add(s.getRow())) {
+                    designSummaryRows++;
+                    maxDesignRow = Math.max(maxDesignRow, s.getRow());
+                }
+            }
+            summaryDesignRows.addAll(seenSdRows);
+            footprintBottom = Math.max(footprintBottom, maxDesignRow);
+
             int n = renderBand(groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas, summaryOutputRows);
-            int groupShift = n > 0 ? n - 1 : 0;
-            globalShift = Math.max(globalShift, groupShift);
-            bandRecords.add(new int[]{groupBandBase, groupShift});
+            // 净插入行数 = 输出行数 - 已占用的设计行数（带声明行 1 行 + 各汇总声明行）。
+            // 汇总声明行本身已在设计中占位，不应被重复计入扩展量，否则带下方内容会多移。
+            int insertion = Math.max(0, n - (1 + designSummaryRows));
+            globalShift = Math.max(globalShift, insertion);
+            bandRecords.add(new int[]{groupBandBase, insertion});
         }
 
         // 3b. 下移模板 merge：纵向带扩展后，带下方和汇总行的模板合并区域需要跟随下移
@@ -244,6 +265,68 @@ public class ReportRenderer {
                 }
             }
             // 其他（带扩展范围内的非汇总 merge）：属于模板残留，随数据覆盖，不下移
+        }
+
+        // 3c. 下移带下方的静态模板格子：标题/页脚等无绑定的模板内容（如末行说明文字）
+        //     必须随数据扩展一起下移，否则会被展开的数据行覆盖或停留在错误位置。
+        //     只搬运"位于带下沿之下、且非汇总声明行、且非绑定格"的纯静态格。
+        if (footprintBottom != Integer.MIN_VALUE && !canvas.template.isEmpty()) {
+            Set<String> bindingKeys = new HashSet<>();
+            for (CellBinding b : report.getCellBindings()) {
+                if (!inAnyLoop(report, b.getCell())) {
+                    bindingKeys.add(key(b.getCell().row(), b.getCell().column()));
+                }
+            }
+            // 先快照需要搬运的模板格（避免遍历时修改 canvas.cells）
+            List<Cell> staticCells = new ArrayList<>(canvas.template.values());
+            for (Cell tc : staticCells) {
+                int r = tc.getRow();
+                if (r <= footprintBottom || summaryDesignRows.contains(r)
+                        || bindingKeys.contains(key(r, tc.getCol()))) {
+                    continue;
+                }
+                int sh = 0;
+                for (int[] rec : bandRecords) {
+                    if (r >= rec[0] + 1) {
+                        sh += rec[1];
+                    }
+                }
+                if (sh == 0) {
+                    continue; // 带未扩展，静态格原地不动（也未被数据覆盖）
+                }
+                String origKey = key(r, tc.getCol());
+                // 原位若未被数据动态写入，则是纯静态残留，需移除避免重影
+                if (!canvas.dynamic.contains(origKey)) {
+                    canvas.cells.remove(origKey);
+                }
+                Cell moved = new Cell();
+                moved.setRow(r + sh);
+                moved.setCol(tc.getCol());
+                moved.setValue(tc.getValue());
+                moved.setRichText(tc.getRichText());
+                moved.setStyle(tc.getStyle());
+                canvas.cells.put(key(r + sh, tc.getCol()), moved);
+            }
+        }
+
+        // 3d. 行高位移：模板自定义行高也要随带扩展跟随到输出行，否则页脚/汇总行的行高会错位
+        //     （带声明行的行高保留在首条数据行；汇总声明行跟随到汇总输出行；带下方行按累计 shift 下移）
+        if (footprintBottom != Integer.MIN_VALUE && !canvas.templateRows.isEmpty()) {
+            for (Row rw : canvas.templateRows) {
+                int r = rw.getIndex();
+                Integer summaryOutRow = summaryOutputRows.get(r);
+                if (summaryOutRow != null) {
+                    rw.setIndex(summaryOutRow);
+                } else if (r >= globalBandBase + 1) {
+                    int sh = 0;
+                    for (int[] rec : bandRecords) {
+                        if (r >= rec[0] + 1) {
+                            sh += rec[1];
+                        }
+                    }
+                    rw.setIndex(r + sh);
+                }
+            }
         }
 
         final int shift = globalShift;
@@ -551,6 +634,10 @@ public class ReportRenderer {
         EvalContext ec = EvalContext.aggregate(groupRows, ctx).withLocal("group", groupVal);
         for (SummaryCell sc : s.getCells()) {
             o.values.put(sc.getColumn(), engine.eval(sc.getValue(), ec));
+            // 汇总行从模板的"汇总声明行"继承样式（边框/字体随汇总行滚动到输出位置）
+            if (s.getRow() != null) {
+                o.sources.put(sc.getColumn(), new CellRef(null, s.getRow(), sc.getColumn()));
+            }
         }
         return o;
     }
@@ -685,6 +772,17 @@ public class ReportRenderer {
         final Map<String, Cell> cells = new LinkedHashMap<>();
         final List<Merge> merges = new ArrayList<>();
         final Map<String, Cell> template = new HashMap<>();
+        /** 渲染过程中被动态写入（数据/聚合/汇总/循环）的格子 key，用于区分"已被数据覆盖"与"纯静态残留" */
+        final Set<String> dynamic = new HashSet<>();
+        // —— 模板的表级布局（行高/列宽/默认尺寸），渲染后需原样带出，否则导出会丢失尺寸 ——
+        String sheetId = "sheet1";
+        String sheetName = "Sheet1";
+        boolean hasTemplate = false;
+        double defaultRowHeight = 24;
+        double defaultColumnWidth = 88;
+        List<Column> columns = new ArrayList<>();
+        /** 模板原始行配置（按设计行号），渲染后按带扩展位移落到输出行 */
+        final List<Row> templateRows = new ArrayList<>();
     }
 
     /** 画布坐标 key：row:col */
@@ -702,6 +800,18 @@ public class ReportRenderer {
             return;
         }
         Sheet ts = template.getSheets().get(0);
+        // 带出表级布局：sheet 标识、默认行高/列宽、列宽配置、行高配置
+        canvas.hasTemplate = true;
+        if (ts.getId() != null) canvas.sheetId = ts.getId();
+        if (ts.getName() != null) canvas.sheetName = ts.getName();
+        canvas.defaultRowHeight = ts.getDefaultRowHeight();
+        canvas.defaultColumnWidth = ts.getDefaultColumnWidth();
+        if (ts.getColumns() != null) {
+            canvas.columns.addAll(ts.getColumns());
+        }
+        if (ts.getRows() != null) {
+            canvas.templateRows.addAll(ts.getRows());
+        }
         if (ts.getCells() != null) {
             for (Cell tc : ts.getCells()) {
                 canvas.template.put(key(tc.getRow(), tc.getCol()), tc);
@@ -741,6 +851,9 @@ public class ReportRenderer {
             canvas.cells.put(key(outRow, outCol), cell);
         }
         cell.setValue(toNode(value));
+        // 动态值覆盖任何模板残留的富文本（否则陈旧富文本会盖住数据显示）
+        cell.setRichText(null);
+        canvas.dynamic.add(key(outRow, outCol));
         if (source != null) {
             Cell src = canvas.template.get(key(source.row(), source.column()));
             if (src != null && src.getStyle() != null) {
@@ -762,12 +875,23 @@ public class ReportRenderer {
         }
 
         Sheet sheet = new Sheet();
-        sheet.setId("sheet1");
-        sheet.setName("Sheet1");
+        sheet.setId(canvas.sheetId);
+        sheet.setName(canvas.sheetName);
         sheet.setRowCount(maxRow + 1);
         sheet.setColumnCount(maxCol + 1);
         sheet.setCells(new ArrayList<>(canvas.cells.values()));
         sheet.setMerges(canvas.merges);
+        // 带出模板的表级布局：默认行高/列宽、列宽配置、（已按带扩展位移的）行高配置
+        if (canvas.hasTemplate) {
+            sheet.setDefaultRowHeight(canvas.defaultRowHeight);
+            sheet.setDefaultColumnWidth(canvas.defaultColumnWidth);
+            if (!canvas.columns.isEmpty()) {
+                sheet.setColumns(new ArrayList<>(canvas.columns));
+            }
+            if (!canvas.templateRows.isEmpty()) {
+                sheet.setRows(new ArrayList<>(canvas.templateRows));
+            }
+        }
 
         Workbook workbook = new Workbook();
         workbook.setSheets(List.of(sheet));
