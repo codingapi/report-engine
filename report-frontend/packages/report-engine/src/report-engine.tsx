@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, Divider, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Divider, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
@@ -648,11 +648,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               </Button>
             </Upload>
           )}
-          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
-            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
-              循环块
-            </Button>
-          </Badge>
+          <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
+            循环块{loopBlocks.length > 0 && `(${loopBlocks.length})`}
+          </Button>
           {onExport && (
             <Button
               icon={<ExportOutlined />}

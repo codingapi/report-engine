@@ -156,10 +156,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           key: 'condition',
           label: (
             <span>
-              条件
-              {binding.conditions.length > 0 && (
-                <Badge count={binding.conditions.length} size="small" style={{ marginLeft: 4 }} />
-              )}
+              条件{binding.conditions.length > 0 && `(${binding.conditions.length})`}
             </span>
           ),
           children: (
