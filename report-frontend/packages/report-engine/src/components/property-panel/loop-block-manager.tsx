@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
+import { Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { LoopBlock, Dataset, ReportParam } from '../../types';
 import { describeRange } from '../../utils/excel-cell';
@@ -26,99 +26,82 @@ const LoopBlockForm: React.FC<{
   allLoops: LoopBlock[];
   params?: ReportParam[];
   onUpdate: (patch: Partial<LoopBlock>) => void;
-  onDelete: () => void;
-}> = ({ lb, datasets, allLoops, params, onUpdate, onDelete }) => {
+}> = ({ lb, datasets, allLoops, params, onUpdate }) => {
   return (
     <div className="re-prop-loop-item__body">
       {/* 名称 */}
-      <SectionLabel text="循环块名称" hint="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）" />
-      <Input
-        size="small"
-        value={lb.label}
-        onChange={(e) => onUpdate({ label: e.target.value })}
-        placeholder="输入名称，如：员工薪资条"
-        style={{ marginBottom: 8 }}
-      />
+      <div className="re-form-field">
+        <SectionLabel text="循环块名称" hint="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）" />
+        <Input
+          size="small"
+          value={lb.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="输入名称，如：员工薪资条"
+        />
+      </div>
 
       {/* 模板区域（由右键选区确定，只读） */}
-      <SectionLabel
-        text="模板区域"
-        hint="循环块在表格中覆盖的矩形区域，由创建时选中的区域决定。"
-      />
-      <Input
-        size="small"
-        value={describeRegion(lb)}
-        readOnly
-        style={{ marginBottom: 8, background: '#f5f5f5' }}
-      />
+      <div className="re-form-field">
+        <SectionLabel text="模板区域" hint="循环块在表格中覆盖的矩形区域，由创建时选中的区域决定。" />
+        <Input
+          size="small"
+          value={describeRegion(lb)}
+          readOnly
+          style={{ background: '#f5f5f5' }}
+        />
+      </div>
 
       {/* 驱动数据集 */}
-      <SectionLabel
-        text="驱动数据集"
-        hint="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。"
-      />
-      <Select
-        size="small"
-        value={lb.source.datasetId || undefined}
-        onChange={(dsId) => onUpdate({ source: { ...lb.source, datasetId: dsId } })}
-        placeholder="选择驱动数据集"
-        style={{ width: '100%', marginBottom: 8 }}
-        options={datasetOptions(datasets)}
-      />
+      <div className="re-form-field">
+        <SectionLabel text="驱动数据集" hint="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。" />
+        <Select
+          size="small"
+          value={lb.source.datasetId || undefined}
+          onChange={(dsId) => onUpdate({ source: { ...lb.source, datasetId: dsId } })}
+          placeholder="选择驱动数据集"
+          style={{ width: '100%' }}
+          options={datasetOptions(datasets)}
+        />
+      </div>
 
       {/* 分组字段 */}
-      <SectionLabel
-        text="分组字段"
-        hint="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。"
-      />
-      <Select
-        size="small"
-        mode="multiple"
-        value={lb.source.groupBy}
-        onChange={(groupBy) => onUpdate({ source: { ...lb.source, groupBy } })}
-        placeholder="不分组（逐行迭代）"
-        style={{ width: '100%', marginBottom: 8 }}
-        options={fieldOptions(datasets, lb.source.datasetId)}
-      />
+      <div className="re-form-field">
+        <SectionLabel text="分组字段" hint="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。" />
+        <Select
+          size="small"
+          mode="multiple"
+          value={lb.source.groupBy}
+          onChange={(groupBy) => onUpdate({ source: { ...lb.source, groupBy } })}
+          placeholder="不分组（逐行迭代）"
+          style={{ width: '100%' }}
+          options={fieldOptions(datasets, lb.source.datasetId)}
+        />
+      </div>
 
       {/* 排序字段 */}
-      <SectionLabel text="排序字段" hint="控制循环迭代的输出顺序，可多选。" />
-      <Select
-        size="small"
-        mode="multiple"
-        value={lb.source.orderBy}
-        onChange={(orderBy) => onUpdate({ source: { ...lb.source, orderBy } })}
-        placeholder="不排序（按原始顺序）"
-        style={{ width: '100%', marginBottom: 8 }}
-        options={fieldOptions(datasets, lb.source.datasetId)}
-      />
+      <div className="re-form-field">
+        <SectionLabel text="排序字段" hint="控制循环迭代的输出顺序，可多选。" />
+        <Select
+          size="small"
+          mode="multiple"
+          value={lb.source.orderBy}
+          onChange={(orderBy) => onUpdate({ source: { ...lb.source, orderBy } })}
+          placeholder="不排序（按原始顺序）"
+          style={{ width: '100%' }}
+          options={fieldOptions(datasets, lb.source.datasetId)}
+        />
+      </div>
 
       {/* 过滤条件 */}
-      <SectionLabel
-        text="过滤条件"
-        hint="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。"
-      />
-      <ConditionEditor
-        conditions={lb.source.filters}
-        datasets={datasets}
-        loopBlocks={allLoops}
-        params={params}
-        onChange={(filters) => onUpdate({ source: { ...lb.source, filters } })}
-      />
-
-      {/* 删除 */}
-      <div className="re-prop-actions">
-        <Popconfirm
-          title="删除此循环块？"
-          description="删除后块内的循环字段引用将失效"
-          onConfirm={onDelete}
-          okText="删除"
-          cancelText="取消"
-        >
-          <Button type="text" size="small" danger icon={<DeleteOutlined />}>
-            删除此循环块
-          </Button>
-        </Popconfirm>
+      <div className="re-form-field">
+        <SectionLabel text="过滤条件" hint="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。" />
+        <ConditionEditor
+          conditions={lb.source.filters}
+          datasets={datasets}
+          loopBlocks={allLoops}
+          params={params}
+          onChange={(filters) => onUpdate({ source: { ...lb.source, filters } })}
+        />
       </div>
     </div>
   );
@@ -156,7 +139,27 @@ const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
           onChange={setActiveKey}
           items={loopBlocks.map((lb, i) => ({
             key: lb.id,
-            label: lb.label || `循环块${i + 1}`,
+            label: (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span>{lb.label || `循环块${i + 1}`}</span>
+                <Popconfirm
+                  title="删除此循环块？"
+                  description="删除后块内的循环字段引用将失效"
+                  onConfirm={(e) => {
+                    e?.stopPropagation();
+                    handleDelete(i);
+                  }}
+                  onCancel={(e) => e?.stopPropagation()}
+                  okText="删除"
+                  cancelText="取消"
+                >
+                  <DeleteOutlined
+                    style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>
+              </span>
+            ),
             children: (
               <LoopBlockForm
                 lb={lb}
@@ -164,7 +167,6 @@ const LoopBlockManager: React.FC<LoopBlockManagerProps> = ({
                 allLoops={loopBlocks}
                 params={params}
                 onUpdate={(patch) => handleUpdate(i, patch)}
-                onDelete={() => handleDelete(i)}
               />
             ),
           }))}

@@ -786,6 +786,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
       {/* 循环块管理抽屉 */}
       <Drawer
+        className="re-drawer"
         title={
           <span>
             循环块管理

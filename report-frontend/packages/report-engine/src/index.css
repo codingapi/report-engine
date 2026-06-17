@@ -1,6 +1,6 @@
 /* ─── 主题变量（默认值） ─── */
-/* 使用方可通过覆盖 .re 上的变量定制主题 */
-.re {
+/* 使用方可通过覆盖 .re 或 .re-drawer 上的变量定制主题 */
+.re, .re-drawer {
   /* 字体大小 */
   --re-font-size-xs: 10px;
   --re-font-size-sm: 12px;
@@ -53,6 +53,9 @@
 
   /* 按钮尺寸 */
   --re-header-btn-width: 112px;
+
+  /* 表单间距 */
+  --re-form-field-gap: 14px;
 }
 
 /* ─── 根容器 ─── */
@@ -290,12 +293,19 @@
   background: var(--re-color-bg-hover); padding: 0 var(--re-spacing-sm); border-radius: var(--re-radius-sm); color: var(--re-color-code-pink);
 }
 
-/* ─── 扩展设置编辑器 ─── */
-.re-prop-exp-section { margin-bottom: var(--re-spacing-lg); }
-.re-prop-exp-section__label {
-  font-size: var(--re-font-size-base); color: var(--re-color-text); font-weight: 500; margin-bottom: var(--re-spacing-xs);
+/* ─── 表单字段（共用） ─── */
+.re-form-field { margin-bottom: var(--re-form-field-gap); }
+.re-form-label {
   display: flex; align-items: center; gap: var(--re-spacing-xs);
+  font-size: var(--re-font-size-base) !important; color: var(--re-color-text-secondary) !important;
+  font-weight: 500; margin-bottom: 6px; line-height: 1.4;
 }
+.re-form-label__hint {
+  font-size: 12px !important; color: var(--re-color-text-quaternary) !important; cursor: help;
+}
+.re-form-label__hint:hover { color: var(--re-color-primary) !important; }
+
+/* ─── 扩展设置编辑器 ─── */
 
 /* ─── 条件编辑器 ─── */
 .re-prop-cond-empty {
@@ -303,14 +313,6 @@
 }
 
 /* ─── 循环块管理 ─── */
-.re-loop-label {
-  display: flex; align-items: center; gap: var(--re-spacing-sm);
-  font-size: var(--re-font-size-sm); color: #555; margin-bottom: var(--re-spacing-sm); font-weight: 500;
-}
-.re-loop-label__hint {
-  font-size: var(--re-font-size-sm); color: var(--re-color-text-quaternary); cursor: help;
-}
-.re-loop-label__hint:hover { color: var(--re-color-primary); }
 .re-prop-loop-list { display: flex; flex-direction: column; gap: var(--re-spacing-lg); margin-bottom: var(--re-spacing-lg); }
 .re-prop-loop-item {
   border: 1px solid var(--re-color-border); border-radius: var(--re-radius-lg); overflow: hidden;
@@ -319,7 +321,7 @@
   display: flex; align-items: flex-start; gap: var(--re-spacing-md);
   padding: 10px var(--re-spacing-lg); background: var(--re-color-bg-subtle); border-bottom: 1px solid var(--re-color-border-light);
 }
-.re-prop-loop-item__body { padding: 10px var(--re-spacing-lg); }
+.re-prop-loop-item__body { padding: var(--re-spacing-lg); }
 
 /* ─── 小计 / 总计管理 ─── */
 .re-prop-summary-cells { display: flex; flex-direction: column; gap: 6px; }
