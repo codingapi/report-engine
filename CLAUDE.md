@@ -135,7 +135,9 @@ com.codingapi.report
 `CellBinding` 是单类（不再是 sealed interface 的两个实现），拆成两件互不干扰的事：
 
 - **值层** `value: Value` — 这个格子最终显示什么值（纯文本/字段/聚合/格式化），统一为表达式树
-- **控制层** `expansion / expandMode / mergeRepeated / parentCell / conditions` — 值怎么在格子上铺开
+- **控制层** `expansion / expandMode / mergeRepeated / parentCell / conditions / independent` — 值怎么在格子上铺开
+
+`independent`（默认 false）：同一数据集的纵向列**默认对齐成一条带**（一行一记录，列共享行）。置 true 时该列从自身声明行**独立向下展开**（交错/错位排版），不参与对齐带的位移/汇总/merge 下移，也无法再与别列做跨列聚合/跨列汇总/主从合并。`renderFree` 中由 `groupIndependentByRow` 按声明行分组、各自 `renderBand`。
 
 渲染两层处理：① `ExpressionEngine.eval(value, ctx)` 算出数据 → ② 控制层按 expansion/merge 决定落格，样式从模板继承。
 
@@ -179,6 +181,8 @@ render(dataModel, report, paramContext, templateWorkbook)
 
 POJO 模型同时作为前后端 JSON 契约（Jackson 序列化兼容）。样式构建使用缓存机制（JSON 序列化作为 cache key），避免超出 POI 64K 样式上限。
 
+**合并区边框补全**：POI 中合并单元格只有左上锚点格样式生效，边框只设在锚点格会导致 Excel 仅在左上角描出残缺边框。`ExcelExporter.applyMergeBorders` 把锚点格的边框按位置铺满整个合并区周边（顶边铺首行、底边铺末行、左右边铺首末列），保留 RGB 颜色与锚点的字体/填充。
+
 ### Starter Module (`report-engine-starter`)
 
 Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不能放 framework），故落在 starter。`ReportEngineAutoConfiguration` 用 `@Bean` + `@ConditionalOnMissingBean` 注册，使用方（如 example）可覆盖任意 Bean。
@@ -200,6 +204,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 **DTO 层**（`dto/RenderDtos` + `converter/RenderDtoConverter`）：
 - 前端 JSON → DTO record → framework 领域对象（`CellBinding` / `Value` / `LoopBlock` / `SummaryRow`）
 - `Value` 等 sealed interface **未加 Jackson 多态注解**，故用 DTO 中间层而非直接反序列化
+- ⚠️ **给 `CellBinding` 加字段要同步五处**（否则字段会在某条链路被悄悄丢弃）：framework `CellBinding`、starter `RenderDtos.BindingDTO` + `RenderDtoConverter.convertBindings`、前端 `report-engine` 的 `CellBinding` 类型、**`report-api` 的 `RenderBindingDTO` + `app-pc` 的 `toBindingDTO`**（渲染走显式字段映射，与保存走原始对象是两条独立链路）
 
 ### Example Module (`report-engine-example`)
 
@@ -283,3 +288,8 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - **模板层样式继承**：`renderLoop` 中后续迭代的合并区域需要显式复制（`seedTemplate` 只载入原始位置的 merge），样式通过 `place()` 从模板源格继承
 - **loadReportConfig sheet ID 重映射**：后端存储的 cellKey 中 sheet ID 可能是 `"sheet1"`，但 Univer 运行时活动工作表 ID 可能是 UUID。`loadReportConfig` 必须先 `getActiveSheetId()` 获取实际 ID，再重映射所有 cellKey/parentCell，最后回写绑定显示文本
 - **数据模型随配置加载**：`GET /configs/{id}` 返回的 `dataModel` 字段由后端从注入的 `DataModel` Bean 实时解析（当前始终返回唯一的全局模型），配置中仅存 `dataModelId` 引用
+- **带扩展的内容下移（renderFree）**：纵向带扩展会把带下方的内容整体下移。下移量 = 输出行数 −（带声明行 + 汇总声明行），**汇总行不重复计入扩展量**（否则带下内容多移一行）。需随带下移的不只单值绑定与模板 merge，还包括**无绑定的静态模板格**（标题/页脚，3c）和**模板行高配置**（3d）；汇总行的 merge/静态格按 `summaryOutputRows` 精确归位
+- **带声明格残留清理（renderFree 3e）**：带统一从 bandBase 起填充，若某绑定声明格未被数据覆盖（如声明在 B12 但带从 row0 展开），其设计期占位文本会残留 → 渲染后清除所有"未被动态写入"的带声明格
+- **模板行高/列宽带出**：`buildWorkbook` 会从模板 sheet 带出 `defaultRowHeight/defaultColumnWidth/columns/rows`（早期版本会丢弃）；行高随带扩展按同一位移规则跟随
+- **汇总行样式继承**：`summaryOut` 给汇总单元格设置 `source`（指向模板"汇总声明行"），使汇总行渲染时通过 `place()` 继承模板样式（边框/字体随汇总滚动到输出位置）
+- **单元格变更同步（report-univer）**：监听 `set-range-values` mutation 同步内容到汇总行时，**必须用 `'v' in cell` 判定**是否真有值变更——边框/填充等纯样式 mutation 只带 `s` 不带 `v`，若误读为空字符串会把已设内容同步清空（删除内容时 Univer 会显式带 `v: null`，仍判定为真，不受影响）
