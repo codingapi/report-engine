@@ -88,7 +88,7 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
-      destroyOnClose
+      destroyOnHidden
       width={480}
       okText="确认并导出"
       cancelText="取消"

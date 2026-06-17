@@ -57,7 +57,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
       open={open}
       onOk={handleOk}
       onCancel={onClose}
-      destroyOnClose
+      destroyOnHidden
       width={420}
     >
       <Form form={form} layout="vertical" autoComplete="off">

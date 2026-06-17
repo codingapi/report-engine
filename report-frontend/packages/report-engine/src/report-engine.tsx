@@ -558,9 +558,18 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [messageApi],
   );
 
-  // ─── 单元格值变更 → 同步到汇总行的 SummaryCell.value ───
+  // ─── 单元格值变更 → 清空被删除的绑定 + 同步汇总行 ───
   const handleCellValueChange = useCallback(
     (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
+      // 内容被清空的单元格 → 移除对应的 CellBinding
+      const clearedKeys = new Set(
+        changes.filter((c) => c.value === '').map((c) => `${c.sheetId}:${c.row}:${c.col}`),
+      );
+      if (clearedKeys.size > 0) {
+        setCellBindings((prev) => prev.filter((b) => !clearedKeys.has(b.cellKey)));
+      }
+
+      // 同步到汇总行的 SummaryCell.value
       setSummaries((prev) => {
         let updated = false;
         const next = prev.map((s) => {
@@ -570,16 +579,21 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           const cells = [...s.cells];
           for (const c of matching) {
             const idx = cells.findIndex((sc) => sc.column === c.col);
-            const newValue = parseTemplate(c.value);
-            if (idx >= 0) {
-              // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
-              // 避免覆盖用户通过属性面板设置的聚合表达式
-              const existing = cells[idx];
-              if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
-                cells[idx] = { ...existing, value: newValue };
-              }
+            if (c.value === '') {
+              // 内容被清空 → 移除对应 SummaryCell
+              if (idx >= 0) cells.splice(idx, 1);
             } else {
-              cells.push({ column: c.col, value: newValue });
+              const newValue = parseTemplate(c.value);
+              if (idx >= 0) {
+                // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
+                // 避免覆盖用户通过属性面板设置的聚合表达式
+                const existing = cells[idx];
+                if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
+                  cells[idx] = { ...existing, value: newValue };
+                }
+              } else {
+                cells.push({ column: c.col, value: newValue });
+              }
             }
           }
           updated = true;
@@ -590,6 +604,25 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     },
     [],
   );
+
+  // ─── 选区清除（清除内容/格式/全部）→ 移除对应绑定 ───
+  const handleSelectionClear = useCallback((cellKeys: string[]) => {
+    const keys = new Set(cellKeys);
+    // 提取 row:col 用于匹配汇总行单元格（汇总行无 sheetId）
+    const rowColKeys = new Set(
+      cellKeys.map((k) => {
+        const parts = k.split(':');
+        return `${parts[1]}:${parts[2]}`;
+      }),
+    );
+    setCellBindings((prev) => prev.filter((b) => !keys.has(b.cellKey)));
+    setSummaries((prev) =>
+      prev.map((s) => ({
+        ...s,
+        cells: s.cells.filter((c) => !rowColKeys.has(`${s.row}:${c.column}`)),
+      })),
+    );
+  }, []);
 
   return (
     <div className="re">
@@ -700,6 +733,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
               onCellValueChange={handleCellValueChange}
+              onSelectionClear={handleSelectionClear}
               onFontRequest={onFontRequest}
               onReady={() => console.log('[ReportEngine] Univer ready, sheetId:', sheetRef.current?.getActiveSheetId())}
             />

@@ -67,6 +67,12 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
         value: string;
     }>) => void;
 
+    /**
+     * 选区清除回调 — 用户执行"清除内容"/"清除格式"/"全部清除"时触发。
+     * 返回受影响区域的 cellKey 列表（格式: `${sheetId}:${row}:${col}`）。
+     */
+    onSelectionClear?: (cellKeys: string[]) => void;
+
     // ─── 消息 ───
 
     // ─── 只读模式 ───

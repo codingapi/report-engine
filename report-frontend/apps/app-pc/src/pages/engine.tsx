@@ -217,7 +217,7 @@ const EnginePage = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Spin size="large" tip="加载报表..." />
+        <Spin size="large" description="加载报表..." />
       </div>
     );
   }

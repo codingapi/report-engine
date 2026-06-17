@@ -30,6 +30,9 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
         const onCellValueChangeRef = useRef(props.onCellValueChange);
         onCellValueChangeRef.current = props.onCellValueChange;
 
+        const onSelectionClearRef = useRef(props.onSelectionClear);
+        onSelectionClearRef.current = props.onSelectionClear;
+
         // 用 ref 保存最新的属性存储（供 cell-selection 回调查找）
         const cellPropsRef = useRef(props.cellProps);
         cellPropsRef.current = props.cellProps;
@@ -147,11 +150,18 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                         for (const [colStr, cell] of Object.entries(cols as Record<string, { v?: unknown }>)) {
                             const col = Number(colStr);
                             if (Number.isNaN(col)) continue;
+                            // cell 为 null：ClearSelectionAllCommand（全部清除）用 generateNullCell 生成，
+                            // 整个 cell 置 null，视为内容清除。
+                            if (cell == null) {
+                                changes.push({ sheetId, row, col, value: '' });
+                                continue;
+                            }
                             // 仅当 mutation 真正携带值字段 v 时才视为内容变更。
                             // 边框/填充等纯样式操作只带 s（样式）不带 v，若误读为空字符串，
                             // 会把汇总行等已设内容同步清空（本格内容消失）。
                             // 真正的删除内容操作 Univer 会显式带 v: null，'v' in cell 仍为真，不受影响。
-                            if (!cell || !('v' in cell)) continue;
+                            // ClearSelectionFormatCommand（清除格式）用 generateNullCellStyle → { s: null }，无 v → 跳过。
+                            if (!('v' in cell)) continue;
                             const raw = cell.v;
                             const value = raw == null ? '' : String(raw);
                             changes.push({ sheetId, row, col, value });
@@ -161,12 +171,44 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>(
                 },
             );
 
+            // 监听选区清除命令（清除内容 / 清除格式 / 全部清除）
+            const CLEAR_COMMANDS = new Set([
+                'sheet.command.clear-selection-content',
+                'sheet.command.clear-selection-format',
+                'sheet.command.clear-selection-all',
+            ]);
+            const workbook = univerAPI.getActiveWorkbook();
+            const clearDisposable = workbook?.onCommandExecuted?.((cmd: { id: string }) => {
+                if (!CLEAR_COMMANDS.has(cmd.id)) return;
+                const cb = onSelectionClearRef.current;
+                if (!cb) return;
+                const wb = univerAPI.getActiveWorkbook();
+                if (!wb) return;
+                const sheet = wb.getActiveSheet();
+                if (!sheet) return;
+                const sheetId = sheet.getSheetId?.() as string;
+                const range = wb.getActiveRange();
+                if (!range) return;
+                const startRow = range.getRow() as number;
+                const startCol = range.getColumn() as number;
+                const rowCount = range.getRowCount() as number;
+                const colCount = range.getColumnCount() as number;
+                const cellKeys: string[] = [];
+                for (let r = startRow; r < startRow + rowCount; r++) {
+                    for (let c = startCol; c < startCol + colCount; c++) {
+                        cellKeys.push(`${sheetId}:${r}:${c}`);
+                    }
+                }
+                if (cellKeys.length > 0) cb(cellKeys);
+            });
+
             // 延迟通知父组件，确保 useImperativeHandle 已执行、ref 可用
             setTimeout(() => props.onReady?.(), 0);
 
             return () => {
                 cleanupDragDrop();
                 cellChangeDisposable?.dispose();
+                clearDisposable?.dispose?.();
                 highlightManagerRef.current?.dispose();
                 highlightManagerRef.current = null;
                 dispose();
