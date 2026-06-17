@@ -34,7 +34,16 @@ public final class Values {
     }
 
     /**
-     * 相等比较：两端都能转 double 时按数值比，否则按字符串比。
+     * 相等比较：数值优先，两端都能转 double 时按数值比，否则按字符串比。
+     * <p>这样设计的泛化能力强：
+     * <ul>
+     *   <li>{@code 1 == "1"} → 两端都能转 1.0 → true</li>
+     *   <li>{@code "1" == 1} → 两端都能转 1.0 → true</li>
+     *   <li>{@code "abc" == "abc"} → 不能转 double → 字符串比较 → true</li>
+     *   <li>{@code 10.0 == 10} → 两端都能转 10.0 → true（避免格式差异）</li>
+     * </ul>
+     * <p>CSV 数据源会将 NUMBER 字段转为 Double（如 "10" → 10.0），
+     * 而用户输入可能是 Integer（如 10），数值比较能正确处理这种差异。
      */
     public static boolean equals(Object l, Object r) {
         Double dl = toDouble(l);

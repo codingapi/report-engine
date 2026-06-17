@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Form, Select, Radio, Alert } from 'antd';
+import { Form, Select, Radio, Alert, Space } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
 import { findDataset } from '../../types';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
@@ -92,13 +92,14 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
           </Radio.Group>
 
           {isGroup && (
-            <div className="re-prop-field-cascade" style={{ marginTop: 8 }}>
+            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
               <Select
                 value={summaryRow.groupBy!.datasetId || undefined}
                 onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
                 placeholder="数据集"
                 options={datasetOptions(datasets)}
                 showSearch
+                style={{ flex: 1, minWidth: 0 }}
               />
               <Select
                 value={summaryRow.groupBy!.field || undefined}
@@ -107,8 +108,9 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
                 disabled={!summaryRow.groupBy!.datasetId}
                 options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
                 showSearch
+                style={{ flex: 1, minWidth: 0 }}
               />
-            </div>
+            </Space.Compact>
           )}
         </Form.Item>
 

@@ -83,6 +83,8 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
             datasets={datasets}
             loopBlocks={loopBlocks}
             onChange={setLeft}
+            bare
+            types={['FieldValue', 'LoopFieldValue', 'ParamValue', 'Literal', 'Aggregate']}
           />
         </Form.Item>
 
@@ -104,6 +106,8 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
               datasets={datasets}
               loopBlocks={loopBlocks}
               onChange={setRight}
+              bare
+              types={['FieldValue', 'LoopFieldValue', 'ParamValue', 'Literal', 'Aggregate']}
             />
           </Form.Item>
         )}

@@ -56,6 +56,9 @@
 
 }
 
+/* ─── antd Form.Item 间距收紧 ─── */
+.re .ant-form-item { margin-bottom: 12px; }
+
 /* ─── 根容器 ─── */
 .re { display: flex; flex-direction: column; height: 100vh; }
 
@@ -179,12 +182,6 @@
 
 /* ─── 值表达式编辑器 ─── */
 .re-prop-value-type { margin-bottom: var(--re-spacing-md); }
-.re-prop-value-form { display: flex; flex-direction: column; gap: 6px; }
-.re-prop-field-cascade { display: flex; gap: var(--re-spacing-sm); }
-.re-prop-field-cascade > * { flex: 1; min-width: 0; }
-.re-prop-agg-row { display: flex; gap: var(--re-spacing-sm); align-items: flex-start; }
-.re-prop-agg-row > :first-child { flex: 0 0 40%; }
-.re-prop-agg-row > :last-child { flex: 1; min-width: 0; }
 .re-prop-func-args { display: flex; flex-direction: column; gap: var(--re-spacing-sm); }
 .re-prop-func-arg-row { display: flex; gap: var(--re-spacing-sm); align-items: center; }
 .re-prop-func-arg-row > :first-child { flex: 1; min-width: 0; }
@@ -242,7 +239,6 @@
 /* ─── 小计 / 总计管理 ─── */
 .re-prop-summary-cells { display: flex; flex-direction: column; gap: 6px; }
 .re-prop-summary-cell-row { display: flex; gap: var(--re-spacing-sm); align-items: center; }
-.re-prop-summary-cell-row > .re-prop-field-cascade { gap: var(--re-spacing-sm); }
 
 /* ─── 隐藏 Univer 公式 UI ─── */
 [data-u-comp="sheets-formula-editor"],
