@@ -50,6 +50,9 @@
 
   /* 面板尺寸 */
   --re-expr-panel-height: 280px;
+
+  /* 按钮尺寸 */
+  --re-header-btn-width: 112px;
 }
 
 /* ─── 根容器 ─── */
@@ -66,6 +69,9 @@
   display: flex; align-items: center; gap: var(--re-spacing-md); flex: 1; min-width: 0;
 }
 .re-header__actions { display: flex; align-items: center; gap: var(--re-spacing-md); }
+.re-header__actions > .ant-btn { width: var(--re-header-btn-width); }
+.re-header__actions > .ant-upload-wrapper .ant-btn { width: var(--re-header-btn-width); }
+.re-header__actions > .ant-badge .ant-btn { width: var(--re-header-btn-width); }
 
 /* ─── 面板分割线 ─── */
 .re-separator {

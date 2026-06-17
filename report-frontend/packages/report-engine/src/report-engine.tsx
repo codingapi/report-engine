@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Button, Upload, Tooltip, Drawer, Badge, message } from 'antd';
+import { Button, Upload, Tooltip, Drawer, Badge, Divider, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
   ExportOutlined, ImportOutlined,
@@ -474,7 +474,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     () => [
       {
         id: 'report-engine-menu',
-        title: '报表',
+        title: '报表配置',
         items: [
           {
             id: 'set-loop-block',
@@ -633,20 +633,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
           {extraActions}
-          {onSaveReport && (
-            <Button
-              icon={<SaveOutlined />}
-              loading={savingReport}
-              onClick={handleSaveReport}
-            >
-              保存
-            </Button>
-          )}
-          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
-            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
-              循环块
-            </Button>
-          </Badge>
+          {extraActions && <Divider type="vertical" />}
           {onImport && (
             <Upload
               accept=".xlsx,.xls"
@@ -661,14 +648,27 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               </Button>
             </Upload>
           )}
+          <Badge count={loopBlocks.length} size="small" offset={[-4, 0]}>
+            <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
+              循环块
+            </Button>
+          </Badge>
           {onExport && (
             <Button
-              type="primary"
               icon={<ExportOutlined />}
               loading={exporting}
               onClick={handleExport}
             >
               导出报表
+            </Button>
+          )}
+          {onSaveReport && (
+            <Button
+              icon={<SaveOutlined />}
+              loading={savingReport}
+              onClick={handleSaveReport}
+            >
+              保存
             </Button>
           )}
         </div>
@@ -680,9 +680,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <ResizablePanel
             id="left-panel"
             panelRef={leftPanelRef}
-            defaultSize="20%"
-            minSize="280px"
-            maxSize="35%"
+            defaultSize="25%"
+            minSize="320px"
+            maxSize="40%"
             collapsible
             collapsedSize="36px"
             onResize={(_size, _id, _prev) => {
