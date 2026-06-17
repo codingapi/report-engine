@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, useRef, forwardRef } from 'react';
+import { useEffect, useImperativeHandle, useRef, forwardRef } from 'react';
 import { setupUniver } from '@/core/setup';
 import type { UniverAPI } from '@/core/setup';
 import { registerCellSelection } from '@/core/cell-selection';

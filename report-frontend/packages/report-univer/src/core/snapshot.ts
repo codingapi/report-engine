@@ -7,7 +7,7 @@
 import type {
     ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelFont,
     ExcelBorders, ExcelBorder, ExcelBorderStyle,
-    ExcelRichText, ExcelMerge, ExcelRow, ExcelColumn,
+    ExcelRichText, ExcelMerge,
     ExcelLoopBlock, LoopBlockConfig,
 } from '@/types';
 

@@ -13,7 +13,7 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig, ReportValue } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, ReportParam, ReportConfig, ReportValue } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
@@ -95,7 +95,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [_activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const lastAppliedRef = useRef<TemplatePreset | null>(null);
 
   // ─── 面板收缩 ───
