@@ -149,12 +149,12 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
       return params
         .filter((p) => {
           if (!keyword) return true;
-          const label = p.label || p.name;
+          const label = p.alias || p.name;
           return matchWithPinyin(label, keyword) || matchWithPinyin(p.name, keyword);
         })
         .map((p) => ({
           expr: p.name,
-          label: p.label || p.name,
+          label: p.alias || p.name,
           desc: `\${${p.name}}`,
         }));
     }

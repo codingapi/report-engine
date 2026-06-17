@@ -493,13 +493,39 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [handleCreateLoopFromRange, handleCreateSummaryFromRange],
   );
 
-  // ─── 字段拖入 → 创建 CellBinding ───
+  // ─── 字段/参数拖入 → 创建 CellBinding ───
   const handleFieldDrop = useCallback(
     (info: FieldDropInfo, handle: CellHandle) => {
       try {
         const data = JSON.parse(info.data);
+        const ck = `${info.sheetId}:${info.row}:${info.column}`;
+
+        // 参数拖入
+        if (data.type === 'report-param') {
+          handle.setValue(data.paramAlias || data.paramName);
+
+          const binding: CellBinding = {
+            cellKey: ck,
+            value: { type: 'NameRef', payload: data.paramName },
+            expansion: 'NONE',
+            expandMode: 'LIST',
+            mergeRepeated: false,
+            parentCell: null,
+            conditions: [],
+          };
+
+          setCellBindings((prev) => {
+            const filtered = prev.filter((b) => b.cellKey !== ck);
+            return [...filtered, binding];
+          });
+          setActiveTemplate(null);
+
+          messageApi.success(`已绑定参数 ${data.paramAlias || data.paramName}`);
+          return;
+        }
+
+        // 字段拖入
         if (data.datasetId && data.field) {
-          const ck = `${info.sheetId}:${info.row}:${info.column}`;
           const fieldRef = `${data.datasetId}.${data.field}`;
 
           handle.setValue(data.alias || data.field);

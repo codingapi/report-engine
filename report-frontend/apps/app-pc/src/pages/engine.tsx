@@ -11,6 +11,7 @@ import {
 } from '@coding-report/report-api';
 import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
+import ParamInputModal from '../components/param-input-modal';
 
 // ─── 转换函数 ──────────────────────────────────
 
@@ -65,6 +66,21 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/** 合并默认值与用户输入，生成参数值映射 */
+function buildParamValues(params: ReportParam[], userInput: Record<string, unknown>) {
+  return Object.fromEntries(
+    params.map((p) => [p.name, userInput[p.name] ?? p.defaultValue ?? null]),
+  );
+}
+
+interface PendingExport {
+  bindings: CellBinding[];
+  loops: LoopBlock[];
+  summaries: SummaryRow[];
+  workbook: ExcelWorkbook;
+  params: ReportParam[];
+}
+
 // ─── 页面组件 ──────────────────────────────────
 
 const EnginePage = () => {
@@ -78,6 +94,10 @@ const EnginePage = () => {
   const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
   const engineRef = useRef<ReportEngineHandle>(null);
+
+  // 导出参数弹窗状态
+  const [paramModalOpen, setParamModalOpen] = useState(false);
+  const pendingExportRef = useRef<PendingExport | null>(null);
 
   const handlePrintConfig = () => {
     const config = engineRef.current?.getReportConfig();
@@ -153,6 +173,21 @@ const EnginePage = () => {
     return importExcel(file);
   };
 
+  /** 执行渲染并下载 */
+  const doRender = async (paramValues: Record<string, unknown>) => {
+    const p = pendingExportRef.current;
+    if (!p) return;
+    pendingExportRef.current = null;
+    const blob = await renderReport({
+      cellBindings: p.bindings.map(toBindingDTO),
+      loopBlocks: p.loops,
+      summaries: p.summaries,
+      params: paramValues,
+      template: p.workbook,
+    });
+    downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const handleExport = async (
     bindings: CellBinding[],
     loops: LoopBlock[],
@@ -160,17 +195,19 @@ const EnginePage = () => {
     workbook: ExcelWorkbook,
     params: ReportParam[],
   ): Promise<void> => {
-    const paramValues = Object.fromEntries(
-      params.map((p) => [p.name, p.defaultValue ?? null]),
-    );
-    const blob = await renderReport({
-      cellBindings: bindings.map(toBindingDTO),
-      loopBlocks: loops,
-      summaries: summaries,
-      params: paramValues,
-      template: workbook,
-    });
-    downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const pending: PendingExport = { bindings, loops, summaries, workbook, params };
+
+    // 有无默认值的必填参数 → 弹窗输入
+    const hasRequired = params.some((p) => !p.defaultValue);
+    if (hasRequired) {
+      pendingExportRef.current = pending;
+      setParamModalOpen(true);
+      return;
+    }
+
+    // 全部有默认值或无参数 → 直接渲染
+    pendingExportRef.current = pending;
+    await doRender(buildParamValues(params, {}));
   };
 
   const handleSaveReport = async (config: ReportConfig): Promise<string> => {
@@ -186,22 +223,38 @@ const EnginePage = () => {
   }
 
   return (
-    <ReportEngine
-      datasets={datasets}
-      relationships={relationships}
-      dataModelId={dataModelId}
-      functions={functions}
-      engineRef={engineRef}
-      onImport={handleImport}
-      onExport={handleExport}
-      onSaveReport={handleSaveReport}
-      onFontRequest={fetchFonts}
-      extraActions={
-        <Button icon={<PrinterOutlined />} onClick={handlePrintConfig}>
-          打印配置
-        </Button>
-      }
-    />
+    <>
+      <ReportEngine
+        datasets={datasets}
+        relationships={relationships}
+        dataModelId={dataModelId}
+        functions={functions}
+        engineRef={engineRef}
+        onImport={handleImport}
+        onExport={handleExport}
+        onSaveReport={handleSaveReport}
+        onFontRequest={fetchFonts}
+        extraActions={
+          <Button icon={<PrinterOutlined />} onClick={handlePrintConfig}>
+            打印配置
+          </Button>
+        }
+      />
+
+      <ParamInputModal
+        params={pendingExportRef.current?.params ?? []}
+        open={paramModalOpen}
+        onConfirm={async (values) => {
+          setParamModalOpen(false);
+          const params = pendingExportRef.current?.params ?? [];
+          await doRender(buildParamValues(params, values));
+        }}
+        onCancel={() => {
+          setParamModalOpen(false);
+          pendingExportRef.current = null;
+        }}
+      />
+    </>
   );
 };
 

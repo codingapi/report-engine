@@ -109,10 +109,10 @@ export interface ReportParam {
   id: string;
   /** 表达式中引用的名字（${name}） */
   name: string;
-  /** 显示名（可选，缺省用 name） */
-  label?: string;
+  /** 别名/中文名称（可选，缺省用 name；在表达式选择界面展示） */
+  alias?: string;
   dataType: DataType;
-  /** 默认值（渲染时若外部未传值则用它） */
+  /** 默认值（渲染时若外部未传值则用它；无默认值则导出/预览时必须传入） */
   defaultValue?: string;
 }
 
