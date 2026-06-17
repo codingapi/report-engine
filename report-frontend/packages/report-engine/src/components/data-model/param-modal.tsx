@@ -12,7 +12,13 @@ interface ParamModalProps {
   onConfirm: (param: ReportParam) => void;
 }
 
-const DATA_TYPES: DataType[] = ['STRING', 'NUMBER', 'DATE', 'DATETIME', 'BOOLEAN'];
+const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> = [
+  { value: 'STRING', label: '字符串' },
+  { value: 'NUMBER', label: '数字' },
+  { value: 'DATE', label: '日期' },
+  { value: 'DATETIME', label: '日期时间' },
+  { value: 'BOOLEAN', label: '布尔值' },
+];
 
 /** 参数添加/编辑弹窗：四字段表单（name / alias / dataType / defaultValue）。 */
 const ParamModal: React.FC<ParamModalProps> = ({
@@ -103,9 +109,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
           rules={[{ required: true, message: '请选择数据类型' }]}
           initialValue="STRING"
         >
-          <Select
-            options={DATA_TYPES.map((t) => ({ value: t, label: t }))}
-          />
+          <Select options={DATA_TYPE_OPTIONS} />
         </Form.Item>
 
         <Form.Item
