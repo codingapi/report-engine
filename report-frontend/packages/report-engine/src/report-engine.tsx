@@ -503,7 +503,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
 
         // 参数拖入
         if (data.type === 'report-param') {
-          handle.setValue(data.paramAlias || data.paramName);
+          const paramAlias = data.paramAlias || data.paramName;
+          handle.setValue(`\${${paramAlias}}`);
 
           const binding: CellBinding = {
             cellKey: ck,
@@ -521,15 +522,16 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           });
           setActiveTemplate(null);
 
-          messageApi.success(`已绑定参数 ${data.paramAlias || data.paramName}`);
+          messageApi.success(`已绑定参数 ${paramAlias}`);
           return;
         }
 
         // 字段拖入
         if (data.datasetId && data.field) {
           const fieldRef = `${data.datasetId}.${data.field}`;
+          const fieldAlias = data.alias || data.field;
 
-          handle.setValue(data.alias || data.field);
+          handle.setValue(`\${${fieldAlias}}`);
 
           const binding: CellBinding = {
             cellKey: ck,
@@ -547,7 +549,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           });
           setActiveTemplate(null);
 
-          messageApi.success(`已绑定 ${data.alias || data.field}`);
+          messageApi.success(`已绑定 ${fieldAlias}`);
         }
       } catch {
         // 非 JSON 拖拽数据，忽略
