@@ -240,7 +240,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           /* ── 空白单元格 ── */
           <div className="re-prop-unbound">
             <div className="re-prop-unbound__hint">
-              此单元格未配置。可绑定数据字段；如需汇总行（小计/总计），在表格中框选同一行的单元格后右键「设为汇总行」。
+              未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。
             </div>
             <Button
               type="dashed"

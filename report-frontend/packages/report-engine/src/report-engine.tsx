@@ -744,8 +744,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <ResizablePanel
             id="right-panel"
             panelRef={rightPanelRef}
-            defaultSize="20%"
-            minSize="280px"
+            defaultSize="25%"
+            minSize="320px"
             maxSize="35%"
             collapsible
             collapsedSize="36px"

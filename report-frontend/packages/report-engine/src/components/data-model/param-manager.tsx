@@ -69,11 +69,6 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
 
   return (
     <div className="re-param-manager">
-      <div className="re-param-intro">
-        报表参数在设计时定义，渲染时由外部传值（缺省用默认值）。
-        在表达式中通过 <code>{'${参数名}'}</code> 引用，或拖入报表单元格。
-      </div>
-
       {params.length > 0 ? (
         <List
           className="re-param-list"

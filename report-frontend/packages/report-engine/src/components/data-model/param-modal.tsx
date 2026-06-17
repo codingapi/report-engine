@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Modal, Form, Input, Select } from 'antd';
+import { Modal, Form, Input, Select, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { ReportParam } from '../../types';
 import { DATA_TYPE_OPTIONS } from '../../types';
 
@@ -53,7 +54,18 @@ const ParamModal: React.FC<ParamModalProps> = ({
 
   return (
     <Modal
-      title={isEdit ? '编辑参数' : '添加参数'}
+      title={
+        <span>
+          {isEdit ? '编辑参数' : '添加参数'}
+          <Tooltip
+            trigger="click"
+            placement="topLeft"
+            title="报表参数在设计时定义，渲染时由外部传值（缺省用默认值）。在表达式中通过 ${参数名} 引用，或拖入报表单元格。"
+          >
+            <QuestionCircleOutlined style={{ marginLeft: 6, color: 'rgba(0,0,0,0.45)', cursor: 'pointer' }} />
+          </Tooltip>
+        </span>
+      }
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -64,6 +76,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
         <Form.Item
           name="name"
           label="参数名"
+          tooltip="在表达式中以 ${参数名} 引用，需唯一"
           rules={[
             { required: true, message: '请输入参数名' },
             {
@@ -83,22 +96,14 @@ const ParamModal: React.FC<ParamModalProps> = ({
               },
             }),
           ]}
-          extra="在表达式中以 ${参数名} 引用"
         >
           <Input placeholder="如 companyName" disabled={isEdit} />
         </Form.Item>
 
         <Form.Item
-          name="alias"
-          label="别名"
-          extra="中文名称，在表达式选择界面展示"
-        >
-          <Input placeholder="如 公司名称" />
-        </Form.Item>
-
-        <Form.Item
           name="dataType"
           label="数据类型"
+          tooltip="决定导出预览时的输入控件类型"
           rules={[{ required: true, message: '请选择数据类型' }]}
           initialValue="STRING"
         >
@@ -106,9 +111,17 @@ const ParamModal: React.FC<ParamModalProps> = ({
         </Form.Item>
 
         <Form.Item
+          name="alias"
+          label="别名"
+          tooltip="可选的中文名称，便于识别"
+        >
+          <Input placeholder="如 公司名称" />
+        </Form.Item>
+
+        <Form.Item
           name="defaultValue"
           label="默认值"
-          extra="渲染时若外部未传值则使用此值；留空则导出时必须传入"
+          tooltip="渲染时若外部未传值则使用此值；留空则导出时必须传入"
         >
           <Input placeholder="可选" />
         </Form.Item>
