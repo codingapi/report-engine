@@ -46,6 +46,7 @@ public final class RenderDtoConverter {
                     .mergeRepeated(dto.mergeRepeated())
                     .parentCell(dto.parentCell() != null ? CellRef.parse(dto.parentCell()) : null)
                     .conditions(convertConditions(dto.conditions()))
+                    .independent(dto.independent())
                     .build());
         }
         return result;

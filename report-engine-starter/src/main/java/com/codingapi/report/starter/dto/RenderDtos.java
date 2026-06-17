@@ -32,6 +32,7 @@ public final class RenderDtos {
             boolean mergeRepeated,
             String parentCell,
             List<ConditionDTO> conditions,
+            boolean independent,
             String preview) {
     }
 
