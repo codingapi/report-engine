@@ -71,4 +71,13 @@ public class SummaryRow {
      * 要么是某字段的聚合值（如 SUM(工资)）。各 cell 的列应落在 [fromColumn, toColumn] 内。
      */
     private List<SummaryCell> cells;
+
+    /**
+     * 设计态锚定行号（0-based）——汇总行在模板表格中占据的实际行。
+     * <p>渲染时 framework 按 groupBy 动态追加到数据带末尾，不以此字段定位输出行。
+     * 此字段仅供模板 merge 下移时识别"哪个模板 merge 属于哪条汇总行"：
+     * 当模板 merge 的 startRow 等于某汇总行的 row 时，该 merge 应跟随汇总行移动。
+     * <p>null 时表示未指定（测试或无模板场景）。
+     */
+    private Integer row;
 }

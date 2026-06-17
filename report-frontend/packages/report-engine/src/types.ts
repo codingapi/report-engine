@@ -259,4 +259,6 @@ export interface ReportEngineProps {
   onSaveReport?: (config: ReportConfig) => Promise<string> | void;
   /** 字体加载回调 */
   onFontRequest?: () => Promise<FontItem[]>;
+  /** 自定义操作按钮，渲染在默认按钮左侧 */
+  extraActions?: ReactNode;
 }

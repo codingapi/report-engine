@@ -64,7 +64,7 @@ public final class RenderDtos {
             List<String> orderBy) {
     }
 
-    public record SummaryRowDTO(FieldRefDTO groupBy, int fromColumn, int toColumn, List<SummaryCellDTO> cells) {
+    public record SummaryRowDTO(FieldRefDTO groupBy, int fromColumn, int toColumn, List<SummaryCellDTO> cells, Integer row) {
     }
 
     public record FieldRefDTO(String datasetId, String field) {

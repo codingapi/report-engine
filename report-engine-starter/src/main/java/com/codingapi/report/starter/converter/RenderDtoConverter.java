@@ -149,7 +149,7 @@ public final class RenderDtoConverter {
             }
             result.add(SummaryRow.builder().groupBy(groupBy)
                     .fromColumn(dto.fromColumn()).toColumn(dto.toColumn())
-                    .cells(cells).build());
+                    .cells(cells).row(dto.row()).build());
         }
         return result;
     }

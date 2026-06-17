@@ -14,6 +14,9 @@ importers:
       '@rslib/core':
         specifier: ^0.20.0
         version: 0.20.3(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)(core-js@3.47.0)(typescript@5.9.3)
+      '@rslint/core':
+        specifier: ^0.6.1
+        version: 0.6.1(jiti@2.7.0)
       '@rstest/adapter-rslib':
         specifier: ^0.2.1
         version: 0.2.2(@rslib/core@0.20.3(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)(core-js@3.47.0)(typescript@5.9.3))(@rstest/core@0.9.10(core-js@3.47.0)(happy-dom@20.10.2))(typescript@5.9.3)
@@ -1109,6 +1112,62 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  '@rslint/core@0.6.1':
+    resolution: {integrity: sha512-UTc2kp3ERxjwkLUBsGMRjuI95K8Ws4xbIriYTrGZ2BAnLHg6BwqWli/sTBWiMAEtefWe/5Vu2ejLwcgV1F3QSA==}
+    hasBin: true
+    peerDependencies:
+      jiti: ^2.0.0
+    peerDependenciesMeta:
+      jiti:
+        optional: true
+
+  '@rslint/native-darwin-arm64@0.6.1':
+    resolution: {integrity: sha512-Xt6gkSIztk8l7O1O0YXZ8X6kjEhaQvm9MplkDJR24RRSuALVw4Pzc9Z3ASjEbv4xnkuvPQLNQZg7/M3v274uNw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@rslint/native-darwin-x64@0.6.1':
+    resolution: {integrity: sha512-LZ0AaqpF3wAFl3lfDM5P0YCGoavm8AN33Cy9Z5wD+N8Ffj+KR39QdmuWX6ZivPm0OPPw0xov6YDzDRCHvVtsbA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@rslint/native-linux-arm64-gnu@0.6.1':
+    resolution: {integrity: sha512-H1jI8uEw4gdeEcD/zTn7xD0LWIJTfSyrhDnimN22xvKZ3ufo3EvTOs5t9alVns7xiGbxFeWnjPjwl/p6DI95AA==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rslint/native-linux-arm64-musl@0.6.1':
+    resolution: {integrity: sha512-BbXisiQaJDgLwCXXIIKllbTDxtJoS33OEsk/zEQ2wvxSH52G9c/XLcoQaEgTa4Mc3XULgmPFfCdlNXQckeJQkg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@rslint/native-linux-x64-gnu@0.6.1':
+    resolution: {integrity: sha512-ZQoxbBCxzSY1jnbt2jdyNaSFqGUmF2u69jqMS7v9VsYDod9JtSHb3Wnp71finz3KhslZExHXKqQQvGmdyC5cwA==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rslint/native-linux-x64-musl@0.6.1':
+    resolution: {integrity: sha512-6uKdu8KAnKdllZvKWInfD5pntdIik3+3p+vDUzcPeLlTgAv6qxT6MQZqGjVCRPa1XbnCamwbdp/zV7onuV79Ag==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@rslint/native-win32-arm64-msvc@0.6.1':
+    resolution: {integrity: sha512-1TG5JCSkm/rzmUSTlBNrgLE14fxreXUZlC1TgzUWg8rjm6AJSVBKYntvC6c4SestXI33LKMOfnTb+dXd4DdZ8Q==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@rslint/native-win32-x64-msvc@0.6.1':
+    resolution: {integrity: sha512-LXhHXfzu4YjjqVbBC2tKyq1L7UVJqtbnSXyOXMhdaVNHRkHfuCjX3Us5uNe4/TbQdOIH7Qcfwzsj1/GpMYID+A==}
+    cpu: [x64]
+    os: [win32]
+
+  '@rslint/native@0.6.1':
+    resolution: {integrity: sha512-WR/tITtBCjxkBhpDRip4h6n+gxMMqqijFKmDjuc3O/ScWMrX+KbeKcnS0u1Y8e0YfoAmk7dHR9HIT+IRHod1IQ==}
 
   '@rspack/binding-darwin-arm64@1.7.11':
     resolution: {integrity: sha512-oduECiZVqbO5zlVw+q7Vy65sJFth99fWPTyucwvLJJtJkPL5n17Uiql2cYP6Ijn0pkqtf1SXgK8WjiKLG5bIig==}
@@ -2402,6 +2461,10 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
+  picomatch@4.0.4:
+    resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
+    engines: {node: '>=12'}
+
   pretty-format@27.5.1:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
@@ -3644,6 +3707,56 @@ snapshots:
       - '@module-federation/runtime-tools'
       - '@typescript/native-preview'
       - core-js
+
+  '@rslint/core@0.6.1(jiti@2.7.0)':
+    dependencies:
+      '@rslint/native': 0.6.1
+      picomatch: 4.0.4
+    optionalDependencies:
+      '@rslint/native-darwin-arm64': 0.6.1
+      '@rslint/native-darwin-x64': 0.6.1
+      '@rslint/native-linux-arm64-gnu': 0.6.1
+      '@rslint/native-linux-arm64-musl': 0.6.1
+      '@rslint/native-linux-x64-gnu': 0.6.1
+      '@rslint/native-linux-x64-musl': 0.6.1
+      '@rslint/native-win32-arm64-msvc': 0.6.1
+      '@rslint/native-win32-x64-msvc': 0.6.1
+      jiti: 2.7.0
+
+  '@rslint/native-darwin-arm64@0.6.1':
+    optional: true
+
+  '@rslint/native-darwin-x64@0.6.1':
+    optional: true
+
+  '@rslint/native-linux-arm64-gnu@0.6.1':
+    optional: true
+
+  '@rslint/native-linux-arm64-musl@0.6.1':
+    optional: true
+
+  '@rslint/native-linux-x64-gnu@0.6.1':
+    optional: true
+
+  '@rslint/native-linux-x64-musl@0.6.1':
+    optional: true
+
+  '@rslint/native-win32-arm64-msvc@0.6.1':
+    optional: true
+
+  '@rslint/native-win32-x64-msvc@0.6.1':
+    optional: true
+
+  '@rslint/native@0.6.1':
+    optionalDependencies:
+      '@rslint/native-darwin-arm64': 0.6.1
+      '@rslint/native-darwin-x64': 0.6.1
+      '@rslint/native-linux-arm64-gnu': 0.6.1
+      '@rslint/native-linux-arm64-musl': 0.6.1
+      '@rslint/native-linux-x64-gnu': 0.6.1
+      '@rslint/native-linux-x64-musl': 0.6.1
+      '@rslint/native-win32-arm64-msvc': 0.6.1
+      '@rslint/native-win32-x64-msvc': 0.6.1
 
   '@rspack/binding-darwin-arm64@1.7.11':
     optional: true
@@ -5771,6 +5884,8 @@ snapshots:
       minipass: 7.1.3
 
   picocolors@1.1.1: {}
+
+  picomatch@4.0.4: {}
 
   pretty-format@27.5.1:
     dependencies:

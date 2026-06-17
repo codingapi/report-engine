@@ -13,7 +13,7 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, Dataset, ReportParam, ReportConfig, ReportValue } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, ReportParam, ReportConfig, ReportValue } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
@@ -60,6 +60,8 @@ export interface ReportEngineHandle {
   applyTemplate: (template: TemplatePreset) => void;
   /** 加载报表配置，整体恢复设计态 */
   loadReportConfig: (config: ReportConfig) => void;
+  /** 获取当前完整报表配置（外部调试/持久化用），表格为空时返回 null */
+  getReportConfig: () => ReportConfig | null;
 }
 
 /**
@@ -80,6 +82,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   onImport,
   onSaveReport,
   onFontRequest,
+  extraActions,
 }) => {
   const sheetRef = useRef<SheetPanelHandle>(null);
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -92,7 +95,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [params, setParams] = useState<ReportParam[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
-  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [_activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const lastAppliedRef = useRef<TemplatePreset | null>(null);
 
   // ─── 面板收缩 ───
@@ -257,8 +260,24 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     messageApi.success(`已打开报表：${config.name || '未命名'}`);
   }, [messageApi, datasets]);
 
+  // 获取当前完整报表配置（外部按需调用）
+  const getReportConfig = useCallback((): ReportConfig | null => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) return null;
+    return {
+      id: reportId ?? undefined,
+      name: reportName,
+      dataModelId,
+      cellBindings,
+      loopBlocks,
+      summaries,
+      params,
+      template: snapshot,
+    };
+  }, [reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params]);
+
   // 暴露 ref
-  React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig }), [applyTemplate, loadReportConfig]);
+  React.useImperativeHandle(engineRef, () => ({ applyTemplate, loadReportConfig, getReportConfig }), [applyTemplate, loadReportConfig, getReportConfig]);
 
   // ─── cellProps：CellBinding → Univer CellProp 映射 ───
   const cellProps: Record<string, CellProp[]> = {};
@@ -509,6 +528,39 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [messageApi],
   );
 
+  // ─── 单元格值变更 → 同步到汇总行的 SummaryCell.value ───
+  const handleCellValueChange = useCallback(
+    (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
+      setSummaries((prev) => {
+        let updated = false;
+        const next = prev.map((s) => {
+          // 找出落在本汇总行的变更
+          const matching = changes.filter((c) => c.row === s.row && c.col >= s.fromColumn && c.col <= s.toColumn);
+          if (matching.length === 0) return s;
+          const cells = [...s.cells];
+          for (const c of matching) {
+            const idx = cells.findIndex((sc) => sc.column === c.col);
+            const newValue = parseTemplate(c.value);
+            if (idx >= 0) {
+              // 已有 SummaryCell：仅当当前是纯文本（Literal/Template）时才同步
+              // 避免覆盖用户通过属性面板设置的聚合表达式
+              const existing = cells[idx];
+              if (existing.value.type === 'Literal' || existing.value.type === 'Template') {
+                cells[idx] = { ...existing, value: newValue };
+              }
+            } else {
+              cells.push({ column: c.col, value: newValue });
+            }
+          }
+          updated = true;
+          return { ...s, cells };
+        });
+        return updated ? next : prev;
+      });
+    },
+    [],
+  );
+
   return (
     <div className="re">
       {messageContextHolder}
@@ -517,6 +569,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       <div className="re-header">
         <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
+          {extraActions}
           {onSaveReport && (
             <Button
               icon={<SaveOutlined />}
@@ -616,6 +669,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               contextMenuGroups={contextMenuGroups}
               onCellSelect={handleCellSelect}
               onFieldDrop={handleFieldDrop}
+              onCellValueChange={handleCellValueChange}
               onFontRequest={onFontRequest}
               onReady={() => console.log('[ReportEngine] Univer ready, sheetId:', sheetRef.current?.getActiveSheetId())}
             />

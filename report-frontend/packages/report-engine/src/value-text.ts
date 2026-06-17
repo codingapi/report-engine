@@ -6,7 +6,7 @@
  * 2. Template 值的可逆编辑：parts 结构 ↔ `${...}` 文本字符串
  */
 
-import type { ReportValue, Dataset, SummaryCell, LoopBlock } from './types';
+import type { ReportValue, Dataset, LoopBlock } from './types';
 import { findField, findDataset } from './types';
 
 // ─── 字段引用 → 别名 ───────────────────────────

@@ -6,6 +6,7 @@ import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 import com.codingapi.report.excel.ExcelExporter;
 import com.codingapi.report.excel.ExcelImporter;
 import com.codingapi.report.excel.pojo.Cell;
+import com.codingapi.report.excel.pojo.Merge;
 import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
@@ -653,6 +654,128 @@ class ReportScenarioTest {
         assertNull(findCell(sheet, 5, 3), "staff 总计行右侧不应出现 products 汇总");
         // products 总计行（row 4）左侧是 staff 明细赵六，而非被广播的"员工合计"
         assertEquals("赵六", text(sheet, 4, 0), "products 总计行左侧应是 staff 明细，而非被广播的员工合计");
+    }
+
+    // ============================================================
+    // 9. 模板 merge 下移：VERTICAL band 下方有模板合并区域，扩展后 merge 应跟随下移
+    // ============================================================
+
+    @Test
+    @DisplayName("模板 merge 下移：band(row2) 下方 row3 有模板合并，3 条数据扩展后 merge 应移至 row5")
+    void templateMergeShiftedAfterBandExpansion() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        CellBinding title = label(0, 0, "商品清单");
+        CellBinding h1 = label(1, 0, "商品名");
+        CellBinding h2 = label(1, 1, "价格");
+        CellBinding nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
+        CellBinding priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
+        Report report = report("r_merge_shift", dm, List.of(title, h1, h2, nameCol, priceCol),
+                List.of(), List.of());
+
+        // 模板：标题 merge(row0, colSpan=2) + band 下方 merge(row3, colSpan=2)
+        Workbook template = new Workbook();
+        Sheet tplSheet = new Sheet();
+        tplSheet.setId("sheet1");
+        tplSheet.setName("Sheet1");
+        Merge titleMerge = new Merge();
+        titleMerge.setStartRow(0); titleMerge.setStartCol(0);
+        titleMerge.setRowSpan(1); titleMerge.setColSpan(2);
+        Merge belowBandMerge = new Merge();
+        belowBandMerge.setStartRow(3); belowBandMerge.setStartCol(0);
+        belowBandMerge.setRowSpan(1); belowBandMerge.setColSpan(2);
+        tplSheet.setMerges(List.of(titleMerge, belowBandMerge));
+        template.setSheets(List.of(tplSheet));
+
+        Workbook workbook = renderer.render(dm, report, new ParamContext(Map.of()), template);
+        Sheet sheet = workbook.getSheets().get(0);
+
+        // 数据 3 行：row 2/3/4
+        assertEquals("苹果", text(sheet, 2, 0));
+        assertEquals("香蕉", text(sheet, 3, 0));
+        assertEquals("橙子", text(sheet, 4, 0));
+
+        // 标题 merge 保持不动（row 0 < bandBase 2，不满足 >= bandBase + 1）
+        assertTrue(sheet.getMerges().stream().anyMatch(m ->
+                        m.getStartRow() == 0 && m.getStartCol() == 0 && m.getColSpan() == 2),
+                "标题 merge 应保持原位");
+
+        // band 下方 merge：原 row 3 → 应移至 row 5（shift = 3 - 1 = 2）
+        assertTrue(sheet.getMerges().stream().anyMatch(m ->
+                        m.getStartRow() == 5 && m.getStartCol() == 0 && m.getColSpan() == 2),
+                "band 下方的模板 merge 应下移至 row 5");
+
+        // 原位置的 merge 不应再存在
+        assertTrue(sheet.getMerges().stream().noneMatch(m ->
+                        m.getStartRow() == 3 && m.getStartCol() == 0 && m.getColSpan() == 2),
+                "原 row 3 的 merge 不应再存在");
+    }
+
+    @Test
+    @DisplayName("汇总行模板 merge：band(row0) + 汇总(row1)，merge(row1,colSpan=2) 应跟随汇总行下移")
+    void summaryTemplateMergeFollowsSummary() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // band at row 0: name(VERT) + price(VERT)
+        CellBinding nameCol = listCol(new CellRef("sheet1", 0, 0), new FieldRef("d_prod", "name"));
+        CellBinding priceCol = listCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "price"));
+        // summary at template row 1: label("合计") + SUM(price)
+        SummaryRow total = SummaryRow.builder()
+                .row(1)
+                .groupBy(null).fromColumn(0).toColumn(1)
+                .cells(List.of(
+                        SummaryCell.label(0, "合计"),
+                        SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM")))
+                .build();
+        Report report = report("r_summary_merge", dm, List.of(nameCol, priceCol),
+                List.of(), List.of(), List.of(total));
+
+        // 模板：merge at row 1, colSpan 2（为汇总行的"合计"合并前两列）
+        Workbook template = new Workbook();
+        Sheet tplSheet = new Sheet();
+        tplSheet.setId("sheet1");
+        tplSheet.setName("Sheet1");
+        Merge summaryMerge = new Merge();
+        summaryMerge.setStartRow(1); summaryMerge.setStartCol(0);
+        summaryMerge.setRowSpan(1); summaryMerge.setColSpan(2);
+        tplSheet.setMerges(List.of(summaryMerge));
+        template.setSheets(List.of(tplSheet));
+
+        Workbook workbook = renderer.render(dm, report, new ParamContext(Map.of()), template);
+        Sheet sheet = workbook.getSheets().get(0);
+
+        // 数据 3 行：row 0/1/2
+        assertEquals("苹果", text(sheet, 0, 0));
+        assertEquals("香蕉", text(sheet, 1, 0));
+        assertEquals("橙子", text(sheet, 2, 0));
+
+        // 汇总行在 row 3（bandBase=0, shift=2, 模板 row 1 → 输出 row 3）
+        assertEquals("合计", text(sheet, 3, 0));
+        assertEquals(12.0, number(sheet, 3, 1), 0.0001);
+
+        // 汇总行的 merge 应跟随汇总行移至 row 3（而非停留在 row 1）
+        assertTrue(sheet.getMerges().stream().anyMatch(m ->
+                        m.getStartRow() == 3 && m.getStartCol() == 0 && m.getColSpan() == 2),
+                "汇总行的模板 merge 应跟随汇总行下移至 row 3");
+
+        // 原位置的 merge 不应再存在
+        assertTrue(sheet.getMerges().stream().noneMatch(m ->
+                        m.getStartRow() == 1 && m.getStartCol() == 0 && m.getColSpan() == 2),
+                "原 row 1 的 merge 不应再存在（避免数据区内出现多余合并）");
     }
 
     // ============================================================

@@ -182,6 +182,12 @@ public class ReportRenderer {
         int globalShift = 0;
         int globalBandBase = Integer.MAX_VALUE;
         RawTable firstGroupFiltered = null;
+        // 记录每条带的基准行和扩展行数，用于后续下移模板 merge
+        List<int[]> bandRecords = new ArrayList<>();
+        // 模板原始 merge 数量（renderBand 会追加新 merge，只对模板 merge 做下移）
+        int templateMergeCount = canvas.merges.size();
+        // 汇总行位置：模板行号 → 输出行号（用于精确下移跟随汇总的模板 merge）
+        Map<Integer, Integer> summaryOutputRows = new HashMap<>();
 
         for (List<CellBinding> group : groups) {
             // 组内 band cells
@@ -210,9 +216,34 @@ public class ReportRenderer {
 
             // 渲染带：只把"列落在本带"的汇总行交给本带，避免并列报表互相串扰
             List<SummaryRow> groupSummaries = summariesForBand(report.getSummaries(), groupBand);
-            int n = renderBand(groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas);
+            int n = renderBand(groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas, summaryOutputRows);
             int groupShift = n > 0 ? n - 1 : 0;
             globalShift = Math.max(globalShift, groupShift);
+            bandRecords.add(new int[]{groupBandBase, groupShift});
+        }
+
+        // 3b. 下移模板 merge：纵向带扩展后，带下方和汇总行的模板合并区域需要跟随下移
+        //     仅处理 seedTemplate 载入的原始 merge（renderBand/mergeColumn 动态创建的 merge 已在正确位置）
+        for (int mi = 0; mi < templateMergeCount; mi++) {
+            Merge m = canvas.merges.get(mi);
+            Integer summaryOutRow = summaryOutputRows.get(m.getStartRow());
+
+            if (summaryOutRow != null) {
+                // 汇总行的 merge：直接移至汇总行的输出位置
+                m.setStartRow(summaryOutRow);
+            } else if (m.getStartRow() >= globalBandBase + 1) {
+                // 带下方的非汇总 merge：按累计 shift 下移
+                int mergeShift = 0;
+                for (int[] rec : bandRecords) {
+                    if (m.getStartRow() >= rec[0] + 1) {
+                        mergeShift += rec[1];
+                    }
+                }
+                if (mergeShift > 0) {
+                    m.setStartRow(m.getStartRow() + mergeShift);
+                }
+            }
+            // 其他（带扩展范围内的非汇总 merge）：属于模板残留，随数据覆盖，不下移
         }
 
         final int shift = globalShift;
@@ -376,6 +407,17 @@ public class ReportRenderer {
      */
     private int renderBand(List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
                            int bandBase, ParamContext ctx, Canvas canvas) {
+        return renderBand(band, summaries, filtered, bandBase, ctx, canvas, null);
+    }
+
+    /**
+     * 同上，额外收集汇总行的位置到 {@code summaryOutputRows}（非 null 时启用）。
+     * <p>key = 汇总行的模板行号（{@code SummaryRow.row}），value = 该汇总行的输出行号。
+     * 用于 renderFree 的模板 merge 下移：汇总行处的 merge 应跟随汇总行移动。
+     */
+    private int renderBand(List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
+                           int bandBase, ParamContext ctx, Canvas canvas,
+                           Map<Integer, Integer> summaryOutputRows) {
         List<CellBinding> groupCols = new ArrayList<>();
         List<CellBinding> listCols = new ArrayList<>();
         List<CellBinding> aggCols = new ArrayList<>();
@@ -434,6 +476,9 @@ public class ReportRenderer {
                         Object groupVal = details.get(i).tuple.get(d);
                         for (SummaryRow s : ss) {
                             seq.add(summaryOut(s, groupRows, groupVal, ctx));
+                            if (summaryOutputRows != null && s.getRow() != null) {
+                                summaryOutputRows.put(s.getRow(), bandBase + seq.size() - 1);
+                            }
                         }
                     }
                 }
@@ -446,6 +491,9 @@ public class ReportRenderer {
         if (grand != null) {
             for (SummaryRow s : grand) {
                 seq.add(summaryOut(s, rows, null, ctx));
+                if (summaryOutputRows != null && s.getRow() != null) {
+                    summaryOutputRows.put(s.getRow(), bandBase + seq.size() - 1);
+                }
             }
         }
 
