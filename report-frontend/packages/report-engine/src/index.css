@@ -49,7 +49,7 @@
   --re-radius-lg: 6px;
 
   /* 面板尺寸 */
-  --re-expr-panel-height: 280px;
+  --re-expr-panel-height: 420px;
 
   /* 按钮尺寸 */
   --re-header-btn-width: 112px;
@@ -209,15 +209,70 @@
 /* ─── 表达式构建器 ─── */
 .re-expr-builder { display: flex; flex-direction: column; gap: var(--re-spacing-md); }
 
+.re-expr-label {
+  font-size: var(--re-font-size-sm);
+  font-weight: 500;
+  color: var(--re-color-text);
+  margin-bottom: calc(var(--re-spacing-xs) * -1);
+}
+
 .re-expr-panel {
   display: flex; border: 1px solid var(--re-color-border); border-radius: var(--re-radius-base);
   height: var(--re-expr-panel-height); overflow: hidden;
+}
+
+/* 一级菜单区域 */
+.re-expr-panel > .ant-menu-inline {
+  flex: 0 0 120px;
+  border-right: 1px solid var(--re-color-border-light) !important;
+  background: var(--re-color-bg-subtle) !important;
+  padding: 0 !important;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item {
+  margin: 0 !important;
+  padding: 0 var(--re-spacing-lg) !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--re-color-border-light);
+  height: 40px !important;
+  line-height: 40px !important;
+  transition: all 0.2s;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item::after {
+  content: '›';
+  position: absolute;
+  right: 12px;
+  font-size: 18px;
+  color: var(--re-color-text-tertiary);
+  transition: transform 0.2s;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item:hover {
+  background: var(--re-color-bg-hover) !important;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item:hover::after {
+  transform: translateX(2px);
+  color: var(--re-color-primary);
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item-selected {
+  background: var(--re-color-bg) !important;
+  font-weight: 500;
+}
+
+.re-expr-panel > .ant-menu-inline .ant-menu-item-selected::after {
+  content: '✓';
+  color: var(--re-color-primary);
+  font-size: 14px;
 }
 
 /* 二级选择区 */
 .re-expr-selector {
   flex: 1; display: flex; flex-direction: column; min-width: 0;
   padding: var(--re-spacing-md);
+  background: var(--re-color-bg);
 }
 .re-expr-selector > .ant-input-affix-wrapper { margin-bottom: var(--re-spacing-md); }
 

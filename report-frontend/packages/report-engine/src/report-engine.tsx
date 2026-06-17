@@ -558,7 +558,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [messageApi],
   );
 
-  // ─── 单元格值变更 → 清空被删除的绑定 + 同步汇总行 ───
+  // ─── 单元格值变更 → 清空被删除的绑定 + 同步绑定值 + 同步汇总行 ───
   const handleCellValueChange = useCallback(
     (changes: Array<{ sheetId: string; row: number; col: number; value: string }>) => {
       // 内容被清空的单元格 → 移除对应的 CellBinding
@@ -568,6 +568,30 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       if (clearedKeys.size > 0) {
         setCellBindings((prev) => prev.filter((b) => !clearedKeys.has(b.cellKey)));
       }
+
+      // 同步到普通 CellBinding.value（仅当当前是纯文本时才同步）
+      setCellBindings((prev) => {
+        let updated = false;
+        const next = prev.map((b) => {
+          // 跳过被清空的（已在上一步处理）
+          if (clearedKeys.has(b.cellKey)) return b;
+
+          // 查找对应的变更
+          const { sheetId, row, col } = parseCellKey(b.cellKey);
+          const change = changes.find((c) => c.sheetId === sheetId && c.row === row && c.col === col);
+          if (!change || change.value === '') return b;
+
+          // 仅当当前绑定值是纯文本（Literal/Template）时才同步
+          // 避免覆盖用户通过属性面板设置的字段引用、聚合等表达式
+          if (b.value.type === 'Literal' || b.value.type === 'Template') {
+            const newValue = parseTemplate(change.value);
+            updated = true;
+            return { ...b, value: newValue };
+          }
+          return b;
+        });
+        return updated ? next : prev;
+      });
 
       // 同步到汇总行的 SummaryCell.value
       setSummaries((prev) => {

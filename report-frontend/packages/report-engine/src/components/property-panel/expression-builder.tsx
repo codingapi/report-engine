@@ -196,6 +196,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
 
   return (
     <div className="re-expr-builder">
+      <div className="re-expr-label">内容表达式</div>
       <Input.TextArea
         ref={taRef}
         value={text}
@@ -217,41 +218,53 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
             key: cat.key,
             label: cat.label,
           }))}
-          style={{ flex: '0 0 100px', borderRight: 'none' }}
         />
 
         {/* 二级选择区 */}
-        {category && (
-          <div className="re-expr-selector">
-            <Input
-              size="small"
-              prefix={<SearchOutlined />}
-              placeholder="搜索..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              allowClear
-            />
-            <List
-              size="small"
-              dataSource={secondLevelItems}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配项" /> }}
-              style={{ flex: 1, overflowY: 'auto', maxHeight: 'var(--re-expr-panel-height, 200px)' }}
-              split={false}
-              renderItem={(item, idx) => (
-                <List.Item
-                  key={`${item.expr}-${idx}`}
-                  onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
-                  style={{ cursor: 'pointer', borderRadius: 'var(--re-radius-base)', padding: '6px 12px', marginBottom: 2 }}
-                >
-                  <List.Item.Meta
-                    title={<span style={{ fontWeight: 500 }}>{item.label}</span>}
-                    description={item.desc}
-                  />
-                </List.Item>
-              )}
-            />
-          </div>
-        )}
+        <div className="re-expr-selector">
+          {category ? (
+            <>
+              <Input
+                size="small"
+                prefix={<SearchOutlined />}
+                placeholder="搜索..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                allowClear
+              />
+              <List
+                size="small"
+                dataSource={secondLevelItems}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配项" /> }}
+                style={{ flex: 1, overflowY: 'auto' }}
+                split={false}
+                renderItem={(item, idx) => (
+                  <List.Item
+                    key={`${item.expr}-${idx}`}
+                    onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
+                    style={{ cursor: 'pointer', borderRadius: 'var(--re-radius-base)', padding: '6px 12px', marginBottom: 2 }}
+                  >
+                    <List.Item.Meta
+                      title={<span style={{ fontWeight: 500 }}>{item.label}</span>}
+                      description={item.desc}
+                    />
+                  </List.Item>
+                )}
+              />
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <span style={{ color: 'var(--re-color-text-secondary)' }}>
+                    请先选择左侧分类
+                  </span>
+                }
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
