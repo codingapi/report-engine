@@ -680,6 +680,18 @@ public class ReportRenderer {
                 o.sources.put(sc.getColumn(), new CellRef(null, s.getRow(), sc.getColumn()));
             }
         }
+        // 补齐列区间 [fromColumn, toColumn] 内"无汇总格"的空列：从模板汇总声明行继承样式。
+        // 否则未定义汇总格的列在汇总行输出位置完全无格 → 边框等样式缺失（小计行尤其明显：
+        // 它有多个输出实例，靠 renderFree 搬运单条模板声明行的静态格只能补到其中一行）。
+        // 仅在模板态（s.row 非 null）补齐，无模板的测试/数据校验场景保持原样不变。
+        if (s.getRow() != null) {
+            for (int col = s.getFromColumn(); col <= s.getToColumn(); col++) {
+                if (!o.values.containsKey(col)) {
+                    o.values.put(col, null);
+                    o.sources.put(col, new CellRef(null, s.getRow(), col));
+                }
+            }
+        }
         return o;
     }
 
@@ -734,10 +746,28 @@ public class ReportRenderer {
         // 4b. 收集块范围内的模板合并区域（用于后续迭代时复制）
         int loopStartRow = loop.getStart().row();
         int loopEndRow = loop.getEnd().row();
+        int loopStartCol = loop.getStart().column();
+        int loopEndCol = loop.getEnd().column();
         List<Merge> blockMerges = new ArrayList<>();
         for (Merge m : canvas.merges) {
             if (m.getStartRow() >= loopStartRow && m.getStartRow() + m.getRowSpan() - 1 <= loopEndRow) {
                 blockMerges.add(m);
+            }
+        }
+
+        // 4c. 收集块内"无绑定的静态模板格"（表头文字 / 纯边框空格等）。
+        //     后续迭代只 place 绑定格 + 复制 merge，这些静态格不会自动重复 → 须按 rowOffset 复制，
+        //     否则第二条起的薪资条表头/边框残缺。
+        Set<String> blockBindingKeys = new HashSet<>();
+        for (CellBinding b : blockCells) {
+            blockBindingKeys.add(key(b.getCell().row(), b.getCell().column()));
+        }
+        List<Cell> blockStaticCells = new ArrayList<>();
+        for (Cell tc : canvas.template.values()) {
+            if (tc.getRow() >= loopStartRow && tc.getRow() <= loopEndRow
+                    && tc.getCol() >= loopStartCol && tc.getCol() <= loopEndCol
+                    && !blockBindingKeys.contains(key(tc.getRow(), tc.getCol()))) {
+                blockStaticCells.add(tc);
             }
         }
 
@@ -754,7 +784,7 @@ public class ReportRenderer {
                 place(canvas, b.getCell(), row, col, evalLoopCell(b, q.getDatasetId(), drow, ctx));
             }
 
-            // 为后续迭代复制合并区域（第一次迭代的合并已由 seedTemplate 载入）
+            // 为后续迭代复制合并区域 + 静态模板格（第一次迭代的内容已由 seedTemplate 载入）
             if (i > 0) {
                 for (Merge orig : blockMerges) {
                     Merge copy = new Merge();
@@ -763,6 +793,15 @@ public class ReportRenderer {
                     copy.setRowSpan(orig.getRowSpan());
                     copy.setColSpan(orig.getColSpan());
                     canvas.merges.add(copy);
+                }
+                for (Cell tc : blockStaticCells) {
+                    Cell copy = new Cell();
+                    copy.setRow(tc.getRow() + rowOffset);
+                    copy.setCol(tc.getCol());
+                    copy.setValue(tc.getValue());
+                    copy.setRichText(tc.getRichText());
+                    copy.setStyle(tc.getStyle());
+                    canvas.cells.put(key(tc.getRow() + rowOffset, tc.getCol()), copy);
                 }
             }
         }

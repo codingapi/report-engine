@@ -283,6 +283,14 @@ export interface ReportEngineProps {
     workbook: ExcelWorkbook,
     params: ReportParam[],
   ) => void | Promise<void>;
+  /** 预览回调：参数与 onExport 一致，由父组件渲染后端预览结果（网页预览） */
+  onPreview?: (
+    bindings: CellBinding[],
+    loops: LoopBlock[],
+    summaries: SummaryRow[],
+    workbook: ExcelWorkbook,
+    params: ReportParam[],
+  ) => void | Promise<void>;
   /** 导入回调：接收文件，返回快照 */
   onImport?: (file: File) => Promise<ExcelWorkbook>;
   /** 保存报表回调：接收整张报表配置，返回报表 id（用于后续更新） */

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Button, Upload, Tooltip, Drawer, Divider, message } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import {
-  ExportOutlined, ImportOutlined,
+  ExportOutlined, ImportOutlined, EyeOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
   BlockOutlined, QuestionCircleOutlined,
 } from '@ant-design/icons';
@@ -79,6 +79,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   title,
   engineRef,
   onExport,
+  onPreview,
   onImport,
   onSaveReport,
   onFontRequest,
@@ -106,11 +107,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [loopDrawerOpen, setLoopDrawerOpen] = useState(false);
 
   // ─── 报表 IO（保存/导出/导入） ───
-  const { savingReport, exporting, importing, handleSaveReport, handleExport, handleImport } = useReportIO({
+  const { savingReport, exporting, previewing, importing, handleSaveReport, handleExport, handlePreview, handleImport } = useReportIO({
     sheetRef, datasets, dataModelId,
     cellBindings, loopBlocks, summaries, params,
     reportId, reportName, onReportIdChange: setReportId,
-    onSaveReport, onExport, onImport, messageApi,
+    onSaveReport, onExport, onPreview, onImport, messageApi,
   });
 
   // ─── 清空旧模板单元格 ───
@@ -679,6 +680,15 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
             循环块{loopBlocks.length > 0 && `(${loopBlocks.length})`}
           </Button>
+          {onPreview && (
+            <Button
+              icon={<EyeOutlined />}
+              loading={previewing}
+              onClick={handlePreview}
+            >
+              预览
+            </Button>
+          )}
           {onExport && (
             <Button
               icon={<ExportOutlined />}

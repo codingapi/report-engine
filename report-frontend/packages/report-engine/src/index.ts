@@ -1,6 +1,9 @@
 export { ReportEngine } from './report-engine';
 export type { ReportEngineHandle } from './report-engine';
 
+export { default as ReportPreview } from './components/preview/report-preview';
+export type { ReportPreviewProps } from './components/preview/report-preview';
+
 export type {
   // 枚举
   DataType,

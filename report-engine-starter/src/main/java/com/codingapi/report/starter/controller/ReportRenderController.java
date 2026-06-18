@@ -12,6 +12,7 @@ import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryRow;
 import com.codingapi.report.starter.converter.RenderDtoConverter;
 import com.codingapi.report.starter.dto.RenderDtos.RenderRequest;
+import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,8 +26,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 报表渲染 API：前端配置 + 模板快照 → {@link ReportRenderer} 渲染 → 返回填充数据的 .xlsx。
+ * 报表渲染 API：前端配置 + 模板快照 → {@link ReportRenderer} 渲染。
  * <p>
+ * 两个出口共用同一渲染结果 {@link Workbook}：
+ * <ul>
+ *   <li>{@code /render} —— 经 {@link ExcelExporter} 转 .xlsx 字节流下载</li>
+ *   <li>{@code /preview} —— 直接返回 {@link Workbook} JSON，供前端 HTML 渲染网页预览</li>
+ * </ul>
  * DTO 承接前端 JSON、{@link RenderDtoConverter} 转为领域对象，本类只负责端点编排。
  */
 @RestController
@@ -44,6 +50,28 @@ public class ReportRenderController {
 
     @PostMapping("/render")
     public ResponseEntity<byte[]> render(@RequestBody RenderRequest request) {
+        Workbook result = renderWorkbook(request);
+        byte[] xlsx = new ExcelExporter().export(result);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentLength(xlsx.length)
+                .body(xlsx);
+    }
+
+    /**
+     * 网页预览：与 {@code /render} 共用同一渲染结果，但直接返回 {@link Workbook} JSON，
+     * 不经 {@link ExcelExporter}。前端据此用 HTML 表格渲染预览。
+     */
+    @PostMapping("/preview")
+    public SingleResponse<Workbook> preview(@RequestBody RenderRequest request) {
+        return SingleResponse.of(renderWorkbook(request));
+    }
+
+    /** 配置 + 模板快照 → 领域对象 → 渲染为 {@link Workbook}（render/preview 共用）。 */
+    private Workbook renderWorkbook(RenderRequest request) {
         ReportRenderer renderer = new ReportRenderer(List.of(csvExtractor));
 
         List<CellBinding> bindings = RenderDtoConverter.convertBindings(request.cellBindings());
@@ -61,14 +89,6 @@ public class ReportRenderController {
 
         Workbook template = request.template();
         Map<String, Object> paramValues = request.params() != null ? request.params() : Map.of();
-        Workbook result = renderer.render(dataModel, report, new ParamContext(paramValues), template);
-        byte[] xlsx = new ExcelExporter().export(result);
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report.xlsx")
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .contentLength(xlsx.length)
-                .body(xlsx);
+        return renderer.render(dataModel, report, new ParamContext(paramValues), template);
     }
 }

@@ -57,6 +57,12 @@ export async function renderReport(request: RenderRequest): Promise<Blob> {
   return res.data;
 }
 
+/** 预览报表：发送配置 + 模板 → 返回填充数据的工作簿 JSON（不下载，供前端 HTML 渲染网页预览） */
+export async function previewReport(request: RenderRequest): Promise<ExcelWorkbook> {
+  const res = await http.post('/report/preview', request);
+  return res.data as ExcelWorkbook;
+}
+
 // ============================================================
 // 报表配置持久化（保存 / 加载 / 列表）
 // ============================================================

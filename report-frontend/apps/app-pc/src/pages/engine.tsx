@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Spin, Button, message } from 'antd';
-import { PrinterOutlined } from '@ant-design/icons';
-import { ReportEngine } from '@coding-report/report-engine';
+import { Spin, Button, Drawer, message } from 'antd';
+import { PrinterOutlined, ExportOutlined } from '@ant-design/icons';
+import { ReportEngine, ReportPreview } from '@coding-report/report-engine';
 import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship, ReportValue } from '@coding-report/report-engine';
 import {
-  importExcel, fetchFonts, renderReport, fetchFunctions,
+  importExcel, fetchFonts, renderReport, previewReport, fetchFunctions,
   saveReportConfig, loadReportConfig,
 } from '@coding-report/report-api';
-import type { RenderBindingDTO, RenderValueDTO, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
+import type { RenderBindingDTO, RenderValueDTO, RenderRequest, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 import ParamInputModal from '../components/param-input-modal';
 
@@ -74,6 +74,8 @@ function buildParamValues(params: ReportParam[], userInput: Record<string, unkno
 }
 
 interface PendingExport {
+  /** 渲染动作：导出 .xlsx 下载 或 网页预览 */
+  mode: 'export' | 'preview';
   bindings: CellBinding[];
   loops: LoopBlock[];
   summaries: SummaryRow[];
@@ -98,6 +100,13 @@ const EnginePage = () => {
   // 导出参数弹窗状态
   const [paramModalOpen, setParamModalOpen] = useState(false);
   const pendingExportRef = useRef<PendingExport | null>(null);
+
+  // 网页预览抽屉状态
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewWorkbook, setPreviewWorkbook] = useState<ExcelWorkbook>();
+  const [exportingPreview, setExportingPreview] = useState(false);
+  // 预览所用的渲染请求：抽屉内「导出报表」复用同一份配置/参数，无需重新填参
+  const previewRequestRef = useRef<RenderRequest | null>(null);
 
   const handlePrintConfig = () => {
     const config = engineRef.current?.getReportConfig();
@@ -173,42 +182,74 @@ const EnginePage = () => {
     return importExcel(file);
   };
 
-  /** 执行渲染并下载 */
-  const doRender = async (paramValues: Record<string, unknown>) => {
+  /** 执行渲染：按 pending.mode 决定下载 .xlsx 或网页预览 */
+  const doRenderAction = async (paramValues: Record<string, unknown>) => {
     const p = pendingExportRef.current;
     if (!p) return;
     pendingExportRef.current = null;
-    const blob = await renderReport({
+    const request = {
       cellBindings: p.bindings.map(toBindingDTO),
       loopBlocks: p.loops,
       summaries: p.summaries,
       params: paramValues,
       template: p.workbook,
-    });
-    downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+    if (p.mode === 'preview') {
+      const wb = await previewReport(request);
+      previewRequestRef.current = request; // 抽屉内导出复用
+      setPreviewWorkbook(wb);
+      setPreviewOpen(true);
+    } else {
+      const blob = await renderReport(request);
+      downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
   };
 
-  const handleExport = async (
+  /** 预览抽屉内导出：复用生成预览时的同一份请求，直接渲染下载 */
+  const handleExportFromPreview = async () => {
+    const req = previewRequestRef.current;
+    if (!req) return;
+    setExportingPreview(true);
+    try {
+      const blob = await renderReport(req);
+      downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      message.error(`导出失败: ${e}`);
+    } finally {
+      setExportingPreview(false);
+    }
+  };
+
+  /** 导出/预览共用：收集必填参数（弹窗）后执行渲染动作 */
+  const runRenderAction = async (
+    mode: 'export' | 'preview',
     bindings: CellBinding[],
     loops: LoopBlock[],
     summaries: SummaryRow[],
     workbook: ExcelWorkbook,
     params: ReportParam[],
   ): Promise<void> => {
-    const pending: PendingExport = { bindings, loops, summaries, workbook, params };
+    pendingExportRef.current = { mode, bindings, loops, summaries, workbook, params };
 
     // 有无默认值的必填参数 → 弹窗输入
     const hasRequired = params.some((p) => !p.defaultValue);
     if (hasRequired) {
-      pendingExportRef.current = pending;
       setParamModalOpen(true);
       return;
     }
-
     // 全部有默认值或无参数 → 直接渲染
-    pendingExportRef.current = pending;
-    await doRender(buildParamValues(params, {}));
+    await doRenderAction(buildParamValues(params, {}));
   };
+
+  const handleExport = (
+    bindings: CellBinding[], loops: LoopBlock[], summaries: SummaryRow[],
+    workbook: ExcelWorkbook, params: ReportParam[],
+  ): Promise<void> => runRenderAction('export', bindings, loops, summaries, workbook, params);
+
+  const handlePreview = (
+    bindings: CellBinding[], loops: LoopBlock[], summaries: SummaryRow[],
+    workbook: ExcelWorkbook, params: ReportParam[],
+  ): Promise<void> => runRenderAction('preview', bindings, loops, summaries, workbook, params);
 
   const handleSaveReport = async (config: ReportConfig): Promise<string> => {
     return saveReportConfig({ ...config, dataModelId });
@@ -232,6 +273,7 @@ const EnginePage = () => {
         engineRef={engineRef}
         onImport={handleImport}
         onExport={handleExport}
+        onPreview={handlePreview}
         onSaveReport={handleSaveReport}
         onFontRequest={fetchFonts}
         extraActions={
@@ -247,13 +289,35 @@ const EnginePage = () => {
         onConfirm={async (values) => {
           setParamModalOpen(false);
           const params = pendingExportRef.current?.params ?? [];
-          await doRender(buildParamValues(params, values));
+          await doRenderAction(buildParamValues(params, values));
         }}
         onCancel={() => {
           setParamModalOpen(false);
           pendingExportRef.current = null;
         }}
       />
+
+      <Drawer
+        title="报表预览"
+        placement="right"
+        width="100%"
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        destroyOnHidden
+        styles={{ body: { padding: 0, background: '#fff' } }}
+        extra={
+          <Button
+            type="primary"
+            icon={<ExportOutlined />}
+            loading={exportingPreview}
+            onClick={handleExportFromPreview}
+          >
+            导出报表
+          </Button>
+        }
+      >
+        <ReportPreview workbook={previewWorkbook} />
+      </Drawer>
     </>
   );
 };
