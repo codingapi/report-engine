@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Empty, Tabs } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Empty, Tabs, Modal, Table } from 'antd';
 import type {
   ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelBorder, ExcelBorderStyle,
 } from '@coding-report/report-univer';
@@ -13,6 +13,10 @@ import type {
  */
 export interface ReportPreviewProps {
   workbook?: ExcelWorkbook;
+  /** 可反查的单元格坐标列表（"row:col" 格式） */
+  drillable?: string[];
+  /** 点击可反查单元格时的回调 */
+  onDrill?: (row: number, col: number) => void;
 }
 
 // ─── 边框线型 → CSS ─────────────────────────────────────────
@@ -102,8 +106,17 @@ const BASE_TD_STYLE: React.CSSProperties = {
   border: '1px dotted #eeeeee',
 };
 
+// 反查格样式：蓝色链接 + 手型光标 + 悬停下划线
+const DRILLABLE_STYLE: React.CSSProperties = {
+  color: '#1677ff',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+  textDecorationStyle: 'dotted',
+  textUnderlineOffset: '2px',
+};
+
 /** 单个 sheet → 居中白纸卡片内的 HTML 表格 */
-const SheetTable: React.FC<{ sheet: ExcelSheet }> = ({ sheet }) => {
+const SheetTable: React.FC<{ sheet: ExcelSheet; drillable?: Set<string>; onDrill?: (row: number, col: number) => void }> = ({ sheet, drillable, onDrill }) => {
   const model = useMemo(() => {
     const cellMap = new Map<string, ExcelCell>();
     let maxRow = 0;
@@ -172,12 +185,18 @@ const SheetTable: React.FC<{ sheet: ExcelSheet }> = ({ sheet }) => {
                   if (covered.has(key)) return null;
                   const span = anchorSpan.get(key);
                   const cell = cellMap.get(key);
+                  const isDrillable = drillable?.has(key) ?? false;
                   return (
                     <td
                       key={c}
                       rowSpan={span?.rowSpan}
                       colSpan={span?.colSpan}
-                      style={{ ...BASE_TD_STYLE, ...styleToCss(cell?.style) }}
+                      style={{
+                        ...BASE_TD_STYLE,
+                        ...styleToCss(cell?.style),
+                        ...(isDrillable ? DRILLABLE_STYLE : {}),
+                      }}
+                      onClick={isDrillable && onDrill ? () => onDrill(r, c) : undefined}
                     >
                       {renderCellContent(cell)}
                     </td>
@@ -195,8 +214,9 @@ const SheetTable: React.FC<{ sheet: ExcelSheet }> = ({ sheet }) => {
 const ROOT_STYLE: React.CSSProperties = { minHeight: '100%', background: '#fff' };
 const PANE_STYLE: React.CSSProperties = { padding: 24 };
 
-const ReportPreview: React.FC<ReportPreviewProps> = ({ workbook }) => {
+const ReportPreview: React.FC<ReportPreviewProps> = ({ workbook, drillable, onDrill }) => {
   const sheets = (workbook?.sheets || []).filter((s) => s.cells && s.cells.length > 0);
+  const drillableSet = useMemo(() => new Set(drillable || []), [drillable]);
 
   if (sheets.length === 0) {
     return (
@@ -210,7 +230,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ workbook }) => {
     return (
       <div style={ROOT_STYLE}>
         <div style={PANE_STYLE}>
-          <SheetTable sheet={sheets[0]} />
+          <SheetTable sheet={sheets[0]} drillable={drillableSet} onDrill={onDrill} />
         </div>
       </div>
     );
@@ -232,7 +252,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({ workbook }) => {
           label: s.name || '工作表',
           children: (
             <div style={PANE_STYLE}>
-              <SheetTable sheet={s} />
+              <SheetTable sheet={s} drillable={drillableSet} onDrill={onDrill} />
             </div>
           ),
         }))}

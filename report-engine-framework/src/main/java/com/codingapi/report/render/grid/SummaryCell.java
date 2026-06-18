@@ -23,7 +23,6 @@ import lombok.Data;
  * <p>取决于所属 {@link SummaryRow#getGroupBy()}：非 null（小计）只聚合当前分组内的行，null（总计）聚合全表。
  */
 @Data
-@AllArgsConstructor
 public class SummaryCell {
 
     /** 落在哪一列（0-based）。 */
@@ -31,6 +30,32 @@ public class SummaryCell {
 
     /** 值表达式：标签（Template）或聚合（Aggregate）。 */
     private Value value;
+
+    /**
+     * 是否开启反查（drill-down）能力（默认 false）。
+     * <p>开启后，预览态下该汇总格渲染为可点击（蓝色链接样式），用户点击可查看聚合计算的明细数据。
+     * 仅对聚合格有意义；标签格开启无效果。
+     * <p>反查视图由 {@link #drillView} 指定；未指定时使用该格字段所属数据集作为默认视图。
+     */
+    private boolean drillEnabled;
+
+    /**
+     * 反查视图（数据集 id，可 null）。
+     * <p>指定反查时展示哪个数据集的明细数据。null 时回退到该格字段所属的数据集（每个数据集的默认视图=它本身）。
+     * 仅在 {@link #drillEnabled} = true 时生效。
+     */
+    private String drillView;
+
+    public SummaryCell(int column, Value value) {
+        this(column, value, false, null);
+    }
+
+    public SummaryCell(int column, Value value, boolean drillEnabled, String drillView) {
+        this.column = column;
+        this.value = value;
+        this.drillEnabled = drillEnabled;
+        this.drillView = drillView;
+    }
 
     /**
      * 创建标签单元格。

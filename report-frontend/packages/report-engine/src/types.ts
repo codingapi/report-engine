@@ -148,6 +148,10 @@ export interface CellBinding {
   independent?: boolean;
   /** 表达式预览（友好文本，导出时附带存储；派生自 value，不作为权威来源） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false）。开启后预览态下该格可点击，查看明细数据。 */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
   /**
    * 单元格展示文本（设计态：别名友好文本，由 valueDisplayText(value) 正向派生）。
    * transient——保存时剥离，后端不接收也不存储。两个用途：
@@ -180,6 +184,10 @@ export interface SummaryCell {
   value: ReportValue;
   /** 表达式预览（友好文本，导出时附带存储） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false）。开启后预览态下该格可点击，查看明细数据。 */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
   /** 单元格展示文本（设计态，transient）。回声判别基准，见 CellBinding.displayText。 */
   displayText?: string;
 }

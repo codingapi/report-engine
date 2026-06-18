@@ -34,6 +34,10 @@ export interface RenderBindingDTO {
   independent?: boolean;
   /** 表达式预览（友好文本，后端仅存储不渲染） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false） */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
 }
 
 export interface RenderRequest {
@@ -57,10 +61,43 @@ export async function renderReport(request: RenderRequest): Promise<Blob> {
   return res.data;
 }
 
-/** 预览报表：发送配置 + 模板 → 返回填充数据的工作簿 JSON（不下载，供前端 HTML 渲染网页预览） */
-export async function previewReport(request: RenderRequest): Promise<ExcelWorkbook> {
+/** 预览响应：工作簿 + 反查格坐标列表（"row:col" 格式） */
+export interface PreviewResult {
+  workbook: ExcelWorkbook;
+  drillable: string[];
+}
+
+/** 预览报表：发送配置 + 模板 → 返回填充数据的工作簿 JSON + 反查格坐标列表（供前端 HTML 渲染预览） */
+export async function previewReport(request: RenderRequest): Promise<PreviewResult> {
   const res = await http.post('/report/preview', request);
-  return res.data as ExcelWorkbook;
+  return res.data as PreviewResult;
+}
+
+/** 反查请求：渲染配置 + 目标格坐标 */
+export interface DrillRequestParams {
+  request: RenderRequest;
+  row: number;
+  col: number;
+}
+
+/** 字段信息：name + alias */
+export interface DrillFieldInfo {
+  name: string;
+  alias: string | null;
+}
+
+/** 反查结果：数据集 id/别名 + 字段列表 + 明细行（本期全量返回，不分页） */
+export interface DrillResult {
+  datasetId: string | null;
+  alias: string | null;
+  fields: DrillFieldInfo[];
+  rows: Array<Record<string, unknown>>;
+}
+
+/** 反查明细：传入渲染配置 + 目标格坐标，返回该格贡献的原始数据行 */
+export async function drillReport(params: DrillRequestParams): Promise<DrillResult> {
+  const res = await http.post('/report/drill', params);
+  return res.data as DrillResult;
 }
 
 // ============================================================

@@ -4,6 +4,8 @@ export type { ReportEngineHandle } from './report-engine';
 export { default as ReportPreview } from './components/preview/report-preview';
 export type { ReportPreviewProps } from './components/preview/report-preview';
 
+export { default as DrillModal } from './components/preview/drill-modal';
+
 export type {
   // 枚举
   DataType,

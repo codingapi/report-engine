@@ -101,6 +101,8 @@ public class ReportRenderer {
     private final Map<String, RawTable> cache = new HashMap<>();
     /** 表达式引擎：所有格子的值（文本插值/字段/聚合/格式化）统一经它求值 */
     private final ExpressionEngine engine = new ExpressionEngine();
+    /** 反查信息收集器：仅当显式传入时启用（null 时零影响），旁路捕获聚合/汇总格的贡献行 */
+    private DrillCollector drillCollector;
 
     /**
      * @param extractors 已注册的提取器列表（如 [CsvDataExtractor, DbDataExtractor, ...]）
@@ -127,8 +129,24 @@ public class ReportRenderer {
      * @return 渲染后的 Workbook，可直接传给 ExcelExporter 生成 .xlsx
      */
     public Workbook render(DataModel dm, Report report, ParamContext ctx, Workbook template) {
+        return render(dm, report, ctx, template, null);
+    }
+
+    /**
+     * 模板覆盖渲染（带反查收集）：同上，额外传入 {@link DrillCollector} 用于旁路捕获聚合/汇总格的贡献明细行。
+     * <p>仅当 drillCollector != null 时启用反查捕获；null 时行为与 {@link #render(DataModel, Report, ParamContext, Workbook)} 完全一致。
+     *
+     * @param dm              数据模型（数据集 + 关系定义）
+     * @param report          报表定义（格子绑定 + 循环块 + 小计/总计）
+     * @param ctx             运行时参数上下文
+     * @param template        Univer 模板画布（null 时退化为无模板渲染）
+     * @param drillCollector  反查信息收集器（null 时不收集）
+     * @return 渲染后的 Workbook，可直接传给 ExcelExporter 生成 .xlsx
+     */
+    public Workbook render(DataModel dm, Report report, ParamContext ctx, Workbook template, DrillCollector drillCollector) {
         this.dm = dm;
         this.cache.clear();
+        this.drillCollector = drillCollector;
 
         Canvas canvas = new Canvas();
         seedTemplate(canvas, template);
@@ -621,12 +639,18 @@ public class ReportRenderer {
             }
         }
 
-        // 落格（游标 = bandBase + 序号）
+        // 落格（游标 = bandBase + 序号）+ 反查捕获
         for (int k = 0; k < seq.size(); k++) {
             Out o = seq.get(k);
             int outRow = bandBase + k;
             for (Map.Entry<Integer, Object> e : o.values.entrySet()) {
-                place(canvas, o.sources.get(e.getKey()), outRow, e.getKey(), e.getValue());
+                int col = e.getKey();
+                place(canvas, o.sources.get(col), outRow, col, e.getValue());
+                // 反查：若该列有捕获信息，记录到 collector
+                DrillCapture dc = o.drills.get(col);
+                if (dc != null && drillCollector != null) {
+                    drillCollector.record(outRow, col, dc.drillView, dc.rows);
+                }
             }
         }
 
@@ -665,6 +689,16 @@ public class ReportRenderer {
             List<Map<String, Object>> groupRows = rowsWithPrefix(rows, groupCols, unit.tuple, p);
             o.values.put(ac.getCell().column(), engine.eval(ac.getValue(), EvalContext.aggregate(groupRows, ctx)));
             o.sources.put(ac.getCell().column(), ac.getCell());
+            // 反查：仅当 drillEnabled 时记录贡献行（带内聚合列）
+            if (ac.isDrillEnabled() && ac.getValue() instanceof Value.Aggregate agg) {
+                String drillView = ac.getDrillView();
+                if (drillView == null && agg.operand() instanceof Value.FieldValue fv) {
+                    drillView = fv.ref().datasetId();
+                }
+                if (drillView != null && drillCollector != null) {
+                    o.drills.put(ac.getCell().column(), new DrillCapture(drillView, groupRows));
+                }
+            }
         }
         return o;
     }
@@ -678,6 +712,16 @@ public class ReportRenderer {
             // 汇总行从模板的"汇总声明行"继承样式（边框/字体随汇总行滚动到输出位置）
             if (s.getRow() != null) {
                 o.sources.put(sc.getColumn(), new CellRef(null, s.getRow(), sc.getColumn()));
+            }
+            // 反查：仅当 drillEnabled 时记录贡献行（聚合/汇总格）
+            if (sc.isDrillEnabled() && sc.getValue() instanceof Value.Aggregate agg) {
+                String drillView = sc.getDrillView();
+                if (drillView == null && agg.operand() instanceof Value.FieldValue fv) {
+                    drillView = fv.ref().datasetId();
+                }
+                if (drillView != null && drillCollector != null) {
+                    o.drills.put(sc.getColumn(), new DrillCapture(drillView, groupRows));
+                }
             }
         }
         // 补齐列区间 [fromColumn, toColumn] 内"无汇总格"的空列：从模板汇总声明行继承样式。
@@ -782,6 +826,33 @@ public class ReportRenderer {
                 int row = b.getCell().row() + rowOffset;
                 int col = b.getCell().column();
                 place(canvas, b.getCell(), row, col, evalLoopCell(b, q.getDatasetId(), drow, ctx));
+                // 反查：仅当 drillEnabled 且为聚合时记录贡献行（循环块内聚合）
+                if (b.isDrillEnabled() && b.getValue() instanceof Value.Aggregate agg && drillCollector != null) {
+                    List<FieldRef> refs = new ArrayList<>();
+                    collectFieldRefs(b.getValue(), refs);
+                    String other = null;
+                    for (FieldRef r : refs) {
+                        if (!r.datasetId().equals(q.getDatasetId())) {
+                            other = r.datasetId();
+                            break;
+                        }
+                    }
+                    String drillView = b.getDrillView();
+                    List<Map<String, Object>> drillRows;
+                    if (other != null) {
+                        // 引用其他数据集：用过滤后的行
+                        RawTable f = Operators.filter(extract(other), b.getConditions(), ctx, engine);
+                        drillRows = f.getRows();
+                        if (drillView == null) drillView = other;
+                    } else {
+                        // 引用驱动数据集：用当前迭代行（单行）
+                        drillRows = List.of(drow);
+                        if (drillView == null) drillView = q.getDatasetId();
+                    }
+                    if (drillView != null) {
+                        drillCollector.record(row, col, drillView, drillRows);
+                    }
+                }
             }
 
             // 为后续迭代复制合并区域 + 静态模板格（第一次迭代的内容已由 seedTemplate 载入）
@@ -1427,10 +1498,23 @@ public class ReportRenderer {
         final Map<Integer, Object> values = new LinkedHashMap<>();
         /** 列号 → 声明格坐标（样式继承来源） */
         final Map<Integer, CellRef> sources = new HashMap<>();
+        /** 列号 → 反查捕获信息（仅当该列 drillEnabled 时填充） */
+        final Map<Integer, DrillCapture> drills = new HashMap<>();
 
         Out(boolean detail, List<Object> tuple) {
             this.detail = detail;
             this.tuple = tuple;
+        }
+    }
+
+    /** 反查捕获：单格的贡献行 + 反查视图 */
+    private static class DrillCapture {
+        final String drillView;
+        final List<Map<String, Object>> rows;
+
+        DrillCapture(String drillView, List<Map<String, Object>> rows) {
+            this.drillView = drillView;
+            this.rows = rows;
         }
     }
 }

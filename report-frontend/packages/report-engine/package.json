@@ -33,6 +33,7 @@
     "push": "pnpm run build && pnpm publish --access public"
   },
   "dependencies": {
+    "@coding-report/report-api": "workspace:*",
     "@coding-report/report-univer": "workspace:*",
     "react-resizable-panels": "^4.11.2",
     "tiny-pinyin": "^1.3.2"

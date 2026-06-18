@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spin, Button, Drawer, message } from 'antd';
 import { PrinterOutlined, ExportOutlined } from '@ant-design/icons';
-import { ReportEngine, ReportPreview } from '@coding-report/report-engine';
+import { ReportEngine, ReportPreview, DrillModal } from '@coding-report/report-engine';
 import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
 import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship, ReportValue } from '@coding-report/report-engine';
 import {
-  importExcel, fetchFonts, renderReport, previewReport, fetchFunctions,
+  importExcel, fetchFonts, renderReport, previewReport, drillReport, fetchFunctions,
   saveReportConfig, loadReportConfig,
 } from '@coding-report/report-api';
+import type { DrillResult } from '@coding-report/report-api';
 import type { RenderBindingDTO, RenderValueDTO, RenderRequest, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 import ParamInputModal from '../components/param-input-modal';
@@ -47,6 +48,8 @@ function toBindingDTO(binding: CellBinding): RenderBindingDTO {
     })),
     independent: binding.independent ?? false,
     preview: binding.preview,
+    drillEnabled: binding.drillEnabled,
+    drillView: binding.drillView,
   };
 }
 
@@ -104,9 +107,15 @@ const EnginePage = () => {
   // 网页预览抽屉状态
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewWorkbook, setPreviewWorkbook] = useState<ExcelWorkbook>();
+  const [previewDrillable, setPreviewDrillable] = useState<string[]>([]);
   const [exportingPreview, setExportingPreview] = useState(false);
   // 预览所用的渲染请求：抽屉内「导出报表」复用同一份配置/参数，无需重新填参
   const previewRequestRef = useRef<RenderRequest | null>(null);
+
+  // 反查明细弹窗状态
+  const [drillModalOpen, setDrillModalOpen] = useState(false);
+  const [drillResult, setDrillResult] = useState<DrillResult>();
+  const [drillLoading, setDrillLoading] = useState(false);
 
   const handlePrintConfig = () => {
     const config = engineRef.current?.getReportConfig();
@@ -195,9 +204,10 @@ const EnginePage = () => {
       template: p.workbook,
     };
     if (p.mode === 'preview') {
-      const wb = await previewReport(request);
+      const result = await previewReport(request);
       previewRequestRef.current = request; // 抽屉内导出复用
-      setPreviewWorkbook(wb);
+      setPreviewWorkbook(result.workbook);
+      setPreviewDrillable(result.drillable || []);
       setPreviewOpen(true);
     } else {
       const blob = await renderReport(request);
@@ -217,6 +227,24 @@ const EnginePage = () => {
       message.error(`导出失败: ${e}`);
     } finally {
       setExportingPreview(false);
+    }
+  };
+
+  /** 反查明细：点击预览中的可反查格 → 调 drillReport → 弹窗展示原始行 */
+  const handleDrill = async (row: number, col: number) => {
+    const req = previewRequestRef.current;
+    if (!req) return;
+    setDrillResult(undefined);
+    setDrillModalOpen(true);
+    setDrillLoading(true);
+    try {
+      const result = await drillReport({ request: req, row, col });
+      setDrillResult(result);
+    } catch (e) {
+      message.error(`反查失败: ${e}`);
+      setDrillModalOpen(false);
+    } finally {
+      setDrillLoading(false);
     }
   };
 
@@ -316,8 +344,19 @@ const EnginePage = () => {
           </Button>
         }
       >
-        <ReportPreview workbook={previewWorkbook} />
+        <ReportPreview
+          workbook={previewWorkbook}
+          drillable={previewDrillable}
+          onDrill={handleDrill}
+        />
       </Drawer>
+
+      <DrillModal
+        open={drillModalOpen}
+        loading={drillLoading}
+        result={drillResult}
+        onClose={() => setDrillModalOpen(false)}
+      />
     </>
   );
 };

@@ -81,4 +81,19 @@ public class CellBinding {
      * 横向同一行也不再代表同一条记录。仅在确需把同源数据分段错位排版时使用。
      */
     private boolean independent;
+
+    /**
+     * 是否开启反查（drill-down）能力（默认 false）。
+     * <p>开启后，预览态下该格渲染为可点击（蓝色链接样式），用户点击可查看聚合/汇总计算的明细数据。
+     * 仅对聚合格有意义；普通字段/文本格开启无效果。
+     * <p>反查视图由 {@link #drillView} 指定；未指定时使用该格字段所属数据集作为默认视图。
+     */
+    private boolean drillEnabled;
+
+    /**
+     * 反查视图（数据集 id，可 null）。
+     * <p>指定反查时展示哪个数据集的明细数据。null 时回退到该格字段所属的数据集（每个数据集的默认视图=它本身）。
+     * 仅在 {@link #drillEnabled} = true 时生效。
+     */
+    private String drillView;
 }

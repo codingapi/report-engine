@@ -7,6 +7,7 @@ import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
+import DrillEditor from './drill-editor';
 import { valueDisplayText } from '../../value-text';
 import { cellA1 } from '../../utils/excel-cell';
 
@@ -171,6 +172,33 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 loopBlocks={loopBlocks}
                 params={params}
                 onChange={(conditions) => updateBinding({ conditions })}
+              />
+            </div>
+          ),
+        },
+        {
+          key: 'drill',
+          label: '反查',
+          children: (
+            <div className="re-prop-tab-content">
+              <DrillEditor
+                drillEnabled={binding.drillEnabled}
+                drillView={binding.drillView}
+                datasets={datasets}
+                defaultView={(() => {
+                  // 推断该格字段所属数据集：从 value 中提取 FieldValue 的 datasetId
+                  const v = binding.value;
+                  if (v.type === 'FieldValue' && v.payload) {
+                    const parts = v.payload.split('.');
+                    return parts.length >= 2 ? parts[0] : null;
+                  }
+                  if (v.type === 'Aggregate' && v.operand?.type === 'FieldValue' && v.operand.payload) {
+                    const parts = v.operand.payload.split('.');
+                    return parts.length >= 2 ? parts[0] : null;
+                  }
+                  return null;
+                })()}
+                onChange={(patch) => updateBinding(patch)}
               />
             </div>
           ),

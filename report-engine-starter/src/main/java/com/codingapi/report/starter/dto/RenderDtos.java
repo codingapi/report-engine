@@ -33,7 +33,9 @@ public final class RenderDtos {
             String parentCell,
             List<ConditionDTO> conditions,
             boolean independent,
-            String preview) {
+            String preview,
+            boolean drillEnabled,
+            String drillView) {
     }
 
     public record ValueDTO(
@@ -71,6 +73,7 @@ public final class RenderDtos {
     public record FieldRefDTO(String datasetId, String field) {
     }
 
-    public record SummaryCellDTO(int column, ValueDTO value, String kind, String payload, String aggregation, String preview) {
+    public record SummaryCellDTO(int column, ValueDTO value, String kind, String payload, String aggregation, String preview,
+                                 boolean drillEnabled, String drillView) {
     }
 }

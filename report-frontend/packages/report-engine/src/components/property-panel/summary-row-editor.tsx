@@ -5,6 +5,7 @@ import { findDataset } from '../../types';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
 import { valueDisplayText } from '../../value-text';
 import ExpressionBuilder from './expression-builder';
+import DrillEditor from './drill-editor';
 
 interface SummaryRowEditorProps {
   summaryRow: SummaryRow;
@@ -42,6 +43,15 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
     } else {
       cells = [...summaryRow.cells, { column, value }];
     }
+    onChange({ ...summaryRow, cells });
+  };
+
+  /** 更新反查配置 */
+  const setDrillConfig = (patch: { drillEnabled?: boolean; drillView?: string | null }) => {
+    if (!cell) return;
+    const cells = summaryRow.cells.map((c) =>
+      c.column === column ? { ...c, ...patch } : c
+    );
     onChange({ ...summaryRow, cells });
   };
 
@@ -138,6 +148,28 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
             </>
           )}
         </Form.Item>
+
+        {cell && (
+          <DrillEditor
+            drillEnabled={cell.drillEnabled}
+            drillView={cell.drillView}
+            datasets={datasets}
+            defaultView={(() => {
+              // 推断该格字段所属数据集：从 value 中提取 FieldValue 的 datasetId
+              const v = cell.value;
+              if (v.type === 'FieldValue' && v.payload) {
+                const parts = v.payload.split('.');
+                return parts.length >= 2 ? parts[0] : null;
+              }
+              if (v.type === 'Aggregate' && v.operand?.type === 'FieldValue' && v.operand.payload) {
+                const parts = v.operand.payload.split('.');
+                return parts.length >= 2 ? parts[0] : null;
+              }
+              return null;
+            })()}
+            onChange={setDrillConfig}
+          />
+        )}
       </Form>
     </div>
   );

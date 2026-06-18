@@ -47,6 +47,8 @@ public final class RenderDtoConverter {
                     .parentCell(dto.parentCell() != null ? CellRef.parse(dto.parentCell()) : null)
                     .conditions(convertConditions(dto.conditions()))
                     .independent(dto.independent())
+                    .drillEnabled(dto.drillEnabled())
+                    .drillView(dto.drillView())
                     .build());
         }
         return result;
@@ -134,8 +136,8 @@ public final class RenderDtoConverter {
             if (dto.cells() != null) {
                 for (SummaryCellDTO c : dto.cells()) {
                     if (c.value() != null) {
-                        // 新格式：直接使用 ValueDTO
-                        cells.add(new SummaryCell(c.column(), convertValue(c.value())));
+                        // 新格式：直接使用 ValueDTO + 反查配置
+                        cells.add(new SummaryCell(c.column(), convertValue(c.value()), c.drillEnabled(), c.drillView()));
                     } else if ("label".equals(c.kind())) {
                         // 旧格式兼容
                         cells.add(SummaryCell.label(c.column(), c.payload()));
