@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Form, Select, Radio, Alert, Space } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Form, Select, Radio, Alert, Space, Tabs } from 'antd';
 import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
 import { findDataset } from '../../types';
 import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
@@ -29,6 +29,17 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   const isGroup = summaryRow.groupBy != null;
   const cell = summaryRow.cells.find((c) => c.column === column);
   const initializedRef = useRef<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('content');
+
+  // 切换选中列或汇总行时重置 Tab 到"内容"
+  const prevKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${summaryRow.id}-${column}`;
+    if (key !== prevKeyRef.current) {
+      prevKeyRef.current = key;
+      setActiveTab('content');
+    }
+  }, [summaryRow.id, column]);
 
   /** 创建空值（由用户自行填写） */
   const createEmptyValue = (): ReportValue => {
@@ -71,107 +82,136 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
       )?.alias || summaryRow.groupBy!.field || '分组'
     : '';
 
-  return (
-    <div>
-      {/* 预览 */}
-      {cell && (
-        <div className="re-prop-preview">
-          <div className="re-prop-preview__label">预览</div>
-          <code>{valueDisplayText(cell.value, datasets, loopBlocks, params) || '（空）'}</code>
-        </div>
-      )}
+  // 推断该格字段所属数据集：从 value 中提取 FieldValue 的 datasetId
+  const defaultDrillView = (() => {
+    if (!cell) return null;
+    const v = cell.value;
+    if (v.type === 'FieldValue' && v.payload) {
+      const parts = v.payload.split('.');
+      return parts.length >= 2 ? parts[0] : null;
+    }
+    if (v.type === 'Aggregate' && v.operand?.type === 'FieldValue' && v.operand.payload) {
+      const parts = v.operand.payload.split('.');
+      return parts.length >= 2 ? parts[0] : null;
+    }
+    return null;
+  })();
 
-      <Form layout="vertical" size="small">
-        <Form.Item label="汇总范围" tooltip="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。">
-          <Radio.Group
-            value={isGroup ? 'group' : 'total'}
-            onChange={(e) =>
-              onChange({
-                ...summaryRow,
-                groupBy:
-                  e.target.value === 'group'
-                    ? { datasetId: datasets[0]?.id || '', field: '' }
-                    : null,
-              })
-            }
-            optionType="button"
-            buttonStyle="solid"
-          >
-            <Radio.Button value="total">总计</Radio.Button>
-            <Radio.Button value="group">分组小计</Radio.Button>
-          </Radio.Group>
-
-          {isGroup && (
-            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-              <Select
-                value={summaryRow.groupBy!.datasetId || undefined}
-                onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
-                placeholder="数据集"
-                options={datasetOptions(datasets)}
-                showSearch
-                style={{ flex: 1, minWidth: 0 }}
-              />
-              <Select
-                value={summaryRow.groupBy!.field || undefined}
-                onChange={(field) => onChange({ ...summaryRow, groupBy: { ...summaryRow.groupBy!, field } })}
-                placeholder="分组字段"
-                disabled={!summaryRow.groupBy!.datasetId}
-                options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
-                showSearch
-                style={{ flex: 1, minWidth: 0 }}
-              />
-            </Space.Compact>
-          )}
-        </Form.Item>
-
-        <Form.Item label="本格内容" tooltip="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
+  const tabItems = [
+    {
+      key: 'content',
+      label: '内容',
+      children: (
+        <div className="re-prop-tab-content">
           {cell && (
-            <>
-              <ExpressionBuilder
-                key={`${summaryRow.id}-${column}`}
-                value={cell.value}
-                datasets={datasets}
-                loopBlocks={loopBlocks}
-                params={params}
-                functions={functions}
-                onChange={setCellValue}
-              />
+            <div className="re-prop-preview">
+              <div className="re-prop-preview__label">预览</div>
+              <code>{valueDisplayText(cell.value, datasets, loopBlocks, params) || '（空）'}</code>
+            </div>
+          )}
+
+          <Form layout="vertical" size="small">
+            <Form.Item label="汇总范围" tooltip="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。">
+              <Radio.Group
+                value={isGroup ? 'group' : 'total'}
+                onChange={(e) =>
+                  onChange({
+                    ...summaryRow,
+                    groupBy:
+                      e.target.value === 'group'
+                        ? { datasetId: datasets[0]?.id || '', field: '' }
+                        : null,
+                  })
+                }
+                optionType="button"
+                buttonStyle="solid"
+              >
+                <Radio.Button value="total">总计</Radio.Button>
+                <Radio.Button value="group">分组小计</Radio.Button>
+              </Radio.Group>
 
               {isGroup && (
-                <Alert
-                  type="info"
-                  showIcon={false}
-                  message={<>可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）</>}
-                  style={{ marginTop: 8, fontSize: 12 }}
-                />
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+                  <Select
+                    value={summaryRow.groupBy!.datasetId || undefined}
+                    onChange={(dsId) => onChange({ ...summaryRow, groupBy: { datasetId: dsId, field: '' } })}
+                    placeholder="数据集"
+                    options={datasetOptions(datasets)}
+                    showSearch
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <Select
+                    value={summaryRow.groupBy!.field || undefined}
+                    onChange={(field) => onChange({ ...summaryRow, groupBy: { ...summaryRow.groupBy!, field } })}
+                    placeholder="分组字段"
+                    disabled={!summaryRow.groupBy!.datasetId}
+                    options={fieldOptions(datasets, summaryRow.groupBy!.datasetId)}
+                    showSearch
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                </Space.Compact>
               )}
-            </>
-          )}
-        </Form.Item>
+            </Form.Item>
 
-        {cell && (
-          <DrillEditor
-            drillEnabled={cell.drillEnabled}
-            drillView={cell.drillView}
-            datasets={datasets}
-            defaultView={(() => {
-              // 推断该格字段所属数据集：从 value 中提取 FieldValue 的 datasetId
-              const v = cell.value;
-              if (v.type === 'FieldValue' && v.payload) {
-                const parts = v.payload.split('.');
-                return parts.length >= 2 ? parts[0] : null;
-              }
-              if (v.type === 'Aggregate' && v.operand?.type === 'FieldValue' && v.operand.payload) {
-                const parts = v.operand.payload.split('.');
-                return parts.length >= 2 ? parts[0] : null;
-              }
-              return null;
-            })()}
-            onChange={setDrillConfig}
-          />
-        )}
-      </Form>
-    </div>
+            <Form.Item label="本格内容" tooltip="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
+              {cell && (
+                <>
+                  <ExpressionBuilder
+                    key={`${summaryRow.id}-${column}`}
+                    value={cell.value}
+                    datasets={datasets}
+                    loopBlocks={loopBlocks}
+                    params={params}
+                    functions={functions}
+                    onChange={setCellValue}
+                  />
+
+                  {isGroup && (
+                    <Alert
+                      type="info"
+                      showIcon={false}
+                      message={<>可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}」的每个取值，渲染时注入）</>}
+                      style={{ marginTop: 8, fontSize: 12 }}
+                    />
+                  )}
+                </>
+              )}
+            </Form.Item>
+          </Form>
+        </div>
+      ),
+    },
+    {
+      key: 'drill',
+      label: '反查',
+      children: (
+        <div className="re-prop-tab-content">
+          {cell ? (
+            <DrillEditor
+              drillEnabled={cell.drillEnabled}
+              drillView={cell.drillView}
+              datasets={datasets}
+              defaultView={defaultDrillView}
+              onChange={setDrillConfig}
+            />
+          ) : (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: '#999', fontSize: 12 }}>
+              请先配置本格内容
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <Tabs
+      activeKey={activeTab}
+      onChange={setActiveTab}
+      size="small"
+      className="re-prop-tabs"
+      items={tabItems}
+    />
   );
 };
 

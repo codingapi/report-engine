@@ -28,7 +28,7 @@ const DrillEditor: React.FC<DrillEditorProps> = ({
   return (
     <Form layout="vertical" size="small">
       <Form.Item
-        label="反查（Drill-down）"
+        label="反查"
         tooltip="开启后，预览态下该格渲染为可点击（蓝色链接样式），用户点击可查看聚合/汇总计算的明细数据。仅对聚合格有意义。"
       >
         <Switch

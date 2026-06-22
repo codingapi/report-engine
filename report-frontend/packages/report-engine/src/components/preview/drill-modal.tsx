@@ -22,6 +22,7 @@ const DrillModal: React.FC<DrillModalProps> = ({ open, loading, result, onClose 
         onCancel={onClose}
         footer={null}
         width="80%"
+        zIndex={1050}
         styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
       >
         加载中...
@@ -44,6 +45,7 @@ const DrillModal: React.FC<DrillModalProps> = ({ open, loading, result, onClose 
       onCancel={onClose}
       footer={null}
       width="80%"
+      zIndex={1050}
       styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
     >
       {rows.length === 0 ? (

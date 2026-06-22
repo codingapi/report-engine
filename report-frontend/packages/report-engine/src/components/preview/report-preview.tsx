@@ -106,13 +106,10 @@ const BASE_TD_STYLE: React.CSSProperties = {
   border: '1px dotted #eeeeee',
 };
 
-// 反查格样式：蓝色链接 + 手型光标 + 悬停下划线
+// 反查格样式：蓝色文字 + 手型光标
 const DRILLABLE_STYLE: React.CSSProperties = {
   color: '#1677ff',
   cursor: 'pointer',
-  textDecoration: 'underline',
-  textDecorationStyle: 'dotted',
-  textUnderlineOffset: '2px',
 };
 
 /** 单个 sheet → 居中白纸卡片内的 HTML 表格 */
