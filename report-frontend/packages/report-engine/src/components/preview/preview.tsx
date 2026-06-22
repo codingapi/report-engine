@@ -1,17 +1,127 @@
-import React, { useMemo, useState } from 'react';
-import { Empty, Tabs, Modal, Table } from 'antd';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { Button, Drawer, Empty, Tabs, message } from 'antd';
+import { ExportOutlined } from '@ant-design/icons';
 import type {
   ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelBorder, ExcelBorderStyle,
 } from '@coding-report/report-univer';
+import type { RenderConfig, RenderService } from '../../types';
+import ParamInputModal from '../param-input-modal';
+import DrillModal from './drill-modal';
+import { useReportPreview } from '../../hooks/use-report-preview';
+
+export interface ReportPreviewHandle {
+  /** 直接导出当前配置为 .xlsx（不经预览抽屉），返回 Promise 供调用方追踪 loading */
+  exportXlsx: (config: RenderConfig) => Promise<void>;
+}
+
+export interface ReportPreviewProps {
+  /** 渲染服务（桥接 report-api），由 app 注入 */
+  renderService: RenderService;
+  /**
+   * 传入配置即触发网页预览：引用变化时重新预览。
+   * 设计器点「预览」按钮传入当前编辑器配置；独立预览页加载配置后传入。
+   */
+  config?: RenderConfig | null;
+  /** 预览 loading 变化回调（供调用方驱动按钮 loading 状态） */
+  onPreviewingChange?: (loading: boolean) => void;
+  /** 导出 loading 变化回调 */
+  onExportingChange?: (loading: boolean) => void;
+  /** 预览抽屉关闭回调：设计器可不传（仅关抽屉），独立预览页可借此返回上一页。 */
+  onClose?: () => void;
+}
 
 /**
- * 报表网页预览：把后端 {@code /api/report/preview} 返回的 {@link ExcelWorkbook}（渲染后的工作簿，
- * 同 .xlsx 导出的同一份数据）渲染为 HTML 表格。
- *
- * <p>纯 UI 组件，不调 API。样式从 {@link ExcelStyle} 机械映射为 CSS，合并区用 rowSpan/colSpan，
- * 行高列宽来自 sheet 的 rows/columns（缺省回退 default*）。多个非空 sheet 用 Tabs 切换，单个不显示 Tabs。
+ * 报表预览能力组件：参数弹窗 → 渲染 → 预览抽屉 → 反查 → 抽屉内导出。
+ * <p>由 report-engine 提供，设计器（报表配置界面）与独立预览页共用：
+ * <ul>
+ *   <li>声明式：传入 {@code config}（引用变化）即触发预览。</li>
+ *   <li>命令式：通过 ref 调 {@link ReportPreviewHandle#exportXlsx} 直接导出。</li>
+ * </ul>
+ * 渲染函数由 app 注入（report-engine 不直接调 API）。
+ * <p>预览抽屉内部用私有 {@link WorkbookTable} 把渲染后的工作簿画成 HTML 表格。
  */
-export interface ReportPreviewProps {
+const ReportPreview = forwardRef<ReportPreviewHandle, ReportPreviewProps>(
+  ({ renderService, config, onPreviewingChange, onExportingChange, onClose }, ref) => {
+    const [messageApi, messageContextHolder] = message.useMessage();
+    const {
+      openPreview, openExport, previewing, exporting,
+      previewOpen, previewWorkbook, previewDrillable, exportingPreview,
+      closePreview, exportFromPreview, drill,
+      paramModalOpen, pendingParams, confirmParams, cancelParams,
+      drillModalOpen, drillResult, drillLoading, closeDrill,
+    } = useReportPreview({ renderService, messageApi, onClose });
+
+    const lastPreviewedRef = useRef<RenderConfig | null>(null);
+
+    // config 引用变化时触发预览（避免 strict mode 重复触发）
+    useEffect(() => {
+      if (!config || config === lastPreviewedRef.current) return;
+      lastPreviewedRef.current = config;
+      openPreview(config);
+    }, [config, openPreview]);
+
+    useEffect(() => { onPreviewingChange?.(previewing); }, [previewing, onPreviewingChange]);
+    useEffect(() => { onExportingChange?.(exporting); }, [exporting, onExportingChange]);
+
+    useImperativeHandle(ref, () => ({
+      exportXlsx: (cfg: RenderConfig) => openExport(cfg),
+    }), [openExport]);
+
+    return (
+      <>
+        {messageContextHolder}
+
+        <ParamInputModal
+          params={pendingParams}
+          open={paramModalOpen}
+          onConfirm={confirmParams}
+          onCancel={cancelParams}
+        />
+
+        <Drawer
+          title="报表预览"
+          placement="right"
+          width="100%"
+          open={previewOpen}
+          onClose={closePreview}
+          destroyOnHidden
+          styles={{ body: { padding: 0, background: '#fff' } }}
+          extra={
+            <Button
+              type="primary"
+              icon={<ExportOutlined />}
+              loading={exportingPreview}
+              onClick={exportFromPreview}
+            >
+              导出报表
+            </Button>
+          }
+        >
+          <WorkbookTable
+            workbook={previewWorkbook}
+            drillable={previewDrillable}
+            onDrill={drill}
+          />
+        </Drawer>
+
+        <DrillModal
+          open={drillModalOpen}
+          loading={drillLoading}
+          result={drillResult}
+          onClose={closeDrill}
+        />
+      </>
+    );
+  },
+);
+
+ReportPreview.displayName = 'ReportPreview';
+
+// ============================================================
+// 私有：把渲染后的工作簿画成 HTML 表格（不单独导出）
+// ============================================================
+
+interface WorkbookTableProps {
   workbook?: ExcelWorkbook;
   /** 可反查的单元格坐标列表（"row:col" 格式） */
   drillable?: string[];
@@ -19,7 +129,7 @@ export interface ReportPreviewProps {
   onDrill?: (row: number, col: number) => void;
 }
 
-// ─── 边框线型 → CSS ─────────────────────────────────────────
+// 边框线型 → CSS
 const BORDER_CSS: Record<ExcelBorderStyle, string> = {
   thin: '1px solid', hair: '1px solid', dotted: '1px dotted', dashed: '1px dashed',
   dashDot: '1px dashed', dashDotDot: '1px dashed', double: '3px double', medium: '2px solid',
@@ -96,8 +206,6 @@ function renderCellContent(cell?: ExcelCell): React.ReactNode {
 }
 
 // 默认浅色网格线用 dotted：在 border-collapse 下，模板定义的实线/虚线边框线型优先级更高
-// （solid/dashed > dotted），与单元格位置无关地压过基线，避免相邻格的浅色基线「吃掉」已定义边框
-// （如薪资条第二条表头的 top 黑线被上一格下边框抢占而消失）。单元格自带边框仍逐边覆盖。
 const BASE_TD_STYLE: React.CSSProperties = {
   padding: '3px 8px',
   overflow: 'hidden',
@@ -211,7 +319,7 @@ const SheetTable: React.FC<{ sheet: ExcelSheet; drillable?: Set<string>; onDrill
 const ROOT_STYLE: React.CSSProperties = { minHeight: '100%', background: '#fff' };
 const PANE_STYLE: React.CSSProperties = { padding: 24 };
 
-const ReportPreview: React.FC<ReportPreviewProps> = ({ workbook, drillable, onDrill }) => {
+const WorkbookTable: React.FC<WorkbookTableProps> = ({ workbook, drillable, onDrill }) => {
   const sheets = (workbook?.sheets || []).filter((s) => s.cells && s.cells.length > 0);
   const drillableSet = useMemo(() => new Set(drillable || []), [drillable]);
 

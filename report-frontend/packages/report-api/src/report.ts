@@ -108,6 +108,15 @@ export async function drillReport(params: DrillRequestParams): Promise<DrillResu
 export interface ReportBrief {
   id: string;
   name: string;
+  dataModelId?: string | null;
+  createTime?: number;
+  updateTime?: number;
+}
+
+/** 数据模型简要信息 */
+export interface DataModelBrief {
+  id: string;
+  name: string;
 }
 
 /** 保存报表配置（含 id 则更新），返回报表 id */
@@ -122,14 +131,25 @@ export async function loadReportConfig<T = Record<string, unknown>>(id: string):
   return res.data as T;
 }
 
-/** 示例报表列表（预存的测试报表） */
-export async function listExampleReports(): Promise<ReportBrief[]> {
-  const res = await http.get('/report/configs/examples');
-  return res.data.list;
+/** 删除指定报表配置 */
+export async function deleteReportConfig(id: string): Promise<void> {
+  await http.delete(`/report/configs/${id}`);
 }
 
-/** 报表列表（id + name） */
-export async function listReportConfigs(): Promise<ReportBrief[]> {
-  const res = await http.get('/report/configs');
+/** 报表列表分页结果（对齐后端 MultiResponse） */
+export interface ReportPage {
+  list: ReportBrief[];
+  total: number;
+}
+
+/** 报表列表（id + name + dataModelId + 时间戳，含示例与用户报表），按 SearchRequest 分页查询 */
+export async function listReportConfigs(current = 1, pageSize = 10): Promise<ReportPage> {
+  const res = await http.get('/report/configs', { params: { current, pageSize } });
+  return { list: res.data.list, total: res.data.total };
+}
+
+/** 数据模型列表（id + name，供创建报表时选择） */
+export async function listDataModels(): Promise<DataModelBrief[]> {
+  const res = await http.get('/datamodels');
   return res.data.list;
 }

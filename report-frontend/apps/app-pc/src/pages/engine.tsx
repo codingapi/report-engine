@@ -1,94 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Spin, Button, Drawer, message } from 'antd';
-import { PrinterOutlined, ExportOutlined } from '@ant-design/icons';
-import { ReportEngine, ReportPreview, DrillModal } from '@coding-report/report-engine';
+import { Spin, Button, message } from 'antd';
+import { CloseOutlined, PrinterOutlined } from '@ant-design/icons';
+import { ReportEngine } from '@coding-report/report-engine';
 import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
-import type { Dataset, CellBinding, LoopBlock, SummaryRow, ReportParam, Relationship, ReportValue } from '@coding-report/report-engine';
+import type { Dataset, Relationship, ExpressionCatalog, DataModelInfo } from '@coding-report/report-engine';
 import {
   importExcel, fetchFonts, renderReport, previewReport, drillReport, fetchFunctions,
   saveReportConfig, loadReportConfig,
 } from '@coding-report/report-api';
-import type { DrillResult } from '@coding-report/report-api';
-import type { RenderBindingDTO, RenderValueDTO, RenderRequest, ExpressionCatalog, DataModelInfo } from '@coding-report/report-api';
-import type { ExcelWorkbook } from '@coding-report/report-univer';
-import ParamInputModal from '../components/param-input-modal';
 
-// ─── 转换函数 ──────────────────────────────────
-
-function toValueDTO(value: ReportValue): RenderValueDTO {
-  return {
-    type: value.type,
-    payload: value.payload,
-    aggregation: value.aggregation,
-    operand: value.operand ? toValueDTO(value.operand) : undefined,
-    funcName: value.funcName,
-    args: value.args?.map(toValueDTO),
-    parts: value.parts?.map((p) => ({
-      kind: p.kind,
-      text: p.text,
-      value: p.value ? toValueDTO(p.value) : undefined,
-    })),
-  };
-}
-
-function toBindingDTO(binding: CellBinding): RenderBindingDTO {
-  return {
-    cellKey: binding.cellKey,
-    value: toValueDTO(binding.value),
-    expansion: binding.expansion,
-    expandMode: binding.expandMode,
-    mergeRepeated: binding.mergeRepeated,
-    parentCell: binding.parentCell,
-    conditions: binding.conditions.map((c) => ({
-      id: c.id,
-      left: toValueDTO(c.left),
-      operator: c.operator,
-      right: c.right ? toValueDTO(c.right) : null,
-    })),
-    independent: binding.independent ?? false,
-    preview: binding.preview,
-    drillEnabled: binding.drillEnabled,
-    drillView: binding.drillView,
-  };
-}
+// ─── 页面组件 ──────────────────────────────────
 
 /** 加载的报表配置（附带后端注入的数据模型信息） */
 interface LoadedReportConfig extends ReportConfig {
   dataModel?: DataModelInfo;
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/** 合并默认值与用户输入，生成参数值映射 */
-function buildParamValues(params: ReportParam[], userInput: Record<string, unknown>) {
-  return Object.fromEntries(
-    params.map((p) => [p.name, userInput[p.name] ?? p.defaultValue ?? null]),
-  );
-}
-
-interface PendingExport {
-  /** 渲染动作：导出 .xlsx 下载 或 网页预览 */
-  mode: 'export' | 'preview';
-  bindings: CellBinding[];
-  loops: LoopBlock[];
-  summaries: SummaryRow[];
-  workbook: ExcelWorkbook;
-  params: ReportParam[];
-}
-
-// ─── 页面组件 ──────────────────────────────────
-
-const EnginePage = () => {
+const AppReport = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const reportIdFromUrl = searchParams.get('id');
@@ -100,22 +29,59 @@ const EnginePage = () => {
   const [loading, setLoading] = useState(true);
   const engineRef = useRef<ReportEngineHandle>(null);
 
-  // 导出参数弹窗状态
-  const [paramModalOpen, setParamModalOpen] = useState(false);
-  const pendingExportRef = useRef<PendingExport | null>(null);
+  // 加载公式目录
+  useEffect(() => {
+    fetchFunctions()
+      .then(setFunctions)
+      .catch((e) => console.error('加载公式列表失败:', e));
+  }, []);
 
-  // 网页预览抽屉状态
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewWorkbook, setPreviewWorkbook] = useState<ExcelWorkbook>();
-  const [previewDrillable, setPreviewDrillable] = useState<string[]>([]);
-  const [exportingPreview, setExportingPreview] = useState(false);
-  // 预览所用的渲染请求：抽屉内「导出报表」复用同一份配置/参数，无需重新填参
-  const previewRequestRef = useRef<RenderRequest | null>(null);
+  // 根据 URL 参数加载报表；无 id 则回到报表管理页（创建动作由报表管理页承担）
+  useEffect(() => {
+    const init = async () => {
+      if (!reportIdFromUrl) {
+        navigate('/reports', { replace: true });
+        return;
+      }
+      try {
+        const config = await loadReportConfig<LoadedReportConfig>(reportIdFromUrl);
+        const dm = config.dataModel;
+        if (dm) {
+          setDatasets(
+            dm.datasets.map((d) => ({
+              id: d.id,
+              alias: d.alias || d.id,
+              sourceType: d.dataSourceType || 'CSV',
+              fields: d.fields.map((f) => ({
+                name: f.name,
+                alias: f.alias || f.name,
+                dataType: f.dataType,
+                primaryKey: f.primaryKey,
+              })),
+            })),
+          );
+          setRelationships(
+            dm.relationships.map((r) => ({
+              left: r.left,
+              right: r.right,
+              joinType: r.joinType,
+            })),
+          );
+        }
+        if (config.dataModelId) setDataModelId(config.dataModelId);
+        engineRef.current?.loadReportConfig(config);
+      } catch (e) {
+        console.error('加载报表失败:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [reportIdFromUrl, navigate]);
 
-  // 反查明细弹窗状态
-  const [drillModalOpen, setDrillModalOpen] = useState(false);
-  const [drillResult, setDrillResult] = useState<DrillResult>();
-  const [drillLoading, setDrillLoading] = useState(false);
+  const handleImport = async (file: File) => {
+    return importExcel(file);
+  };
 
   const handlePrintConfig = () => {
     const config = engineRef.current?.getReportConfig();
@@ -126,158 +92,6 @@ const EnginePage = () => {
     console.log('[ReportConfig object]', config);
     console.log('[ReportConfig JSON]\n', JSON.stringify(config, null, 2));
   };
-
-  // 加载公式目录
-  useEffect(() => {
-    fetchFunctions()
-      .then(setFunctions)
-      .catch((e) => console.error('加载公式列表失败:', e));
-  }, []);
-
-  // 根据 URL 参数加载或创建报表
-  useEffect(() => {
-    const init = async () => {
-      if (reportIdFromUrl) {
-        try {
-          const config = await loadReportConfig<LoadedReportConfig>(reportIdFromUrl);
-          const dm = config.dataModel;
-          if (dm) {
-            setDatasets(
-              dm.datasets.map((d) => ({
-                id: d.id,
-                alias: d.alias || d.id,
-                sourceType: d.dataSourceType || 'CSV',
-                fields: d.fields.map((f) => ({
-                  name: f.name,
-                  alias: f.alias || f.name,
-                  dataType: f.dataType,
-                  primaryKey: f.primaryKey,
-                })),
-              })),
-            );
-            setRelationships(
-              dm.relationships.map((r) => ({
-                left: r.left,
-                right: r.right,
-                joinType: r.joinType,
-              })),
-            );
-          }
-          if (config.dataModelId) setDataModelId(config.dataModelId);
-          engineRef.current?.loadReportConfig(config);
-        } catch (e) {
-          console.error('加载报表失败:', e);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        // 无 id → 创建空白报表并跳转
-        try {
-          const newId = await saveReportConfig({
-            name: '未命名报表',
-            dataModelId: 'default',
-          });
-          navigate(`/engine?id=${newId}`, { replace: true });
-        } catch (e) {
-          console.error('创建报表失败:', e);
-          setLoading(false);
-        }
-      }
-    };
-    init();
-  }, [reportIdFromUrl, navigate]);
-
-  const handleImport = async (file: File): Promise<ExcelWorkbook> => {
-    return importExcel(file);
-  };
-
-  /** 执行渲染：按 pending.mode 决定下载 .xlsx 或网页预览 */
-  const doRenderAction = async (paramValues: Record<string, unknown>) => {
-    const p = pendingExportRef.current;
-    if (!p) return;
-    pendingExportRef.current = null;
-    const request = {
-      cellBindings: p.bindings.map(toBindingDTO),
-      loopBlocks: p.loops,
-      summaries: p.summaries,
-      params: paramValues,
-      template: p.workbook,
-    };
-    if (p.mode === 'preview') {
-      const result = await previewReport(request);
-      previewRequestRef.current = request; // 抽屉内导出复用
-      setPreviewWorkbook(result.workbook);
-      setPreviewDrillable(result.drillable || []);
-      setPreviewOpen(true);
-    } else {
-      const blob = await renderReport(request);
-      downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    }
-  };
-
-  /** 预览抽屉内导出：复用生成预览时的同一份请求，直接渲染下载 */
-  const handleExportFromPreview = async () => {
-    const req = previewRequestRef.current;
-    if (!req) return;
-    setExportingPreview(true);
-    try {
-      const blob = await renderReport(req);
-      downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (e) {
-      message.error(`导出失败: ${e}`);
-    } finally {
-      setExportingPreview(false);
-    }
-  };
-
-  /** 反查明细：点击预览中的可反查格 → 调 drillReport → 弹窗展示原始行 */
-  const handleDrill = async (row: number, col: number) => {
-    const req = previewRequestRef.current;
-    if (!req) return;
-    setDrillResult(undefined);
-    setDrillModalOpen(true);
-    setDrillLoading(true);
-    try {
-      const result = await drillReport({ request: req, row, col });
-      setDrillResult(result);
-    } catch (e) {
-      message.error(`反查失败: ${e}`);
-      setDrillModalOpen(false);
-    } finally {
-      setDrillLoading(false);
-    }
-  };
-
-  /** 导出/预览共用：收集必填参数（弹窗）后执行渲染动作 */
-  const runRenderAction = async (
-    mode: 'export' | 'preview',
-    bindings: CellBinding[],
-    loops: LoopBlock[],
-    summaries: SummaryRow[],
-    workbook: ExcelWorkbook,
-    params: ReportParam[],
-  ): Promise<void> => {
-    pendingExportRef.current = { mode, bindings, loops, summaries, workbook, params };
-
-    // 有无默认值的必填参数 → 弹窗输入
-    const hasRequired = params.some((p) => !p.defaultValue);
-    if (hasRequired) {
-      setParamModalOpen(true);
-      return;
-    }
-    // 全部有默认值或无参数 → 直接渲染
-    await doRenderAction(buildParamValues(params, {}));
-  };
-
-  const handleExport = (
-    bindings: CellBinding[], loops: LoopBlock[], summaries: SummaryRow[],
-    workbook: ExcelWorkbook, params: ReportParam[],
-  ): Promise<void> => runRenderAction('export', bindings, loops, summaries, workbook, params);
-
-  const handlePreview = (
-    bindings: CellBinding[], loops: LoopBlock[], summaries: SummaryRow[],
-    workbook: ExcelWorkbook, params: ReportParam[],
-  ): Promise<void> => runRenderAction('preview', bindings, loops, summaries, workbook, params);
 
   const handleSaveReport = async (config: ReportConfig): Promise<string> => {
     return saveReportConfig({ ...config, dataModelId });
@@ -292,73 +106,28 @@ const EnginePage = () => {
   }
 
   return (
-    <>
-      <ReportEngine
-        datasets={datasets}
-        relationships={relationships}
-        dataModelId={dataModelId}
-        functions={functions}
-        engineRef={engineRef}
-        onImport={handleImport}
-        onExport={handleExport}
-        onPreview={handlePreview}
-        onSaveReport={handleSaveReport}
-        onFontRequest={fetchFonts}
-        extraActions={
-          <Button icon={<PrinterOutlined />} onClick={handlePrintConfig}>
-            打印配置
-          </Button>
-        }
-      />
-
-      <ParamInputModal
-        params={pendingExportRef.current?.params ?? []}
-        open={paramModalOpen}
-        onConfirm={async (values) => {
-          setParamModalOpen(false);
-          const params = pendingExportRef.current?.params ?? [];
-          await doRenderAction(buildParamValues(params, values));
-        }}
-        onCancel={() => {
-          setParamModalOpen(false);
-          pendingExportRef.current = null;
-        }}
-      />
-
-      <Drawer
-        title="报表预览"
-        placement="right"
-        width="100%"
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        destroyOnHidden
-        styles={{ body: { padding: 0, background: '#fff' } }}
-        extra={
-          <Button
-            type="primary"
-            icon={<ExportOutlined />}
-            loading={exportingPreview}
-            onClick={handleExportFromPreview}
-          >
-            导出报表
-          </Button>
-        }
-      >
-        <ReportPreview
-          workbook={previewWorkbook}
-          drillable={previewDrillable}
-          onDrill={handleDrill}
-        />
-      </Drawer>
-
-      <DrillModal
-        open={drillModalOpen}
-        loading={drillLoading}
-        result={drillResult}
-        onClose={() => setDrillModalOpen(false)}
-      />
-    </>
+    <ReportEngine
+      datasets={datasets}
+      relationships={relationships}
+      dataModelId={dataModelId}
+      functions={functions}
+      engineRef={engineRef}
+      renderService={{ preview: previewReport, export: renderReport, drill: drillReport }}
+      onImport={handleImport}
+      onSaveReport={handleSaveReport}
+      onFontRequest={fetchFonts}
+      customActions={
+        <Button icon={<PrinterOutlined />} onClick={handlePrintConfig}>
+          打印配置
+        </Button>
+      }
+      extraActions={
+        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports')}>
+          关闭
+        </Button>
+      }
+    />
   );
 };
 
-export default EnginePage;
+export default AppReport;

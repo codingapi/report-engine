@@ -1,15 +1,19 @@
 package com.example.report.config;
 
-import com.codingapi.report.repository.ReportRepository;
+import com.codingapi.report.config.ReportConfig;
+import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
+import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
+import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
+import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SourceDTO;
+import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
+import com.codingapi.report.starter.repository.ReportRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.example.report.config.ReportConfigBuilder.aggCell;
 import static com.example.report.config.ReportConfigBuilder.aggregate;
@@ -22,12 +26,12 @@ import static com.example.report.config.ReportConfigBuilder.literal;
 /**
  * 预存示例报表：启动时将测试报表配置写入仓库（应用级数据）。
  * <p>
- * 对应 ReportScenarioTest 中的 8 个场景。前端通过
- * {@code GET /api/report/configs/examples} 获取列表，
+ * 对应 ReportScenarioTest 中的 8 个场景。示例报表使用<strong>写死的稳定 id</strong>
+ * （如 {@code example-simple-list}），保证重启后 id 不变，前端引用不会失效。
+ * 前端通过 {@code GET /api/report/configs} 统一列表获取（示例与用户报表同表），
  * 点击即导航到 {@code /engine?id=xxx} 打开对应报表。
  * <p>
- * 向 {@code ExampleReportController}（同 example 模块）提供有序示例 id，
- * 配置用 {@link ReportConfigBuilder} 链式构造。
+ * 配置用 {@link ReportConfigBuilder} 链式构造（产物为强类型 {@link ReportConfig}）。
  * </p>
  */
 @Slf4j
@@ -38,16 +42,11 @@ public class ReportTemplateSeeder {
 
     private final ReportRepository repository;
 
-    /** 预存报表的 id 集合，供示例 API 过滤用。 */
-    private final List<String> exampleIds = new ArrayList<>();
+    /** 已预存示例数量（仅用于日志）。 */
+    private int count = 0;
 
     public ReportTemplateSeeder(ReportRepository repository) {
         this.repository = repository;
-    }
-
-    /** 预存示例报表的有序 id 列表（供同模块的 ExampleReportController 调用）。 */
-    public List<String> getExampleIds() {
-        return List.copyOf(exampleIds);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -60,7 +59,7 @@ public class ReportTemplateSeeder {
         seedPayslipLoop();
         seedIndependentBands();
         seedIndependentBandsWithSummary();
-        log.info("已预存 {} 个示例报表", exampleIds.size());
+        log.info("已预存 {} 个示例报表", count);
     }
 
     // ============================================================
@@ -68,7 +67,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedSimpleList() {
-        save(new ReportConfigBuilder("商品清单报表")
+        save("example-simple-list", new ReportConfigBuilder("商品清单报表")
                 .binding(0, 0, literal("商品清单"), "NONE", "LIST")
                 .binding(1, 0, literal("商品名"), "NONE", "LIST")
                 .binding(1, 1, literal("价格"), "NONE", "LIST")
@@ -90,7 +89,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedMergedList() {
-        save(new ReportConfigBuilder("销售明细报表")
+        save("example-merged-list", new ReportConfigBuilder("销售明细报表")
                 .binding(0, 0, literal("销售明细"), "NONE", "LIST")
                 .binding(1, 0, literal("分类"), "NONE", "LIST")
                 .binding(1, 1, literal("商品"), "NONE", "LIST")
@@ -111,7 +110,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedStatistics() {
-        save(new ReportConfigBuilder("人员统计报表")
+        save("example-statistics", new ReportConfigBuilder("人员统计报表")
                 .binding(0, 0, literal("人员统计"), "NONE", "LIST")
                 .binding(1, 0, literal("单位"), "NONE", "LIST")
                 .binding(1, 1, literal("部门"), "NONE", "LIST")
@@ -135,7 +134,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedMasterDetail() {
-        save(new ReportConfigBuilder("员工学历信息表")
+        save("example-master-detail", new ReportConfigBuilder("员工学历信息表")
                 .binding(0, 0, literal("员工学历信息表"), "NONE", "LIST")
                 .binding(1, 0, literal("姓名"), "NONE", "LIST")
                 .binding(1, 1, literal("性别"), "NONE", "LIST")
@@ -165,7 +164,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedSubtotal() {
-        save(new ReportConfigBuilder("薪资统计报表")
+        save("example-subtotal", new ReportConfigBuilder("薪资统计报表")
                 .binding(0, 0, literal("单位部门薪资统计表"), "NONE", "LIST")
                 .binding(1, 0, literal("单位"), "NONE", "LIST")
                 .binding(1, 1, literal("部门"), "NONE", "LIST")
@@ -175,7 +174,7 @@ public class ReportTemplateSeeder {
                 .binding(2, 1, fieldValue("salary_detail", "dept"), "VERTICAL", "GROUP", true, cellKey(2, 0))
                 .binding(2, 2, fieldValue("salary_detail", "name"), "VERTICAL", "LIST")
                 .binding(2, 3, fieldValue("salary_detail", "salary"), "VERTICAL", "LIST")
-                .summary(3, 0, 3, Map.of("datasetId", "salary_detail", "field", "unit"), List.of(
+                .summary(3, 0, 3, new FieldRefDTO("salary_detail", "unit"), List.of(
                         labelCell(1, "${group}小计"),
                         aggCell(3, "salary_detail.salary", "SUM")))
                 .summary(4, 0, 3, null, List.of(
@@ -198,41 +197,29 @@ public class ReportTemplateSeeder {
 
     private void seedPayslipLoop() {
         // 循环标题：${loop_emp.name}的薪资（LoopFieldValue + 文本，示例特有结构）
-        Map<String, Object> templateValue = new LinkedHashMap<>();
-        templateValue.put("type", "Template");
-        templateValue.put("parts", List.of(
-                Map.of("kind", "hole", "value", Map.of("type", "LoopFieldValue", "payload", "loop_emp.name")),
-                Map.of("kind", "text", "text", "的薪资")
+        ValueDTO templateValue = new ValueDTO("Template", null, null, null, null, null, List.of(
+                new PartDTO("hole", null, new ValueDTO("LoopFieldValue", "loop_emp.name", null, null, null, null, null)),
+                new PartDTO("text", "的薪资", null)
         ));
 
         // 条件：salaries.emp_id == loop_emp.id
-        Map<String, Object> loopCondition = Map.of(
-                "id", "c1",
-                "left", fieldValue("salaries", "emp_id"),
-                "operator", "EQ",
-                "right", Map.of("type", "LoopFieldValue", "payload", "loop_emp.id")
-        );
+        ConditionDTO loopCondition = new ConditionDTO("c1",
+                fieldValue("salaries", "emp_id"),
+                "EQ",
+                new ValueDTO("LoopFieldValue", "loop_emp.id", null, null, null, null, null));
 
-        Map<String, Object> loopBlock = Map.of(
-                "id", "loop_emp",
-                "label", "员工循环",
-                "sheetId", SHEET,
-                "startRow", 0, "startColumn", 0,
-                "endRow", 3, "endColumn", 2,
-                "source", Map.of(
-                        "datasetId", "employees",
-                        "filters", List.of(Map.of(
-                                "id", "lf1",
-                                "left", fieldValue("employees", "status"),
-                                "operator", "EQ",
-                                "right", literal("在职")
-                        )),
-                        "groupBy", List.of(),
-                        "orderBy", List.of()
-                )
-        );
+        LoopBlockDTO loopBlock = new LoopBlockDTO(
+                "loop_emp", "员工循环", SHEET,
+                0, 0, 3, 2,
+                new SourceDTO("employees",
+                        List.of(new ConditionDTO("lf1",
+                                fieldValue("employees", "status"),
+                                "EQ",
+                                literal("在职"))),
+                        List.of(),
+                        List.of()));
 
-        save(new ReportConfigBuilder("薪资条报表")
+        save("example-payslip-loop", new ReportConfigBuilder("薪资条报表")
                 .binding(0, 0, templateValue, "NONE", "LIST")
                 .binding(1, 0, literal("总薪资"), "NONE", "LIST")
                 .binding(1, 1, literal("岗位薪资"), "NONE", "LIST")
@@ -254,7 +241,7 @@ public class ReportTemplateSeeder {
     // ============================================================
 
     private void seedIndependentBands() {
-        save(new ReportConfigBuilder("员工商品并列报表")
+        save("example-independent-bands", new ReportConfigBuilder("员工商品并列报表")
                 .binding(0, 0, literal("姓名"), "NONE", "LIST")
                 .binding(0, 1, literal("单位"), "NONE", "LIST")
                 .binding(0, 2, literal("商品名"), "NONE", "LIST")
@@ -286,7 +273,7 @@ public class ReportTemplateSeeder {
         // 数据带列集合求交归属），互不串扰。两个汇总同锚在设计行 2，分别占列区间 [0,1] 和 [2,3]——
         // 前端右键框选区域即生成该区间，同一设计行可并列多个独立汇总。渲染时后端按各带真实行数
         // 分别落位，与设计态行号无关（员工带 4 行、商品带 3 行 → 各自追加在自己数据末尾）。
-        save(new ReportConfigBuilder("员工商品并列汇总报表")
+        save("example-independent-bands-summary", new ReportConfigBuilder("员工商品并列汇总报表")
                 .binding(0, 0, literal("姓名"), "NONE", "LIST")
                 .binding(0, 1, literal("单位"), "NONE", "LIST")
                 .binding(0, 2, literal("商品名"), "NONE", "LIST")
@@ -317,8 +304,10 @@ public class ReportTemplateSeeder {
     // 辅助
     // ============================================================
 
-    /** 保存配置并登记示例 id。 */
-    private void save(Map<String, Object> config) {
-        exampleIds.add(repository.save(config));
+    /** 保存配置并指定稳定 id（重启后不变）。 */
+    private void save(String id, ReportConfig config) {
+        config.setId(id);
+        repository.save(config);
+        count++;
     }
 }

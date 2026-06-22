@@ -1,98 +1,89 @@
 package com.example.report.config;
 
+import com.codingapi.report.config.ReportConfig;
+import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
+import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
+import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
+import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
+import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SourceDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SummaryCellDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
+import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
 import com.codingapi.report.excel.CellRefs;
+import com.codingapi.report.excel.pojo.Cell;
+import com.codingapi.report.excel.pojo.Sheet;
+import com.codingapi.report.excel.pojo.Workbook;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 示例报表配置的链式构造器，收敛 {@link ReportTemplateSeeder} 的 Map 样板。
+ * 示例报表配置的链式构造器，收敛 {@link ReportTemplateSeeder} 的样板。
  * <p>
- * 产物是与后端 JSON 契约一致的 {@code Map<String,Object>}（name/dataModelId/cellBindings/
- * loopBlocks/summaries/params/template）。值工厂为静态方法，便于在 seed 方法内直接组装。
+ * 产物是强类型 {@link ReportConfig}（name/dataModelId/cellBindings/loopBlocks/summaries/params/template）。
+ * 值工厂为静态方法（返回 {@link ValueDTO}），便于在 seed 方法内直接组装。
  */
 public class ReportConfigBuilder {
 
     private static final String SHEET = "sheet1";
 
-    private final Map<String, Object> config;
-    private final List<Map<String, Object>> bindings = new ArrayList<>();
-    private final List<Map<String, Object>> summaries = new ArrayList<>();
-    private final List<Map<String, Object>> loopBlocks = new ArrayList<>();
+    private final String name;
+    private final List<BindingDTO> bindings = new ArrayList<>();
+    private final List<SummaryRowDTO> summaries = new ArrayList<>();
+    private final List<LoopBlockDTO> loopBlocks = new ArrayList<>();
     private List<CellData> templateCells = List.of();
     private int colCount;
     private int rowCount;
 
     public ReportConfigBuilder(String name) {
-        this.config = new LinkedHashMap<>();
-        config.put("name", name);
-        config.put("dataModelId", "default");
-        config.put("_example", true);
-        config.put("cellBindings", List.of());
-        config.put("loopBlocks", List.of());
-        config.put("summaries", List.of());
-        config.put("params", List.of());
+        this.name = name;
     }
 
     // ─── 链式：单元格绑定 ───
 
-    public ReportConfigBuilder binding(int row, int col, Map<String, Object> value, String expansion, String expandMode) {
+    public ReportConfigBuilder binding(int row, int col, ValueDTO value, String expansion, String expandMode) {
         return binding(row, col, value, expansion, expandMode, false, null);
     }
 
-    public ReportConfigBuilder binding(int row, int col, Map<String, Object> value, String expansion, String expandMode,
+    public ReportConfigBuilder binding(int row, int col, ValueDTO value, String expansion, String expandMode,
                                        boolean mergeRepeated) {
         return binding(row, col, value, expansion, expandMode, mergeRepeated, null);
     }
 
-    public ReportConfigBuilder binding(int row, int col, Map<String, Object> value, String expansion, String expandMode,
+    public ReportConfigBuilder binding(int row, int col, ValueDTO value, String expansion, String expandMode,
                                        boolean mergeRepeated, String parentCell) {
         bindings.add(makeBinding(row, col, value, expansion, expandMode, mergeRepeated, parentCell, List.of()));
         return this;
     }
 
-    public ReportConfigBuilder bindingWithConditions(int row, int col, Map<String, Object> value,
-                                                     String expansion, String expandMode, Map<String, Object> condition) {
-        // Deep-copy condition with unique id
-        Map<String, Object> c = new LinkedHashMap<>(condition);
-        c.put("id", "c_" + row + "_" + col);
+    public ReportConfigBuilder bindingWithConditions(int row, int col, ValueDTO value,
+                                                     String expansion, String expandMode, ConditionDTO condition) {
+        // 条件附带唯一 id
+        ConditionDTO c = new ConditionDTO("c_" + row + "_" + col, condition.left(), condition.operator(), condition.right());
         bindings.add(makeBinding(row, col, value, expansion, expandMode, false, null, List.of(c)));
         return this;
     }
 
-    private Map<String, Object> makeBinding(int row, int col, Map<String, Object> value, String expansion, String expandMode,
-                                            boolean mergeRepeated, String parentCell, List<Map<String, Object>> conditions) {
-        Map<String, Object> b = new LinkedHashMap<>();
-        b.put("cellKey", cellKey(row, col));
-        b.put("value", value);
-        b.put("expansion", expansion);
-        b.put("expandMode", expandMode);
-        b.put("mergeRepeated", mergeRepeated);
-        b.put("parentCell", parentCell);
-        b.put("conditions", conditions);
-        return b;
+    private BindingDTO makeBinding(int row, int col, ValueDTO value, String expansion, String expandMode,
+                                   boolean mergeRepeated, String parentCell, List<ConditionDTO> conditions) {
+        return new BindingDTO(cellKey(row, col), value, expansion, expandMode, mergeRepeated, parentCell, conditions,
+                false, null, false, null);
     }
 
     // ─── 链式：汇总行 ───
 
     public ReportConfigBuilder summary(int row, int fromColumn, int toColumn,
-                                       Map<String, Object> groupBy, List<Map<String, Object>> cells) {
-        Map<String, Object> s = new LinkedHashMap<>();
-        s.put("id", "sum-" + System.nanoTime());
-        s.put("row", row);
-        s.put("fromColumn", fromColumn);
-        s.put("toColumn", toColumn);
-        s.put("groupBy", groupBy);
-        s.put("cells", cells);
-        summaries.add(s);
+                                       FieldRefDTO groupBy, List<SummaryCellDTO> cells) {
+        summaries.add(new SummaryRowDTO("sum-" + System.nanoTime(), groupBy, fromColumn, toColumn,
+                List.copyOf(cells), row));
         return this;
     }
 
-    // ─── 链式：循环块（原始 Map，示例特有结构） ───
+    // ─── 链式：循环块 ───
 
-    public ReportConfigBuilder loopBlock(Map<String, Object> block) {
+    public ReportConfigBuilder loopBlock(LoopBlockDTO block) {
         loopBlocks.add(block);
         return this;
     }
@@ -108,16 +99,16 @@ public class ReportConfigBuilder {
 
     // ─── 构建 ───
 
-    public Map<String, Object> build() {
-        config.put("cellBindings", List.copyOf(bindings));
-        if (!summaries.isEmpty()) {
-            config.put("summaries", List.copyOf(summaries));
-        }
-        if (!loopBlocks.isEmpty()) {
-            config.put("loopBlocks", List.copyOf(loopBlocks));
-        }
-        config.put("template", buildWorkbook(templateCells, colCount, rowCount));
-        return config;
+    public ReportConfig build() {
+        ReportConfig rc = new ReportConfig();
+        rc.setName(name);
+        rc.setDataModelId("default");
+        rc.setCellBindings(List.copyOf(bindings));
+        rc.setSummaries(List.copyOf(summaries));
+        rc.setLoopBlocks(List.copyOf(loopBlocks));
+        rc.setParams(List.of());
+        rc.setTemplate(buildWorkbook(templateCells, colCount, rowCount));
+        return rc;
     }
 
     // ============================================================
@@ -128,61 +119,53 @@ public class ReportConfigBuilder {
         return SHEET + ":" + row + ":" + col;
     }
 
-    public static Map<String, Object> literal(String text) {
-        return Map.of("type", "Literal", "payload", text);
+    public static ValueDTO literal(String text) {
+        return new ValueDTO("Literal", text, null, null, null, null, null);
     }
 
-    public static Map<String, Object> fieldValue(String datasetId, String field) {
-        return Map.of("type", "FieldValue", "payload", datasetId + "." + field);
+    public static ValueDTO fieldValue(String datasetId, String field) {
+        return new ValueDTO("FieldValue", datasetId + "." + field, null, null, null, null, null);
     }
 
-    public static Map<String, Object> aggregate(String agg, String datasetId, String field) {
-        return Map.of("type", "Aggregate", "aggregation", agg, "operand", fieldValue(datasetId, field));
+    public static ValueDTO aggregate(String agg, String datasetId, String field) {
+        return new ValueDTO("Aggregate", null, agg, fieldValue(datasetId, field), null, null, null);
     }
 
-    public static Map<String, Object> labelCell(int column, String label) {
-        Map<String, Object> value;
-        if (label.contains("${")) {
-            // 构造 Template：解析 ${...} 占位为 NameRef
-            value = buildTemplateValue(label);
-        } else {
-            value = Map.of("type", "Literal", "payload", label);
-        }
-        return Map.of("column", column, "value", value);
+    public static SummaryCellDTO labelCell(int column, String label) {
+        ValueDTO value = label.contains("${") ? buildTemplateValue(label) : literal(label);
+        return new SummaryCellDTO(column, value, null, null, null, null, false, null);
     }
 
-    public static Map<String, Object> aggCell(int column, String payload, String aggregation) {
-        return Map.of("column", column, "value", Map.of(
-                "type", "Aggregate",
-                "aggregation", aggregation,
-                "operand", Map.of("type", "FieldValue", "payload", payload)
-        ));
+    public static SummaryCellDTO aggCell(int column, String payload, String aggregation) {
+        ValueDTO value = new ValueDTO("Aggregate", null, aggregation,
+                new ValueDTO("FieldValue", payload, null, null, null, null, null),
+                null, null, null);
+        return new SummaryCellDTO(column, value, null, null, aggregation, null, false, null);
     }
 
-    /** 构造 Template Value：支持 ${name} 占位符（编译为 NameRef） */
-    @SuppressWarnings("unchecked")
-    public static Map<String, Object> buildTemplateValue(String text) {
-        List<Map<String, Object>> parts = new ArrayList<>();
+    /** 构造 Template ValueDTO：支持 ${name} 占位符（编译为 NameRef） */
+    public static ValueDTO buildTemplateValue(String text) {
+        List<PartDTO> parts = new ArrayList<>();
         int i = 0;
         while (i < text.length()) {
             int start = text.indexOf("${", i);
             if (start == -1) {
-                parts.add(Map.of("kind", "text", "text", text.substring(i)));
+                parts.add(new PartDTO("text", text.substring(i), null));
                 break;
             }
             if (start > i) {
-                parts.add(Map.of("kind", "text", "text", text.substring(i, start)));
+                parts.add(new PartDTO("text", text.substring(i, start), null));
             }
             int end = text.indexOf("}", start + 2);
             String name = text.substring(start + 2, end);
-            parts.add(Map.of("kind", "hole", "value", Map.of("type", "NameRef", "payload", name)));
+            parts.add(new PartDTO("hole", null, new ValueDTO("NameRef", name, null, null, null, null, null)));
             i = end + 1;
         }
-        // 如果整个字符串就是一个洞，直接返回洞内 Value
-        if (parts.size() == 1 && "hole".equals(parts.get(0).get("kind"))) {
-            return (Map<String, Object>) parts.get(0).get("value");
+        // 整个字符串就是一个洞 → 直接返回洞内 ValueDTO
+        if (parts.size() == 1 && "hole".equals(parts.get(0).kind())) {
+            return parts.get(0).value();
         }
-        return Map.of("type", "Template", "parts", parts);
+        return new ValueDTO("Template", null, null, null, null, null, List.copyOf(parts));
     }
 
     public static CellData cell(int row, int col, String value) {
@@ -192,31 +175,33 @@ public class ReportConfigBuilder {
     public record CellData(int row, int col, String value) {
     }
 
-    // ─── ExcelWorkbook 构建 ───
+    // ─── Workbook 构建 ───
 
-    private static Map<String, Object> buildWorkbook(List<CellData> cells, int colCount, int rowCount) {
-        List<Map<String, Object>> excelCells = new ArrayList<>();
+    private static Workbook buildWorkbook(List<CellData> cells, int colCount, int rowCount) {
+        List<Cell> excelCells = new ArrayList<>();
         for (CellData c : cells) {
-            Map<String, Object> cell = new LinkedHashMap<>();
-            cell.put("row", c.row());
-            cell.put("col", c.col());
-            cell.put("ref", CellRefs.toRef(c.row(), c.col()));
-            cell.put("value", c.value());
+            Cell cell = new Cell();
+            cell.setRow(c.row());
+            cell.setCol(c.col());
+            cell.setRef(CellRefs.toRef(c.row(), c.col()));
+            cell.setValue(TextNode.valueOf(c.value()));
             excelCells.add(cell);
         }
 
-        Map<String, Object> sheet = new LinkedHashMap<>();
-        sheet.put("id", SHEET);
-        sheet.put("name", "Sheet1");
-        sheet.put("rowCount", rowCount);
-        sheet.put("columnCount", colCount);
-        sheet.put("defaultRowHeight", 25);
-        sheet.put("defaultColumnWidth", 100);
-        sheet.put("merges", List.of());
-        sheet.put("cells", excelCells);
-        sheet.put("rows", List.of());
-        sheet.put("columns", List.of());
+        Sheet sheet = new Sheet();
+        sheet.setId(SHEET);
+        sheet.setName("Sheet1");
+        sheet.setRowCount(rowCount);
+        sheet.setColumnCount(colCount);
+        sheet.setDefaultRowHeight(25);
+        sheet.setDefaultColumnWidth(100);
+        sheet.setMerges(List.of());
+        sheet.setCells(excelCells);
+        sheet.setRows(List.of());
+        sheet.setColumns(List.of());
 
-        return Map.of("sheets", List.of(sheet));
+        Workbook workbook = new Workbook();
+        workbook.setSheets(List.of(sheet));
+        return workbook;
     }
 }

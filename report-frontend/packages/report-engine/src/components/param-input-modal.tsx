@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Switch, message } from 'antd';
-import type { ReportParam } from '@coding-report/report-engine';
+import type { ReportParam } from '../types';
 
 interface ParamInputModalProps {
   params: ReportParam[];
@@ -18,21 +18,20 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({
 }) => {
   const [values, setValues] = useState<Record<string, unknown>>({});
 
-  // 打开时预填默认值
-  useState(() => {
-    if (open) {
-      const init: Record<string, unknown> = {};
-      for (const p of params) {
-        if (p.defaultValue != null && p.defaultValue !== '') {
-          init[p.name] =
-            p.dataType === 'NUMBER' ? Number(p.defaultValue) :
-            p.dataType === 'BOOLEAN' ? p.defaultValue === 'true' :
-            p.defaultValue;
-        }
+  // 打开或参数变化时预填默认值
+  useEffect(() => {
+    if (!open) return;
+    const init: Record<string, unknown> = {};
+    for (const p of params) {
+      if (p.defaultValue != null && p.defaultValue !== '') {
+        init[p.name] =
+          p.dataType === 'NUMBER' ? Number(p.defaultValue) :
+          p.dataType === 'BOOLEAN' ? p.defaultValue === 'true' :
+          p.defaultValue;
       }
-      setValues(init);
     }
-  });
+    setValues(init);
+  }, [open, params]);
 
   const update = (name: string, val: unknown) =>
     setValues((prev) => ({ ...prev, [name]: val }));

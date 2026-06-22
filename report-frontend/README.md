@@ -52,19 +52,19 @@ Univer 电子表格的 React 封装层，提供：
 
 ### @coding-report/report-api
 
-后端 API 客户端：axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `listExampleReports` / `renderReport` / `exportExcel` / `importExcel` / `fetchFonts` 等。
+后端 API 客户端：axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `deleteReportConfig` / `listReportConfigs(current,pageSize)` / `listDataModels` / `renderReport` / `previewReport` / `drillReport` / `exportExcel` / `importExcel` / `fetchFonts` 等。
 
 ### @coding-report/report-engine
 
-报表设计器组件库，三栏式布局：
+报表设计器组件库（纯 UI，不直接调 API）：
 
-- **左面板**：数据源树形浏览
-- **中面板**：Univer 电子表格（报表模板设计）
-- **右面板**：单元格属性配置（条件规则 + 计算方式）
+- **`ReportEngine`**：三栏式布局（左数据模型 / 中电子表格 / 右属性面板）。顶部按钮可配置：默认组（导入模板/循环块/报表预览/导出报表/保存报表）受 `enableImport`/`enableLoopBlock`/`enablePreview`/`enableExport`/`enableSave` 控制；`customActions`（左，加竖线分隔）+ `extraActions`（右）注入自定义按钮。预览/导出通过 `renderService` prop 注入 report-api 函数启用。
+- **`ReportPreview`**：预览能力组件（参数弹窗 → 渲染 → 预览抽屉 → 反查 → 抽屉内导出），设计器与独立预览页共用。声明式 `config`（引用变化触发预览）+ `onClose` 回调 + ref `exportXlsx` 命令式导出。
+- **`useReportPreview`** hook：预览流程逻辑/状态（纯逻辑，JSX 在组件层渲染）。
 
 ### app-pc
 
-演示应用，基于 Rsbuild 构建，用于验证和展示组件库能力。
+演示应用（基于 Rsbuild）。路由：`/`（首页）+ `/reports`（报表管理，antd Table 分页 + 新建/编辑/预览/删除）+ `/engine`（`AppReport` 设计器）+ `/preview`（`AppPreview` 独立预览页）。仅首页/报表管理在菜单。
 
 ## 技术栈
 

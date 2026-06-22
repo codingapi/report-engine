@@ -16,28 +16,24 @@ export interface UseReportIOOptions {
   reportName: string;
   onReportIdChange: (id: string) => void;
   onSaveReport?: ReportEngineProps['onSaveReport'];
-  onExport?: ReportEngineProps['onExport'];
-  onPreview?: ReportEngineProps['onPreview'];
   onImport?: ReportEngineProps['onImport'];
   messageApi: MessageInstance;
 }
 
 /**
- * 报表 IO：保存配置 / 导出渲染 / 导入模板。
- * <p>从 ReportEngine 主组件抽出的 IO 边界——逻辑逐字保留，仅集中管理三个 loading 状态
- * 与对外回调的调用。配置/快照由主组件通过 opts 传入。
+ * 报表 IO：保存配置 / 导入模板 / 收集渲染入参。
+ * <p>从 ReportEngine 主组件抽出的 IO 边界。预览/导出的 UI 编排（参数弹窗、抽屉、反查）
+ * 由 {@link useReportPreview} 承担，本 hook 只负责配置收集与保存/导入。
  */
 export function useReportIO(opts: UseReportIOOptions) {
   const {
     sheetRef, datasets, dataModelId,
     cellBindings, loopBlocks, summaries, params,
     reportId, reportName, onReportIdChange,
-    onSaveReport, onExport, onPreview, onImport, messageApi,
+    onSaveReport, onImport, messageApi,
   } = opts;
 
   const [savingReport, setSavingReport] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
 
   /**
@@ -147,43 +143,6 @@ export function useReportIO(opts: UseReportIOOptions) {
     }
   }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, onReportIdChange, sheetRef, messageApi]);
 
-  // ─── 导出 ───
-  const handleExport = useCallback(async () => {
-    if (!onExport) return;
-    const args = collectRenderArgs();
-    if (!args) {
-      messageApi.warning('表格为空，无法导出');
-      return;
-    }
-    setExporting(true);
-    try {
-      await onExport(args.bindingsOut, loopBlocks, args.summariesOut, args.templateOut, params);
-      messageApi.success('导出成功');
-    } catch (e) {
-      messageApi.error(`导出失败: ${e}`);
-    } finally {
-      setExporting(false);
-    }
-  }, [onExport, collectRenderArgs, loopBlocks, params, messageApi]);
-
-  // ─── 预览（网页） ───
-  const handlePreview = useCallback(async () => {
-    if (!onPreview) return;
-    const args = collectRenderArgs();
-    if (!args) {
-      messageApi.warning('表格为空，无法预览');
-      return;
-    }
-    setPreviewing(true);
-    try {
-      await onPreview(args.bindingsOut, loopBlocks, args.summariesOut, args.templateOut, params);
-    } catch (e) {
-      messageApi.error(`预览失败: ${e}`);
-    } finally {
-      setPreviewing(false);
-    }
-  }, [onPreview, collectRenderArgs, loopBlocks, params, messageApi]);
-
   // ─── 导入 ───
   const handleImport = useCallback(
     async (file: File) => {
@@ -202,5 +161,5 @@ export function useReportIO(opts: UseReportIOOptions) {
     [onImport, sheetRef, messageApi],
   );
 
-  return { savingReport, exporting, previewing, importing, handleSaveReport, handleExport, handlePreview, handleImport };
+  return { savingReport, importing, collectRenderArgs, handleSaveReport, handleImport };
 }

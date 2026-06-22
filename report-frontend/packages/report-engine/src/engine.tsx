@@ -13,11 +13,13 @@ import SheetPanel from './components/sheet-panel';
 import type { SheetPanelHandle, SheetCellSelectInfo } from './components/sheet-panel';
 import PropertyPanel from './components/property-panel/index';
 import LoopBlockManager from './components/property-panel/loop-block-manager';
-import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, ReportParam, ReportConfig, ReportValue } from './types';
+import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell, ReportParam, ReportConfig, ReportValue, RenderConfig } from './types';
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
 import { useReportIO } from './hooks/use-report-io';
+import ReportPreview from './components/preview/preview';
+import type { ReportPreviewHandle } from './components/preview/preview';
 import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
@@ -78,12 +80,17 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   functions,
   title,
   engineRef,
-  onExport,
-  onPreview,
+  renderService,
   onImport,
   onSaveReport,
   onFontRequest,
   extraActions,
+  customActions,
+  enableImport = true,
+  enableLoopBlock = true,
+  enablePreview = true,
+  enableExport = true,
+  enableSave = true,
 }) => {
   const sheetRef = useRef<SheetPanelHandle>(null);
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -106,13 +113,46 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loopDrawerOpen, setLoopDrawerOpen] = useState(false);
 
-  // ─── 报表 IO（保存/导出/导入） ───
-  const { savingReport, exporting, previewing, importing, handleSaveReport, handleExport, handlePreview, handleImport } = useReportIO({
+  // ─── 报表 IO（保存/导入/收集渲染入参） ───
+  const { savingReport, importing, collectRenderArgs, handleSaveReport, handleImport } = useReportIO({
     sheetRef, datasets, dataModelId,
     cellBindings, loopBlocks, summaries, params,
     reportId, reportName, onReportIdChange: setReportId,
-    onSaveReport, onExport, onPreview, onImport, messageApi,
+    onSaveReport, onImport, messageApi,
   });
+
+  // ─── 预览/导出能力（注入 renderService 后启用） ───
+  const previewFlowRef = useRef<ReportPreviewHandle>(null);
+  const [previewConfig, setPreviewConfig] = useState<RenderConfig | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const buildRenderConfig = () => {
+    const args = collectRenderArgs();
+    if (!args) return null;
+    return {
+      bindings: args.bindingsOut,
+      loops: loopBlocks,
+      summaries: args.summariesOut,
+      workbook: args.templateOut,
+      params,
+    } as RenderConfig;
+  };
+  const handlePreviewClick = () => {
+    const cfg = buildRenderConfig();
+    if (!cfg) {
+      messageApi.warning('表格为空，无法预览');
+      return;
+    }
+    setPreviewConfig(cfg);
+  };
+  const handleExportClick = () => {
+    const cfg = buildRenderConfig();
+    if (!cfg) {
+      messageApi.warning('表格为空，无法导出');
+      return;
+    }
+    previewFlowRef.current?.exportXlsx(cfg);
+  };
 
   // ─── 清空旧模板单元格 ───
   const clearPreviousTemplate = useCallback((sheetId: string) => {
@@ -661,9 +701,9 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       <div className="re-header">
         <div className="re-header__title">{title ?? reportName}</div>
         <div className="re-header__actions">
-          {extraActions}
-          {extraActions && <Divider type="vertical" />}
-          {onImport && (
+          {customActions}
+          {customActions && <Divider type="vertical" />}
+          {enableImport && onImport && (
             <Upload
               accept=".xlsx,.xls"
               showUploadList={false}
@@ -677,36 +717,42 @@ export const ReportEngine: React.FC<ReportEngineProps & {
               </Button>
             </Upload>
           )}
-          <Button icon={<BlockOutlined />} onClick={() => setLoopDrawerOpen(true)}>
-            循环块{loopBlocks.length > 0 && `(${loopBlocks.length})`}
-          </Button>
-          {onPreview && (
+          {enableLoopBlock && (
+            <Button
+              icon={<BlockOutlined />}
+              onClick={() => setLoopDrawerOpen(true)}
+            >
+              循环块{loopBlocks.length > 0 && `(${loopBlocks.length})`}
+            </Button>
+          )}
+          {enablePreview && renderService && (
             <Button
               icon={<EyeOutlined />}
               loading={previewing}
-              onClick={handlePreview}
+              onClick={handlePreviewClick}
             >
-              预览
+              报表预览
             </Button>
           )}
-          {onExport && (
+          {enableExport && renderService && (
             <Button
               icon={<ExportOutlined />}
               loading={exporting}
-              onClick={handleExport}
+              onClick={handleExportClick}
             >
               导出报表
             </Button>
           )}
-          {onSaveReport && (
+          {enableSave && onSaveReport && (
             <Button
               icon={<SaveOutlined />}
               loading={savingReport}
               onClick={handleSaveReport}
             >
-              保存
+              保存报表
             </Button>
           )}
+          {extraActions}
         </div>
       </div>
 
@@ -846,6 +892,17 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           onChange={setLoopBlocks}
         />
       </Drawer>
+
+      {/* 预览/导出能力（参数弹窗 + 预览抽屉 + 反查明细） */}
+      {renderService && (
+        <ReportPreview
+          ref={previewFlowRef}
+          renderService={renderService}
+          config={previewConfig}
+          onPreviewingChange={setPreviewing}
+          onExportingChange={setExporting}
+        />
+      )}
     </div>
   );
 };
