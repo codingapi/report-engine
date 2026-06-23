@@ -16,27 +16,69 @@ export interface UseReportIOOptions {
   reportName: string;
   onReportIdChange: (id: string) => void;
   onSaveReport?: ReportEngineProps['onSaveReport'];
-  onExport?: ReportEngineProps['onExport'];
   onImport?: ReportEngineProps['onImport'];
   messageApi: MessageInstance;
 }
 
 /**
- * 报表 IO：保存配置 / 导出渲染 / 导入模板。
- * <p>从 ReportEngine 主组件抽出的 IO 边界——逻辑逐字保留，仅集中管理三个 loading 状态
- * 与对外回调的调用。配置/快照由主组件通过 opts 传入。
+ * 报表 IO：保存配置 / 导入模板 / 收集渲染入参。
+ * <p>从 ReportEngine 主组件抽出的 IO 边界。预览/导出的 UI 编排（参数弹窗、抽屉、反查）
+ * 由 {@link useReportPreview} 承担，本 hook 只负责配置收集与保存/导入。
  */
 export function useReportIO(opts: UseReportIOOptions) {
   const {
     sheetRef, datasets, dataModelId,
     cellBindings, loopBlocks, summaries, params,
     reportId, reportName, onReportIdChange,
-    onSaveReport, onExport, onImport, messageApi,
+    onSaveReport, onImport, messageApi,
   } = opts;
 
   const [savingReport, setSavingReport] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  /**
+   * 收集渲染入参：绑定附带 preview 友好文本，模板用原始 ID（templateToString）替换友好别名，
+   * 确保后端能正确解析 LoopFieldValue 等类型。导出/预览共用。返回 null 表示表格为空。
+   */
+  const collectRenderArgs = useCallback(() => {
+    const snapshot = sheetRef.current?.getSnapshot();
+    if (!snapshot) return null;
+
+    const bindingsOut = cellBindings.map((b) => ({
+      ...b,
+      preview: valueDisplayText(b.value, datasets, loopBlocks, params),
+    }));
+    const summariesOut = summaries.map((s) => ({
+      ...s,
+      cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks, params) })),
+    }));
+
+    const templateOut = {
+      ...snapshot,
+      sheets: snapshot.sheets.map((sheet) => ({
+        ...sheet,
+        cells: sheet.cells.map((cell) => {
+          const binding = cellBindings.find((b) => {
+            const [, row, col] = b.cellKey.split(':');
+            return parseInt(row) === cell.row && parseInt(col) === cell.col;
+          });
+          if (binding) {
+            return { ...cell, value: templateToString(binding.value) };
+          }
+          const summary = summaries.find((s) => s.row === cell.row);
+          if (summary) {
+            const summaryCell = summary.cells.find((c) => c.column === cell.col);
+            if (summaryCell) {
+              return { ...cell, value: templateToString(summaryCell.value) };
+            }
+          }
+          return cell;
+        }),
+      })),
+    };
+
+    return { bindingsOut, summariesOut, templateOut };
+  }, [cellBindings, loopBlocks, summaries, params, datasets, sheetRef]);
 
   // ─── 保存报表配置 ───
   const handleSaveReport = useCallback(async () => {
@@ -101,64 +143,6 @@ export function useReportIO(opts: UseReportIOOptions) {
     }
   }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, onReportIdChange, sheetRef, messageApi]);
 
-  // ─── 导出 ───
-  const handleExport = useCallback(async () => {
-    if (!onExport) return;
-    const snapshot = sheetRef.current?.getSnapshot();
-    if (!snapshot) {
-      messageApi.warning('表格为空，无法导出');
-      return;
-    }
-    setExporting(true);
-    try {
-      // 导出时附带表达式预览（友好文本），随配置一起存储到后端
-      const bindingsOut = cellBindings.map((b) => ({
-        ...b,
-        preview: valueDisplayText(b.value, datasets, loopBlocks, params),
-      }));
-      const summariesOut = summaries.map((s) => ({
-        ...s,
-        cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks, params) })),
-      }));
-
-      // 重建模板：用原始 ID（templateToString）替换友好别名（valueDisplayText）
-      // 确保后端能正确解析 LoopFieldValue 等类型
-      const templateOut = {
-        ...snapshot,
-        sheets: snapshot.sheets.map((sheet) => ({
-          ...sheet,
-          cells: sheet.cells.map((cell) => {
-            // 查找对应的 cellBinding
-            const binding = cellBindings.find((b) => {
-              const [, row, col] = b.cellKey.split(':');
-              return parseInt(row) === cell.row && parseInt(col) === cell.col;
-            });
-            if (binding) {
-              return { ...cell, value: templateToString(binding.value) };
-            }
-            // 查找对应的 summaryCell
-            const summary = summaries.find((s) => s.row === cell.row);
-            if (summary) {
-              const summaryCell = summary.cells.find((c) => c.column === cell.col);
-              if (summaryCell) {
-                return { ...cell, value: templateToString(summaryCell.value) };
-              }
-            }
-            // 其他单元格保持原值
-            return cell;
-          }),
-        })),
-      };
-
-      await onExport(bindingsOut, loopBlocks, summariesOut, templateOut, params);
-      messageApi.success('导出成功');
-    } catch (e) {
-      messageApi.error(`导出失败: ${e}`);
-    } finally {
-      setExporting(false);
-    }
-  }, [onExport, cellBindings, loopBlocks, summaries, params, datasets, sheetRef, messageApi]);
-
   // ─── 导入 ───
   const handleImport = useCallback(
     async (file: File) => {
@@ -177,5 +161,5 @@ export function useReportIO(opts: UseReportIOOptions) {
     [onImport, sheetRef, messageApi],
   );
 
-  return { savingReport, exporting, importing, handleSaveReport, handleExport, handleImport };
+  return { savingReport, importing, collectRenderArgs, handleSaveReport, handleImport };
 }

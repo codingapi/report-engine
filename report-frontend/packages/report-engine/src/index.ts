@@ -1,5 +1,28 @@
-export { ReportEngine } from './report-engine';
-export type { ReportEngineHandle } from './report-engine';
+export { ReportEngine } from './engine';
+export type { ReportEngineHandle } from './engine';
+
+export { default as ReportPreview } from './components/preview/preview';
+export type { ReportPreviewHandle, ReportPreviewProps } from './components/preview/preview';
+
+export { default as DrillModal } from './components/preview/drill-modal';
+export { default as ParamInputModal } from './components/param-input-modal';
+
+export { useReportPreview } from './hooks/use-report-preview';
+export type { UseReportPreviewOptions } from './hooks/use-report-preview';
+
+// 预览/导出所需的渲染契约类型（从 report-api re-export，便于消费方单包 import）
+export type {
+  RenderRequest,
+  RenderBindingDTO,
+  RenderValueDTO,
+  RenderConditionDTO,
+  PreviewResult,
+  DrillRequestParams,
+  DrillResult,
+  DrillFieldInfo,
+  ReportBrief,
+  DataModelBrief,
+} from '@coding-report/report-api';
 
 export type {
   // 枚举
@@ -31,6 +54,9 @@ export type {
   TemplatePreset,
   // 报表配置
   ReportConfig,
+  // 渲染服务（预览/导出注入）
+  RenderService,
+  RenderConfig,
   // 公式目录
   FunctionMeta,
   ExpressionCatalog,

@@ -194,18 +194,21 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 **报表引擎 API**（`controller/`）：
 - `POST /api/report/render`（`ReportRenderController`）— 配置 + 模板快照 → `ReportRenderer.render()` → 填充数据的 `.xlsx`
-- `/api/report/configs[...]`（`ReportConfigController`）— 报表配置保存/加载（附带 `dataModel` 字段）/全部列表/示例列表
+- `/api/report/configs[...]`（`ReportConfigController`）— 报表配置保存（`@RequestBody ReportConfig`）/加载（附带 `dataModel` 富化）/分页列表（`page(SearchRequest): Page<ReportConfig>`）/删除
+- `GET /api/datamodels`（`DataModelController`）— 数据模型列表（注入 `List<DataModel>`，供创建报表时选择）
 - `GET /api/datasets[...]`（`DatasetController`）— 数据集列表（含字段）/预览前 N 行
 - `GET /api/expression/functions`（`ExpressionController`）— 公式目录（聚合 + 函数元信息）
 
-**存储与示例抽象**（接口在 starter，实现可由使用方提供）：
-- `ReportRepository` 接口 + `InMemoryReportRepository` 默认实现（`@ConditionalOnMissingBean`，进程内 Map 存储）
-- `ExampleReportRegistry` 接口（示例报表的有序 id；默认空实现，example 通过 Seeder 覆盖）
+**存储抽象**（接口在 starter，实现由使用方提供）：
+- `ReportRepository` 接口（`com.codingapi.report.starter.repository`）：`save(ReportConfig):String` / `find(id):ReportConfig` / `page(SearchRequest):Page<ReportConfig>` / `delete(id)`。starter **不提供默认实现**（存储交使用方），用 `@ConditionalOnMissingBean` 装配 Controller 允许覆盖。
+- `ReportConfig` 实体在 **framework**（`com.codingapi.report.config`）：强类型 POJO，`id/name/dataModelId/createTime/updateTime`（long 时间戳）+ `cellBindings/loopBlocks/summaries/params/template`（引用 DTO record）+ `dataModel`（响应富化字段，`@JsonInclude NON_NULL`，仅 GET 返回不持久化）。example 的 `InMemoryReportRepository` 在 save 时设时间戳、null 列表归一空。
+- 接口放 starter 而非 framework：因 `page(SearchRequest)` 需 `SearchRequest`/`Page` 这类 Spring 类型，放 framework 会引入 Spring 依赖、破坏"framework 可独立发布"原则。
 
-**DTO 层**（`dto/RenderDtos` + `converter/RenderDtoConverter`）：
-- 前端 JSON → DTO record → framework 领域对象（`CellBinding` / `Value` / `LoopBlock` / `SummaryRow`）
-- `Value` 等 sealed interface **未加 Jackson 多态注解**，故用 DTO 中间层而非直接反序列化
-- ⚠️ **给 `CellBinding` 加字段要同步五处**（否则字段会在某条链路被悄悄丢弃）：framework `CellBinding`、starter `RenderDtos.BindingDTO` + `RenderDtoConverter.convertBindings`、前端 `report-engine` 的 `CellBinding` 类型、**`report-api` 的 `RenderBindingDTO` + `app-pc` 的 `toBindingDTO`**（渲染走显式字段映射，与保存走原始对象是两条独立链路）
+**DTO 契约层**（DTO record 在 **framework** `com.codingapi.report.config.dto.ConfigDtos`，转换在 starter `RenderDtoConverter`）：
+- DTO record（`BindingDTO`/`ValueDTO`/`LoopBlockDTO`/`SummaryRowDTO`/`SummaryCellDTO`/`ConditionDTO`/`PartDTO`/`SourceDTO`/`FieldRefDTO`）同时是 `ReportConfig` 实体的持久化字段类型 + 前端 JSON 契约。
+- 前端 JSON → DTO record（Jackson）→ framework 领域对象（`CellBinding`/`Value`/`LoopBlock`/`SummaryRow`）由 `RenderDtoConverter` 转换。
+- `Value` 等 sealed interface **未加 Jackson 多态注解**，故用 DTO 中间层而非直接反序列化；`RenderDtos` 仅剩 `RenderRequest`（渲染请求，`params` 为运行时值 Map，与实体的 `params` 定义不同）。
+- ⚠️ **给 `CellBinding` 加字段要同步五处**（否则字段会在某条链路被悄悄丢弃）：framework `ConfigDtos.BindingDTO`、starter `RenderDtoConverter.convertBindings`、前端 `report-engine` 的 `CellBinding` 类型、**`report-api` 的 `RenderBindingDTO` + `app-pc` 的 `toBindingDTO`**（渲染走显式字段映射，与保存走原始对象是两条独立链路）。`SummaryRow.id` 也在 DTO 中持久化。
 
 ### Example Module (`report-engine-example`)
 
@@ -218,9 +221,10 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 构建唯一 `DataModel` Bean（id=`"default"`）+ `CsvDataExtractor` Bean，注入 starter 的 Controller
 
 **示例报表预存** (`ReportTemplateSeeder.java`)：
-- 实现 starter 的 `ExampleReportRegistry`；启动时（`ApplicationReadyEvent`）向 `ReportRepository`（starter 默认内存实现）写入 8 个完整报表配置
+- `@Component`，启动时（`@EventListener(ApplicationReadyEvent)`）向 `ReportRepository`（example 内存实现）写入 8 个完整报表配置
+- 示例报表使用**写死的稳定 id**（`example-simple-list` 等），保证重启后 id 不变、前端引用不失效（内存存储重启即丢，但 seeder 用同一批 id 重写）
 - 涵盖：简单列表、分组列表、多级分组统计、主从合并、小计+总计、薪资条循环、独立数据带并列、并列双汇总
-- 配置用 `ReportConfigBuilder`（链式构造器）生成，产物为前后端 JSON 契约的 `Map<String, Object>`（name/dataModelId/cellBindings/loopBlocks/summaries/params/template）
+- 配置用 `ReportConfigBuilder`（链式构造器）生成，产物为强类型 `ReportConfig`（引用 framework DTO record + `Workbook` POJO）。示例列表不再有专用端点，统一走 starter 的 `GET /api/report/configs`（示例与用户报表同表）。
 
 **CSV 数据集**（`src/main/resources/data/`）：10 个 CSV + 对应 JSON 描述 + `relationships.json`。
 
@@ -233,12 +237,18 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 #### Package 职责
 
 - **`report-univer`**：Univer 电子表格 React 封装。提供 `UniverSheet` 组件 + `UniverSheetHandle` 命令式句柄（`getSnapshot` / `loadSnapshot` / `setCellValue` / `getActiveSheetId`）。三层属性存储（cellProps / mergeProps / loopBlockProps）通过泛型自定义。
-- **`report-api`**：后端 API 客户端。axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `listExampleReports` / `renderReport` / `exportExcel` / `importExcel` / `fetchFonts`。
-- **`report-engine`**：报表设计器组件库（纯 UI，不直接调 API）。
+- **`report-api`**：后端 API 客户端。axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `deleteReportConfig` / `listReportConfigs(current,pageSize)` / `listDataModels` / `renderReport` / `previewReport` / `drillReport` / `exportExcel` / `importExcel` / `fetchFonts`。
+- **`report-engine`**：报表设计器组件库（纯 UI，不直接调 API）。核心导出：`ReportEngine`（设计器）、`ReportPreview`（预览能力组件，含参数弹窗+预览抽屉+反查+抽屉内导出）、`useReportPreview` hook。
 
 #### ReportEngine 组件
 
-**Props 驱动**：`datasets` + `relationships` + `dataModelId` + `functions`（公式目录）+ `onExport` / `onImport` / `onSaveReport` / `onFontRequest` 回调。数据由 app-pc 从 API 获取后传入。
+**Props 驱动**：`datasets` + `relationships` + `dataModelId` + `functions`（公式目录）+ `renderService`（注入 report-api 的 `previewReport`/`renderReport`/`drillReport`，启用内置预览/导出全流程）+ `onImport` / `onSaveReport` / `onFontRequest` 回调。数据由 app-pc 从 API 获取后传入。
+
+**顶部按钮可配置**（`re-header__actions`，宽度统一 112px）：
+- 默认按钮组：`导入模板`/`循环块`/`报表预览`/`导出报表`/`保存报表`，各受 `enableImport`/`enableLoopBlock`/`enablePreview`/`enableExport`/`enableSave`（默认 `true`）控制，且受 `onImport`/`renderService`/`onSaveReport` 前置条件约束（取交集）。
+- `customActions?: ReactNode` — 渲染在默认组**左侧**（导入模板左），有内容时加竖线分隔。
+- `extraActions?: ReactNode` — 渲染在默认组**右侧**（保存报表右）。
+- 布局：`[customActions] | 导入模板 | 循环块 | 报表预览 | 导出报表 | 保存报表 | [extraActions]`
 
 **三栏式布局**：
 - 左面板 `DataModelPanel`：数据集 / 数据关系 / 报表参数 三 tab
@@ -247,8 +257,8 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 **配置加载与保存**：
 - `loadReportConfig(config)` — 加载快照 → 获取 Univer 实际 sheet ID → 重映射所有 cellKey → 回写绑定显示文本（`valueDisplayText`）
-- `handleSaveReport` — 收集 `getSnapshot()` + cellBindings/loopBlocks/summaries/params + `dataModelId` → 调 `onSaveReport` 回调
-- `ReportConfig` 持久化结构：`id / name / dataModelId / cellBindings / loopBlocks / summaries / params / template(ExcelWorkbook)`
+- `handleSaveReport`（`use-report-io`）— 收集 `getSnapshot()` + cellBindings/loopBlocks/summaries/params + `dataModelId` → 调 `onSaveReport` 回调；保存前剥离 `displayText`、对模板应用 `templateToString`
+- `ReportConfig` 持久化结构（framework 实体）：`id / name / dataModelId / createTime / updateTime(long 时间戳) / cellBindings / loopBlocks / summaries / params / template(Workbook)` + `dataModel`(响应富化，不持久化)。时间戳由 `InMemoryReportRepository.save` 设置。
 
 **模板预设**（`TemplatePreset` 接口 + `applyTemplate`）仍保留为组件能力，但 app-pc 已改为后端预存示例报表 + 导航加载模式。
 
@@ -257,7 +267,10 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 #### Excel 数据流
 
 `report-univer` 提供双向快照能力，与后端共享同一 JSON 结构（`ExcelWorkbook`）。
-- **报表配置流程**：首页选择示例报表或创建新报表 → `/engine?id=xxx` → `loadReportConfig(GET /configs/{id})` → 设计编辑 → `saveReportConfig(POST /configs)` 持久化
+- **app-pc 路由**：`/`（首页）+ `/reports`（报表管理，antd Table 分页）+ `/engine`（设计器 `AppReport`）+ `/preview`（预览页 `AppPreview`），仅首页/报表管理在菜单。
+- **报表管理流程**：`/reports` 表格列全部报表（`listReportConfigs(current,pageSize)`，按 `SearchRequest` 分页）→ 新建弹窗（名称 + 数据模型，`listDataModels`）→ 操作列「编辑/预览/删除」（a 标签）。
+- **报表配置流程**：`/engine?id=xxx`（`AppReport`）→ `loadReportConfig(GET /configs/{id})` → 设计编辑 → `saveReportConfig(POST /configs)` 持久化。
+- **独立预览流程**：`/preview?id=xxx`（`AppPreview`）→ `loadReportConfig` → 挂 `ReportPreview` 组件（`config` 触发预览，`onClose` 返回报表管理）。
 - **导出渲染报表**：`getSnapshot() → renderReport({ cellBindings, loopBlocks, summaries, template }) → POST /api/report/render → .xlsx Blob`
 - **导出空模板**：`getSnapshot() → exportExcel(workbook) → POST /api/excel/generate → .xlsx Blob`
 - **导入**：`POST /api/excel/import → JSON → loadSnapshot()`
@@ -285,7 +298,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 前端 `UniverSheet` 裁剪了大量菜单项，仅保留报表设计所需的最小功能集
 - **跨模块修改**：修改 framework/excel/starter 后必须 `./mvnw install -DskipTests` 再启动 example，否则 example 使用的是本地仓库中的旧 JAR
 - **Univer 默认 sheet ID**：UniverSheet 创建的默认 sheet ID 不一定是 `'sheet1'`（可能是 UUID），需要通过 `getActiveSheetId()` 从快照获取实际 ID
-- **Value sealed interface 无 Jackson 注解**：前后端传输使用 starter 的 DTO 层（`dto/RenderDtos` + `converter/RenderDtoConverter`）中间转换，而非直接在 Value 上加 `@JsonTypeInfo`
+- **Value sealed interface 无 Jackson 注解**：前后端传输/持久化使用 DTO record（在 framework `ConfigDtos`，同时是 `ReportConfig` 实体字段类型）+ starter `RenderDtoConverter` 中间转换，而非直接在 Value 上加 `@JsonTypeInfo`。`ReportRepository` 接口放 starter（需 `SearchRequest`/`Page`），`ReportConfig` 实体放 framework（纯 POJO，仅依赖 excel 的 `Workbook`），保持 framework 可独立发布。
 - **模板层样式继承**：`renderLoop` 中后续迭代的合并区域需要显式复制（`seedTemplate` 只载入原始位置的 merge），样式通过 `place()` 从模板源格继承
 - **loadReportConfig sheet ID 重映射**：后端存储的 cellKey 中 sheet ID 可能是 `"sheet1"`，但 Univer 运行时活动工作表 ID 可能是 UUID。`loadReportConfig` 必须先 `getActiveSheetId()` 获取实际 ID，再重映射所有 cellKey/parentCell，最后回写绑定显示文本
 - **数据模型随配置加载**：`GET /configs/{id}` 返回的 `dataModel` 字段由后端从注入的 `DataModel` Bean 实时解析（当前始终返回唯一的全局模型），配置中仅存 `dataModelId` 引用
@@ -296,3 +309,5 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - **单元格变更同步（report-univer）**：监听 `set-range-values` mutation 同步内容到汇总行时，**必须用 `'v' in cell` 判定**是否真有值变更——边框/填充等纯样式 mutation 只带 `s` 不带 `v`，若误读为空字符串会把已设内容同步清空（删除内容时 Univer 会显式带 `v: null`，仍判定为真，不受影响）
 - **展示/真实值分轨（前端 report-engine）**：单元格「显示别名、传输真实 ID」。`value.payload` 是真实 ID（权威，用于传输/导出）；`CellBinding`/`SummaryCell.displayText` 是别名展示文本（**transient**，由 `valueDisplayText(value)` 正向派生，用于①写进单元格显示 ②回声判别）。**后端完全不接收、不存储 `displayText`**（与需同步五处的渲染契约字段不同），保存出口（`use-report-io` 的 `handleSaveReport` / `getReportConfig`）剥离。展示永远由 `value` **正向**派生，**绝不反解 `displayText` → `value`**——别名→ID 是多对一（可重名），反向有歧义
 - **回声判别替代 isLoadingRef（`handleCellValueChange`）**：往单元格写显示文本会触发 `set-range-values` mutation，需区分「程序回写」与「用户手敲」。用 `displayText` 作基准：新文本 `=== displayText` ⇒ 回声，忽略；`=== ''` ⇒ 清空，移除绑定；否则用户手敲 → 纯文本/模板格退化为 `Literal`（**不反解别名、不构造引用洞**），字段/聚合/参数等引用格保护不覆盖（改表达式走属性面板/拖拽）。基于数据基准而非时序标志，不依赖 mutation 是否同步派发
+- **预览能力下沉（report-engine `ReportPreview` 组件）**：参数弹窗→渲染→预览抽屉→反查→抽屉内导出全流程封装为 `ReportPreview`（`components/preview/preview.tsx`），设计器与独立预览页共用。`useReportPreview` hook 只管逻辑/状态，JSX 在组件层渲染（含私有 `WorkbookTable` 画表格，不单独导出）。**纯 UI 不调 API**：通过 `renderService` prop 注入 report-api 的 `previewReport`/`renderReport`/`drillReport`（只导类型，不导函数）。设计器点「预览」→ `setPreviewConfig(newConfig)`（引用变化触发）；预览页加载配置后 `setPreviewConfig(loaded)`。`ReportPreview` 用 `lastPreviewedRef` 去重避免 strict-mode 重复触发；预览页加载 effect 用局部 `active` 标志（**勿用跨渲染 `startedRef`**，否则 strict-mode 双调用会让预览永不执行）。抽屉 `onClose` 回调（`ReportPreview` 的 `onClose` prop）：设计器不传（停在设计器），预览页传 `navigate('/reports')`。
+- **已保存配置即渲染就绪态**：`handleSaveReport` 保存时已对模板应用 `templateToString` 并剥离 `displayText`，故 `loadReportConfig` 返回的配置可直接喂给 `ReportPreview`（无需 `collectRenderArgs` 预处理；`preview` 字段可选，后端仅存储不渲染）。

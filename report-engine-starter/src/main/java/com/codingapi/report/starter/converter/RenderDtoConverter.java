@@ -1,5 +1,12 @@
 package com.codingapi.report.starter.converter;
 
+import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
+import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
+import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
+import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SummaryCellDTO;
+import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
+import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
 import com.codingapi.report.operator.condition.CompareOperator;
@@ -12,13 +19,6 @@ import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.LoopBlock;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
-import com.codingapi.report.starter.dto.RenderDtos.BindingDTO;
-import com.codingapi.report.starter.dto.RenderDtos.ConditionDTO;
-import com.codingapi.report.starter.dto.RenderDtos.LoopBlockDTO;
-import com.codingapi.report.starter.dto.RenderDtos.PartDTO;
-import com.codingapi.report.starter.dto.RenderDtos.SummaryCellDTO;
-import com.codingapi.report.starter.dto.RenderDtos.SummaryRowDTO;
-import com.codingapi.report.starter.dto.RenderDtos.ValueDTO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +47,8 @@ public final class RenderDtoConverter {
                     .parentCell(dto.parentCell() != null ? CellRef.parse(dto.parentCell()) : null)
                     .conditions(convertConditions(dto.conditions()))
                     .independent(dto.independent())
+                    .drillEnabled(dto.drillEnabled())
+                    .drillView(dto.drillView())
                     .build());
         }
         return result;
@@ -134,8 +136,8 @@ public final class RenderDtoConverter {
             if (dto.cells() != null) {
                 for (SummaryCellDTO c : dto.cells()) {
                     if (c.value() != null) {
-                        // 新格式：直接使用 ValueDTO
-                        cells.add(new SummaryCell(c.column(), convertValue(c.value())));
+                        // 新格式：直接使用 ValueDTO + 反查配置
+                        cells.add(new SummaryCell(c.column(), convertValue(c.value()), c.drillEnabled(), c.drillView()));
                     } else if ("label".equals(c.kind())) {
                         // 旧格式兼容
                         cells.add(SummaryCell.label(c.column(), c.payload()));

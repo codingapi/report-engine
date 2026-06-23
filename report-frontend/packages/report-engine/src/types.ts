@@ -148,6 +148,10 @@ export interface CellBinding {
   independent?: boolean;
   /** 表达式预览（友好文本，导出时附带存储；派生自 value，不作为权威来源） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false）。开启后预览态下该格可点击，查看明细数据。 */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
   /**
    * 单元格展示文本（设计态：别名友好文本，由 valueDisplayText(value) 正向派生）。
    * transient——保存时剥离，后端不接收也不存储。两个用途：
@@ -180,6 +184,10 @@ export interface SummaryCell {
   value: ReportValue;
   /** 表达式预览（友好文本，导出时附带存储） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false）。开启后预览态下该格可点击，查看明细数据。 */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
   /** 单元格展示文本（设计态，transient）。回声判别基准，见 CellBinding.displayText。 */
   displayText?: string;
 }
@@ -264,6 +272,28 @@ export interface ReportConfig {
 
 // ─── 组件 Props ────────────────────────────────
 
+/**
+ * 渲染服务：由 app 层注入（桥接 report-api 的 previewReport/renderReport/drillReport）。
+ * report-engine 不直接调 API，只做 UI 编排。
+ */
+export interface RenderService {
+  /** 网页预览：发送配置 + 模板 → 返回填充数据的工作簿 + 反查格坐标 */
+  preview: (request: import('@coding-report/report-api').RenderRequest) => Promise<import('@coding-report/report-api').PreviewResult>;
+  /** 导出：发送配置 + 模板 → 返回 .xlsx Blob */
+  export: (request: import('@coding-report/report-api').RenderRequest) => Promise<Blob>;
+  /** 反查：渲染配置 + 目标格坐标 → 返回明细行 */
+  drill: (params: import('@coding-report/report-api').DrillRequestParams) => Promise<import('@coding-report/report-api').DrillResult>;
+}
+
+/** 渲染入参：单元格绑定 + 循环块 + 汇总行 + 模板快照 + 报表参数。 */
+export interface RenderConfig {
+  bindings: CellBinding[];
+  loops: LoopBlock[];
+  summaries: SummaryRow[];
+  workbook: ExcelWorkbook;
+  params: ReportParam[];
+}
+
 export interface ReportEngineProps {
   /** 数据集列表（由父组件从 API 获取后传入） */
   datasets: Dataset[];
@@ -275,20 +305,29 @@ export interface ReportEngineProps {
   functions?: ExpressionCatalog;
   /** 报表标题（支持 ReactNode，可在标题区域嵌入自定义内容） */
   title?: ReactNode;
-  /** 导出回调：接收配置 + 表格快照 + 报表参数 */
-  onExport?: (
-    bindings: CellBinding[],
-    loops: LoopBlock[],
-    summaries: SummaryRow[],
-    workbook: ExcelWorkbook,
-    params: ReportParam[],
-  ) => void | Promise<void>;
+  /**
+   * 渲染服务：注入后启用内部「预览/导出」全流程（参数弹窗 → 预览抽屉 → 反查 → 抽屉内导出）。
+   * 不注入则不显示预览/导出按钮。
+   */
+  renderService?: RenderService;
   /** 导入回调：接收文件，返回快照 */
   onImport?: (file: File) => Promise<ExcelWorkbook>;
   /** 保存报表回调：接收整张报表配置，返回报表 id（用于后续更新） */
   onSaveReport?: (config: ReportConfig) => Promise<string> | void;
   /** 字体加载回调 */
   onFontRequest?: () => Promise<FontItem[]>;
-  /** 自定义操作按钮，渲染在默认按钮左侧 */
+  /** 自定义操作按钮，渲染在默认按钮组左侧 */
   extraActions?: ReactNode;
+  /** 自定义操作按钮，渲染在默认按钮组右侧（保存按钮左侧） */
+  customActions?: ReactNode;
+  /** 是否显示「导入模板」按钮（默认 true，需同时提供 onImport） */
+  enableImport?: boolean;
+  /** 是否显示「循环块」按钮（默认 true） */
+  enableLoopBlock?: boolean;
+  /** 是否显示「报表预览」按钮（默认 true，需同时提供 renderService） */
+  enablePreview?: boolean;
+  /** 是否显示「导出报表」按钮（默认 true，需同时提供 renderService） */
+  enableExport?: boolean;
+  /** 是否显示「保存报表」按钮（默认 true，需同时提供 onSaveReport） */
+  enableSave?: boolean;
 }

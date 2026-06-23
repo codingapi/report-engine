@@ -46,7 +46,7 @@
 - [x] **字体管理系统**：
   - 后端：双目录扫描（内置 + 自定义）、文件名前缀排序、JVM 注册
   - 前端：`onFontRequest` 回调机制、localStorage 缓存、@font-face 动态注入
-- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 / 字体 / Excel）；`ReportRepository`、`ExampleReportRegistry` 抽接口 + 默认实现，`@ConditionalOnMissingBean` 允许使用方覆盖
+- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 CRUD / 数据模型列表 / 字体 / Excel）；`ReportRepository` 接口（`save/find/page(SearchRequest)/delete`）+ 强类型 `ReportConfig` 实体（含 createTime/updateTime 时间戳），`@ConditionalOnMissingBean` 允许使用方覆盖
 - [x] **API 响应标准化**：统一使用 `SingleResponse` / `MultiResponse` 包装，前端 axios 拦截器自动解包
 - [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据模型 / 表格 / 属性），可拖拽调整宽度，面板可收缩
 - [x] **循环块管理**：右键菜单创建/删除，Tab 化多循环块管理，蓝色虚线高亮，循环字段级联选择
@@ -66,16 +66,17 @@
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（CSV/JSON/DB/API/EXCEL）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
-- [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载 API，数据模型随配置附带返回；example 用 `ReportConfigBuilder` 链式预存 8 个示例报表
-- [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，starter DTO 层（`RenderDtos` + `RenderDtoConverter`）匹配前端 JSON 格式
+- [x] **报表配置实体化**：`ReportConfig` 强类型实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/params/template），DTO record（`ConfigDtos`）同时作为持久化字段类型 + 前端 JSON 契约；`ReportRepository.page(SearchRequest)` 分页查询
+- [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 8 个示例报表（写死稳定 id，重启不变）
+- [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `ConfigDtos`）+ `RenderDtoConverter` 匹配前端 JSON 格式
+- [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
+- [x] **报表管理界面**：app-pc 报表管理页（antd Table 分页、新建/编辑/预览/删除），首页 + 报表管理两个入口
 - [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发
 
 - [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD
-- [ ] **报表数据预览**：前端实时预览填充数据后的报表效果（目前仅导出后可见）
-- [ ] **报表参数运行时输入**：报表渲染前提供参数输入表单（目前参数使用默认值）
-- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型
+- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型（当前 `GET /api/datamodels` 已支持多模型列举，仅 example 注册了 `"default"` 一个）
 - [ ] **报表权限与共享**：报表配置的权限控制、多人协作、版本管理
 - [ ] **打印与分页**：报表分页设置、打印预览、页眉页脚配置
 

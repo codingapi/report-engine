@@ -1,6 +1,8 @@
 import { HomeOutlined, TableOutlined } from '@ant-design/icons';
 import HomePage from '@/pages/home';
-import EnginePage from '@/pages/engine';
+import ReportsPage from '@/pages/reports';
+import AppReport from '@/pages/engine';
+import AppPreview from '@/pages/preview';
 import React from "react";
 
 export interface RouteConfig {
@@ -18,10 +20,22 @@ const routes: RouteConfig[] = [
     element: <HomePage />,
   },
   {
+    path: '/reports',
+    name: '报表管理',
+    icon: <TableOutlined />,
+    element: <ReportsPage />,
+  },
+  {
     path: '/engine',
     name: '报表设计器',
     icon: <TableOutlined />,
-    element: <EnginePage />,
+    element: <AppReport />,
+  },
+  {
+    path: '/preview',
+    name: '报表预览',
+    icon: <TableOutlined />,
+    element: <AppPreview />,
   },
 ];
 

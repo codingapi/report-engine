@@ -34,6 +34,10 @@ export interface RenderBindingDTO {
   independent?: boolean;
   /** 表达式预览（友好文本，后端仅存储不渲染） */
   preview?: string;
+  /** 是否开启反查（drill-down）能力（默认 false） */
+  drillEnabled?: boolean;
+  /** 反查视图（数据集 id，可 null；null 时回退到该格字段所属数据集） */
+  drillView?: string | null;
 }
 
 export interface RenderRequest {
@@ -57,12 +61,60 @@ export async function renderReport(request: RenderRequest): Promise<Blob> {
   return res.data;
 }
 
+/** 预览响应：工作簿 + 反查格坐标列表（"row:col" 格式） */
+export interface PreviewResult {
+  workbook: ExcelWorkbook;
+  drillable: string[];
+}
+
+/** 预览报表：发送配置 + 模板 → 返回填充数据的工作簿 JSON + 反查格坐标列表（供前端 HTML 渲染预览） */
+export async function previewReport(request: RenderRequest): Promise<PreviewResult> {
+  const res = await http.post('/report/preview', request);
+  return res.data as PreviewResult;
+}
+
+/** 反查请求：渲染配置 + 目标格坐标 */
+export interface DrillRequestParams {
+  request: RenderRequest;
+  row: number;
+  col: number;
+}
+
+/** 字段信息：name + alias */
+export interface DrillFieldInfo {
+  name: string;
+  alias: string | null;
+}
+
+/** 反查结果：数据集 id/别名 + 字段列表 + 明细行（本期全量返回，不分页） */
+export interface DrillResult {
+  datasetId: string | null;
+  alias: string | null;
+  fields: DrillFieldInfo[];
+  rows: Array<Record<string, unknown>>;
+}
+
+/** 反查明细：传入渲染配置 + 目标格坐标，返回该格贡献的原始数据行 */
+export async function drillReport(params: DrillRequestParams): Promise<DrillResult> {
+  const res = await http.post('/report/drill', params);
+  return res.data as DrillResult;
+}
+
 // ============================================================
 // 报表配置持久化（保存 / 加载 / 列表）
 // ============================================================
 
 /** 报表列表项 */
 export interface ReportBrief {
+  id: string;
+  name: string;
+  dataModelId?: string | null;
+  createTime?: number;
+  updateTime?: number;
+}
+
+/** 数据模型简要信息 */
+export interface DataModelBrief {
   id: string;
   name: string;
 }
@@ -79,14 +131,25 @@ export async function loadReportConfig<T = Record<string, unknown>>(id: string):
   return res.data as T;
 }
 
-/** 示例报表列表（预存的测试报表） */
-export async function listExampleReports(): Promise<ReportBrief[]> {
-  const res = await http.get('/report/configs/examples');
-  return res.data.list;
+/** 删除指定报表配置 */
+export async function deleteReportConfig(id: string): Promise<void> {
+  await http.delete(`/report/configs/${id}`);
 }
 
-/** 报表列表（id + name） */
-export async function listReportConfigs(): Promise<ReportBrief[]> {
-  const res = await http.get('/report/configs');
+/** 报表列表分页结果（对齐后端 MultiResponse） */
+export interface ReportPage {
+  list: ReportBrief[];
+  total: number;
+}
+
+/** 报表列表（id + name + dataModelId + 时间戳，含示例与用户报表），按 SearchRequest 分页查询 */
+export async function listReportConfigs(current = 1, pageSize = 10): Promise<ReportPage> {
+  const res = await http.get('/report/configs', { params: { current, pageSize } });
+  return { list: res.data.list, total: res.data.total };
+}
+
+/** 数据模型列表（id + name，供创建报表时选择） */
+export async function listDataModels(): Promise<DataModelBrief[]> {
+  const res = await http.get('/datamodels');
   return res.data.list;
 }
