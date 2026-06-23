@@ -24,6 +24,11 @@
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "overrides": {
+      "form-data": "^4.0.6"
+    }
+  },
   "devDependencies": {
     "@rsbuild/plugin-react": "^1.4.5",
     "@rslib/core": "^0.20.0",
