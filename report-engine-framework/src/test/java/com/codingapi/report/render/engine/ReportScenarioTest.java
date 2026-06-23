@@ -904,6 +904,207 @@ class ReportScenarioTest {
         assertNull(findCell(sheet, 1, 2), "独立带 price 不应对齐到 row1");
     }
 
+    // ============================================================
+    // 10. 横向带：一条记录占一列、向右铺开（纵向带的转置）
+    // ============================================================
+
+    @Test
+    @DisplayName("横向带：商品名/价格各自横向铺开（行 0/1），右侧单值格随列扩展右移")
+    void horizontalBand() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // 行表头（单值，NONE）：col 0 不随横向带右移
+        CellBinding rh0 = label(0, 0, "商品名");
+        CellBinding rh1 = label(1, 0, "价格");
+        // 横向带从 col 1 起：name 在 row0、price 在 row1，向右逐列铺开
+        CellBinding nameRow = hListCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "name"));
+        CellBinding priceRow = hListCol(new CellRef("sheet1", 1, 1), new FieldRef("d_prod", "price"));
+        // 右侧单值"备注"@(0,5)：应随横向带列扩展右移（colShift = 3-1 = 2 → col 7）
+        CellBinding note = label(0, 5, "备注");
+
+        Report report = report("r_hband", dm, List.of(rh0, rh1, nameRow, priceRow, note), List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "horizontal-band");
+
+        // 行表头固定
+        assertEquals("商品名", text(sheet, 0, 0));
+        assertEquals("价格", text(sheet, 1, 0));
+        // name 横向铺开：苹果/香蕉/橙子 在 row0 的 col 1/2/3
+        assertEquals("苹果", text(sheet, 0, 1));
+        assertEquals("香蕉", text(sheet, 0, 2));
+        assertEquals("橙子", text(sheet, 0, 3));
+        // price 横向铺开：5/3/4 在 row1 的 col 1/2/3
+        assertEquals(5.0, number(sheet, 1, 1), 0.0001);
+        assertEquals(3.0, number(sheet, 1, 2), 0.0001);
+        assertEquals(4.0, number(sheet, 1, 3), 0.0001);
+        // 右侧单值随列扩展右移到 col 7
+        assertEquals("备注", text(sheet, 0, 7));
+        assertNull(findCell(sheet, 0, 5), "备注原位 col5 应已右移，不残留");
+    }
+
+    @Test
+    @DisplayName("横向带 GROUP 合并：分类横向去重合并跨列，商品逐列明细")
+    void horizontalBandGroupMerge() throws Exception {
+        DataSource src = csv("ds_sales", "/data/sales.csv");
+        Dataset sales = TableDataset.builder().id("d_sales").datasourceId("ds_sales").sourceTable("sales.csv")
+                .fields(List.of(
+                        Field.builder().name("category").dataType(DataType.STRING).build(),
+                        Field.builder().name("product").dataType(DataType.STRING).build(),
+                        Field.builder().name("qty").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_sales").name("销售模型")
+                .datasources(List.of(src)).datasets(List.of(sales)).relationships(List.of()).build();
+
+        // 分类 GROUP 横向合并（row0），商品 LIST 横向明细（row1），均从 col 0 起
+        CellBinding catRow = hGroupMerge(new CellRef("sheet1", 0, 0), new FieldRef("d_sales", "category"));
+        CellBinding prodRow = hListCol(new CellRef("sheet1", 1, 0), new FieldRef("d_sales", "product"));
+
+        Report report = report("r_hgroup", dm, List.of(catRow, prodRow), List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "horizontal-group");
+
+        // 商品逐列：苹果/香蕉(水果) + 白菜(蔬菜)
+        assertEquals("苹果", text(sheet, 1, 0));
+        assertEquals("香蕉", text(sheet, 1, 1));
+        assertEquals("白菜", text(sheet, 1, 2));
+        // 分类 row0：水果(顶格 col0) / 蔬菜(col2)
+        assertEquals("水果", text(sheet, 0, 0));
+        assertEquals("蔬菜", text(sheet, 0, 2));
+        // 水果应跨 col 0-1 横向合并（colSpan=2）
+        assertTrue(hasMergeCol(sheet, 0, 0, 2), "水果应跨 2 列横向合并");
+    }
+
+    // ============================================================
+    // 11. 交叉表（矩阵）：行维(region) × 列维(month) → 交叉格 SUM(amount)
+    // ============================================================
+
+    @Test
+    @DisplayName("交叉表：region(行维纵向) × month(列维横向) → SUM(amount) 填满网格，下方/右侧单值避让")
+    void crossTabMatrix() throws Exception {
+        DataSource src = csv("ds_ms", "/data/matrix_sales.csv");
+        Dataset ms = TableDataset.builder().id("d_ms").datasourceId("ds_ms").sourceTable("matrix_sales.csv")
+                .fields(List.of(
+                        Field.builder().name("region").dataType(DataType.STRING).build(),
+                        Field.builder().name("month").dataType(DataType.STRING).build(),
+                        Field.builder().name("amount").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_ms").name("交叉表模型")
+                .datasources(List.of(src)).datasets(List.of(ms)).relationships(List.of()).build();
+
+        // 行维：region 纵向 GROUP，声明在 (1,0) → 沿行向下成行表头
+        CellBinding regionDim = CellBinding.builder().cell(new CellRef("sheet1", 1, 0))
+                .value(new Value.FieldValue(new FieldRef("d_ms", "region")))
+                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).build();
+        // 列维：month 横向 GROUP，声明在 (0,1) → 沿列向右成列表头
+        CellBinding monthDim = CellBinding.builder().cell(new CellRef("sheet1", 0, 1))
+                .value(new Value.FieldValue(new FieldRef("d_ms", "month")))
+                .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.GROUP).build();
+        // 交叉格：SUM(amount)，落在 (1,1) = 行维行 × 列维列 的交点
+        CellBinding cross = CellBinding.builder().cell(new CellRef("sheet1", 1, 1))
+                .value(new Value.Aggregate("SUM", new Value.FieldValue(new FieldRef("d_ms", "amount"))))
+                .expansion(Expansion.NONE).build();
+        // 下方单值（验证行避让）：脚注@(5,0) → 行下移
+        CellBinding footer = label(5, 0, "脚注");
+        // 右侧单值（验证列避让）：右注@(0,5) → 列右移
+        CellBinding rightNote = label(0, 5, "右注");
+
+        Report report = report("r_matrix", dm, List.of(regionDim, monthDim, cross, footer, rightNote),
+                List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "cross-tab");
+
+        // 列表头（month）：1月@(0,1)、2月@(0,2)
+        assertEquals("1月", text(sheet, 0, 1));
+        assertEquals("2月", text(sheet, 0, 2));
+        // 行表头（region，排序：华东 < 华北）：华东@(1,0)、华北@(2,0)
+        assertEquals("华东", text(sheet, 1, 0));
+        assertEquals("华北", text(sheet, 2, 0));
+        // 交叉格：华东×1月=100, 华东×2月=200, 华北×1月=150, 华北×2月=250
+        assertEquals(100.0, number(sheet, 1, 1), 0.0001);
+        assertEquals(200.0, number(sheet, 1, 2), 0.0001);
+        assertEquals(150.0, number(sheet, 2, 1), 0.0001);
+        assertEquals(250.0, number(sheet, 2, 2), 0.0001);
+
+        // 行避让：脚注设计 (5,0)，矩阵行扩展 +1（2 行 - 1 声明行）→ row 6
+        assertEquals("脚注", text(sheet, 6, 0));
+        // 列避让：右注设计 (0,5)，矩阵列扩展 +1（2 列 - 1 声明列）→ col 6
+        assertEquals("右注", text(sheet, 0, 6));
+    }
+
+    @Test
+    @DisplayName("交叉表带合计：行合计(右缘) + 列合计(底缘) + 总计(右下) + 合计表头，紧邻交叉格几何识别")
+    void crossTabMatrixWithTotals() throws Exception {
+        DataSource src = csv("ds_ms", "/data/matrix_sales.csv");
+        Dataset ms = TableDataset.builder().id("d_ms").datasourceId("ds_ms").sourceTable("matrix_sales.csv")
+                .fields(List.of(
+                        Field.builder().name("region").dataType(DataType.STRING).build(),
+                        Field.builder().name("month").dataType(DataType.STRING).build(),
+                        Field.builder().name("amount").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_ms").name("交叉表模型")
+                .datasources(List.of(src)).datasets(List.of(ms)).relationships(List.of()).build();
+
+        FieldRef amount = new FieldRef("d_ms", "amount");
+        // 行维 region@(1,0)、列维 month@(0,1)、交叉格 SUM@(1,1)
+        CellBinding regionDim = CellBinding.builder().cell(new CellRef("sheet1", 1, 0))
+                .value(new Value.FieldValue(new FieldRef("d_ms", "region")))
+                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).build();
+        CellBinding monthDim = CellBinding.builder().cell(new CellRef("sheet1", 0, 1))
+                .value(new Value.FieldValue(new FieldRef("d_ms", "month")))
+                .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.GROUP).build();
+        CellBinding cross = CellBinding.builder().cell(new CellRef("sheet1", 1, 1))
+                .value(new Value.Aggregate("SUM", new Value.FieldValue(amount))).expansion(Expansion.NONE).build();
+        // 合计（紧邻交叉格几何约定）：行合计@(1,2)、列合计@(2,1)、总计@(2,2)
+        CellBinding rowTotal = CellBinding.builder().cell(new CellRef("sheet1", 1, 2))
+                .value(new Value.Aggregate("SUM", new Value.FieldValue(amount))).expansion(Expansion.NONE).build();
+        CellBinding colTotal = CellBinding.builder().cell(new CellRef("sheet1", 2, 1))
+                .value(new Value.Aggregate("SUM", new Value.FieldValue(amount))).expansion(Expansion.NONE).build();
+        CellBinding grand = CellBinding.builder().cell(new CellRef("sheet1", 2, 2))
+                .value(new Value.Aggregate("SUM", new Value.FieldValue(amount))).expansion(Expansion.NONE).build();
+        // 合计表头：右合计列头@(0,2)、底合计行头@(2,0)
+        CellBinding rowTotalHeader = label(0, 2, "合计");
+        CellBinding colTotalHeader = label(2, 0, "合计");
+
+        Report report = report("r_matrix_total", dm,
+                List.of(regionDim, monthDim, cross, rowTotal, colTotal, grand, rowTotalHeader, colTotalHeader),
+                List.of(), List.of());
+
+        Sheet sheet = run(dm, report, Map.of(), "cross-tab-total");
+
+        // 网格本体
+        assertEquals("1月", text(sheet, 0, 1));
+        assertEquals("2月", text(sheet, 0, 2));
+        assertEquals("华东", text(sheet, 1, 0));
+        assertEquals("华北", text(sheet, 2, 0));
+        assertEquals(100.0, number(sheet, 1, 1), 0.0001);
+        assertEquals(250.0, number(sheet, 2, 2), 0.0001);
+        // 合计表头：右合计列头搬到 (0,3)，底合计行头搬到 (3,0)
+        assertEquals("合计", text(sheet, 0, 3));
+        assertEquals("合计", text(sheet, 3, 0));
+        // 行合计（右缘 col3）：华东=100+200=300，华北=150+250=400
+        assertEquals(300.0, number(sheet, 1, 3), 0.0001);
+        assertEquals(400.0, number(sheet, 2, 3), 0.0001);
+        // 列合计（底缘 row3）：1月=100+150=250，2月=200+250=450
+        assertEquals(250.0, number(sheet, 3, 1), 0.0001);
+        assertEquals(450.0, number(sheet, 3, 2), 0.0001);
+        // 总计（右下角 (3,3)）：100+200+150+250=700
+        assertEquals(700.0, number(sheet, 3, 3), 0.0001);
+
+        // 无残影：合计格/表头必须被矩阵消费，不得再落入单值通道（否则在 col4/row4 产生 0 或重复"合计"）
+        assertNull(findCell(sheet, 0, 4), "不应有残影列头");
+        assertNull(findCell(sheet, 1, 4), "不应有残影行合计");
+        assertNull(findCell(sheet, 4, 0), "不应有残影行头");
+        assertNull(findCell(sheet, 4, 1), "不应有残影列合计");
+        assertNull(findCell(sheet, 4, 4), "不应有残影总计");
+    }
+
     private static Cell textProto(int row, int col, String value) {
         Cell c = new Cell();
         c.setRow(row);
@@ -929,6 +1130,18 @@ class ReportScenarioTest {
     private static CellBinding listCol(CellRef cell, FieldRef field) {
         return CellBinding.builder().cell(cell).value(new Value.FieldValue(field))
                 .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).build();
+    }
+
+    /** 横向明细格（向右逐列铺开） */
+    private static CellBinding hListCol(CellRef cell, FieldRef field) {
+        return CellBinding.builder().cell(cell).value(new Value.FieldValue(field))
+                .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.LIST).build();
+    }
+
+    /** 横向分组格（去重 + 横向合并相邻相同值） */
+    private static CellBinding hGroupMerge(CellRef cell, FieldRef field) {
+        return CellBinding.builder().cell(cell).value(new Value.FieldValue(field))
+                .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.GROUP).mergeRepeated(true).build();
     }
 
     /** 分组列（去重 + 合并），可指定父格构成层级 */
@@ -1001,5 +1214,13 @@ class ReportScenarioTest {
         }
         return sheet.getMerges().stream().anyMatch(m ->
                 m.getStartRow() == startRow && m.getStartCol() == startCol && m.getRowSpan() == rowSpan);
+    }
+
+    private static boolean hasMergeCol(Sheet sheet, int startRow, int startCol, int colSpan) {
+        if (sheet.getMerges() == null) {
+            return false;
+        }
+        return sheet.getMerges().stream().anyMatch(m ->
+                m.getStartRow() == startRow && m.getStartCol() == startCol && m.getColSpan() == colSpan);
     }
 }

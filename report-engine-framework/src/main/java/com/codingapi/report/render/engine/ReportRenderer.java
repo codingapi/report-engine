@@ -79,9 +79,12 @@ import java.util.Set;
  *   <li>简单列表（VERTICAL + LIST）：一行一条记录，纵向铺开</li>
  *   <li>带合并列表（GROUP + mergeRepeated）：分组列相邻相同值合并为跨行单元格</li>
  *   <li>统计列表（GROUP + 聚合列）：分组 + SUM/COUNT 等聚合</li>
+ *   <li>横向带（HORIZONTAL）：一条记录占一列、向右铺开（纵向带的转置，见 {@link Axis}）</li>
+ *   <li>交叉表（VERTICAL×HORIZONTAL 矩阵）：行维 × 列维 → 交叉格聚合，由 {@link #detectMatrices} 按几何识别</li>
  *   <li>循环块（LoopBlock）：模板区域重复呈现，每次迭代独立取数</li>
  * </ul>
- * <p>交叉表（HORIZONTAL 扩展）尚未实现。
+ * <p>横向带与交叉表暂不接收汇总（{@link SummaryRow} 仅纵向语义）；交叉表当前支持多个不重叠矩阵，
+ * 维度列暂不做表头合并（去重展开）。
  *
  * <h3>内部画布模型</h3>
  * <p>{@link Canvas} 是一个轻量中间结构：{@code Map<row:col, Cell>} + merges 列表。
@@ -181,18 +184,49 @@ public class ReportRenderer {
      * 连通分量，各自独立展开——行数可以不同，互不影响。这是"并列独立数据区"报表模式的核心支持。
      */
     private void renderFree(Report report, ParamContext ctx, Canvas canvas) {
-        // 1. 收集非循环区格子
+        // 0. 收集非循环区格子；先识别交叉表（矩阵）并消费其绑定，避免被普通带逻辑重复处理
+        List<CellBinding> nonLoop = new ArrayList<>();
+        for (CellBinding b : report.getCellBindings()) {
+            if (!inAnyLoop(report, b.getCell())) {
+                nonLoop.add(b);
+            }
+        }
+        List<Matrix> matrices = detectMatrices(nonLoop);
+        Set<CellRef> matrixConsumed = new HashSet<>();
+        for (Matrix mx : matrices) {
+            for (CellBinding c : new CellBinding[]{mx.rowDim, mx.colDim, mx.crossCell,
+                    mx.rowTotalCell, mx.colTotalCell, mx.grandTotalCell, mx.rowTotalHeader, mx.colTotalHeader}) {
+                if (c != null) {
+                    matrixConsumed.add(c.getCell());
+                }
+            }
+        }
+
+        // 1. 分类剩余格子
         List<CellBinding> band = new ArrayList<>();
         List<CellBinding> singles = new ArrayList<>();
         List<CellBinding> dataCells = new ArrayList<>();
         // 独立纵向带：显式标记的列，从自己的声明行独立展开，不与同源列对齐
         List<CellBinding> independentCells = new ArrayList<>();
-        for (CellBinding b : report.getCellBindings()) {
-            if (inAnyLoop(report, b.getCell())) {
+        // 横向带：一条记录占一列、向右铺开（与纵向带正交，独立成轴处理）
+        List<CellBinding> horizontalBand = new ArrayList<>();
+        List<CellBinding> horizontalDataCells = new ArrayList<>();
+        for (CellBinding b : nonLoop) {
+            if (matrixConsumed.contains(b.getCell())) {
                 continue;
             }
-            (b.getExpansion() == Expansion.VERTICAL ? band : singles).add(b);
-            if (b.isIndependent() && b.getExpansion() == Expansion.VERTICAL && referencesData(b)) {
+            Expansion exp = b.getExpansion();
+            if (exp == Expansion.HORIZONTAL) {
+                horizontalBand.add(b);
+                if (referencesData(b)) {
+                    horizontalDataCells.add(b);
+                } else {
+                    singles.add(b);
+                }
+                continue;
+            }
+            (exp == Expansion.VERTICAL ? band : singles).add(b);
+            if (b.isIndependent() && exp == Expansion.VERTICAL && referencesData(b)) {
                 independentCells.add(b);
             } else if (referencesData(b)) {
                 dataCells.add(b);
@@ -257,7 +291,7 @@ public class ReportRenderer {
             summaryDesignRows.addAll(seenSdRows);
             footprintBottom = Math.max(footprintBottom, maxDesignRow);
 
-            int n = renderBand(groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas, summaryOutputRows);
+            int n = renderBand(Axis.VERTICAL, groupBand, groupSummaries, filtered, groupBandBase, ctx, canvas, summaryOutputRows);
             // 净插入行数 = 输出行数 - 已占用的设计行数（带声明行 1 行 + 各汇总声明行）。
             // 汇总声明行本身已在设计中占位，不应被重复计入扩展量，否则带下方内容会多移。
             int insertion = Math.max(0, n - (1 + designSummaryRows));
@@ -275,7 +309,55 @@ public class ReportRenderer {
             for (CellBinding b : indepGroup) {
                 indepBase = Math.min(indepBase, b.getCell().row());
             }
-            renderBand(indepGroup, List.of(), filtered, indepBase, ctx, canvas);
+            renderBand(Axis.VERTICAL, indepGroup, List.of(), filtered, indepBase, ctx, canvas);
+        }
+
+        // 3a-H. 横向带：沿列向右铺开。与纵向带正交、独立成轴——产生"列位移"而非行位移。
+        //   汇总（SummaryRow）目前仅纵向语义，横向带不接收汇总（传空列表）。
+        int globalColShift = 0;
+        int globalBandBaseCol = Integer.MAX_VALUE;
+        // 记录每条横向带的基准列和"净插入列数"，用于后续右移模板 merge / 列宽 / 单值格
+        List<int[]> bandColRecords = new ArrayList<>();
+        for (List<CellBinding> hGroup : groupByConnectivity(horizontalDataCells)) {
+            List<CellBinding> groupBand = new ArrayList<>();
+            for (CellBinding b : hGroup) {
+                if (b.getExpansion() == Expansion.HORIZONTAL) {
+                    groupBand.add(b);
+                }
+            }
+            if (groupBand.isEmpty()) continue;
+
+            RawTable combined = buildCombinedTable(hGroup);
+            RawTable filtered = Operators.filter(combined, collectConditions(hGroup), ctx, engine);
+
+            int groupBandBaseCol = Integer.MAX_VALUE;
+            for (CellBinding b : groupBand) {
+                groupBandBaseCol = Math.min(groupBandBaseCol, b.getCell().column());
+            }
+            globalBandBaseCol = Math.min(globalBandBaseCol, groupBandBaseCol);
+
+            int n = renderBand(Axis.HORIZONTAL, groupBand, List.of(), filtered, groupBandBaseCol, ctx, canvas);
+            // 净插入列数 = 输出列数 - 1（横向带声明列占 1 列）
+            int insertion = Math.max(0, n - 1);
+            globalColShift = Math.max(globalColShift, insertion);
+            bandColRecords.add(new int[]{groupBandBaseCol, insertion});
+        }
+
+        // 3a-M. 交叉表（矩阵）：行维纵向 × 列维横向 → 交叉格聚合。同时产生行位移与列位移，
+        //   汇入两轴的 shift 账本（bandRecords / bandColRecords），使矩阵下方/右侧内容正确避让。
+        for (Matrix mx : matrices) {
+            int[] dims = renderMatrix(mx, ctx, canvas);
+            int rowBase = mx.rowDim.getCell().row();
+            int colBase = mx.colDim.getCell().column();
+            int rowInsertion = Math.max(0, dims[0] - 1);
+            int colInsertion = Math.max(0, dims[1] - 1);
+            globalShift = Math.max(globalShift, rowInsertion);
+            globalBandBase = Math.min(globalBandBase, rowBase);
+            bandRecords.add(new int[]{rowBase, rowInsertion});
+            footprintBottom = Math.max(footprintBottom, rowBase);
+            globalColShift = Math.max(globalColShift, colInsertion);
+            globalBandBaseCol = Math.min(globalBandBaseCol, colBase);
+            bandColRecords.add(new int[]{colBase, colInsertion});
         }
 
         // 3b. 下移模板 merge：纵向带扩展后，带下方和汇总行的模板合并区域需要跟随下移
@@ -375,15 +457,59 @@ public class ReportRenderer {
             }
         }
 
+        // —— 横向带的列位移：与 3b/3d/3e 镜像，但作用在列轴 ——
+        // 3f. 右移模板 merge：横向带右侧的模板合并区域随列扩展右移（只动 startCol，与 3b 改 startRow 互不冲突）
+        for (int mi = 0; mi < templateMergeCount; mi++) {
+            Merge m = canvas.merges.get(mi);
+            if (m.getStartCol() >= globalBandBaseCol + 1) {
+                int colShiftM = 0;
+                for (int[] rec : bandColRecords) {
+                    if (m.getStartCol() >= rec[0] + 1) {
+                        colShiftM += rec[1];
+                    }
+                }
+                if (colShiftM > 0) {
+                    m.setStartCol(m.getStartCol() + colShiftM);
+                }
+            }
+        }
+
+        // 3g. 右移列宽：横向带右侧的自定义列宽随列扩展右移（与 3d 行高镜像；行/列轴正交，无冲突）
+        if (globalBandBaseCol != Integer.MAX_VALUE && !canvas.columns.isEmpty()) {
+            for (Column cw : canvas.columns) {
+                int c = cw.getIndex();
+                if (c >= globalBandBaseCol + 1) {
+                    int sh = 0;
+                    for (int[] rec : bandColRecords) {
+                        if (c >= rec[0] + 1) {
+                            sh += rec[1];
+                        }
+                    }
+                    cw.setIndex(c + sh);
+                }
+            }
+        }
+
+        // 3h. 清理横向带声明格的残留占位文本（与 3e 镜像）
+        for (CellBinding b : horizontalBand) {
+            String k = key(b.getCell().row(), b.getCell().column());
+            if (!canvas.dynamic.contains(k)) {
+                canvas.cells.remove(k);
+            }
+        }
+
         final int shift = globalShift;
         final int base = globalBandBase;
+        final int colShift = globalColShift;
+        final int baseCol = globalBandBaseCol;
         final RawTable evalTable = firstGroupFiltered;
 
-        // 4. 单值/文本格子：表达式求值，带下方的行下移 shift
+        // 4. 单值/文本格子：表达式求值，带下方的行下移 shift、带右侧的列右移 colShift
         for (CellBinding b : singles) {
             Object v = evalSingle(b, evalTable, ctx);
             int row = b.getCell().row() > base ? b.getCell().row() + shift : b.getCell().row();
-            place(canvas, b.getCell(), row, b.getCell().column(), v);
+            int col = b.getCell().column() > baseCol ? b.getCell().column() + colShift : b.getCell().column();
+            place(canvas, b.getCell(), row, col, v);
         }
     }
 
@@ -547,17 +673,19 @@ public class ReportRenderer {
      * <p>聚合列（agg）按 parentCell 决定汇总层级：parent 指向粗粒度分组列 → 跨该组明细行合并
      * （如"总人数"按单位汇总、跨部门行合并）；不指定则按最细粒度逐行算。
      */
-    private int renderBand(List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
+    private int renderBand(Axis axis, List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
                            int bandBase, ParamContext ctx, Canvas canvas) {
-        return renderBand(band, summaries, filtered, bandBase, ctx, canvas, null);
+        return renderBand(axis, band, summaries, filtered, bandBase, ctx, canvas, null);
     }
 
     /**
      * 同上，额外收集汇总行的位置到 {@code summaryOutputRows}（非 null 时启用）。
      * <p>key = 汇总行的模板行号（{@code SummaryRow.row}），value = 该汇总行的输出行号。
      * 用于 renderFree 的模板 merge 下移：汇总行处的 merge 应跟随汇总行移动。
+     * <p>{@code axis} 决定带的推进方向：纵向沿行向下、横向沿列向右（见 {@link Axis}）。
+     * 汇总（{@link SummaryRow}）目前仅纵向语义，调用方传 {@link Axis#HORIZONTAL} 时应传空汇总列表。
      */
-    private int renderBand(List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
+    private int renderBand(Axis axis, List<CellBinding> band, List<SummaryRow> summaries, RawTable filtered,
                            int bandBase, ParamContext ctx, Canvas canvas,
                            Map<Integer, Integer> summaryOutputRows) {
         List<CellBinding> groupCols = new ArrayList<>();
@@ -606,7 +734,7 @@ public class ReportRenderer {
         List<Out> seq = new ArrayList<>();
         int[] groupStart = new int[Math.max(1, groupCols.size())];
         for (int i = 0; i < details.size(); i++) {
-            seq.add(detailOut(details.get(i), groupCols, listCols, aggCols, rows, groupByCell, ctx));
+            seq.add(detailOut(axis, details.get(i), groupCols, listCols, aggCols, rows, groupByCell, ctx));
             boolean last = i == details.size() - 1;
             int breakLevel = last ? 0 : firstDiffLevel(details.get(i).tuple, details.get(i + 1).tuple, groupCols.size());
             if (last || breakLevel >= 0) {
@@ -639,56 +767,57 @@ public class ReportRenderer {
             }
         }
 
-        // 落格（游标 = bandBase + 序号）+ 反查捕获
+        // 落格（主轴游标 = bandBase + 序号；交叉坐标 = Out 的 key）+ 反查捕获
         for (int k = 0; k < seq.size(); k++) {
             Out o = seq.get(k);
-            int outRow = bandBase + k;
             for (Map.Entry<Integer, Object> e : o.values.entrySet()) {
-                int col = e.getKey();
-                place(canvas, o.sources.get(col), outRow, col, e.getValue());
-                // 反查：若该列有捕获信息，记录到 collector
-                DrillCapture dc = o.drills.get(col);
+                int cross = e.getKey();
+                int outRow = axis.outRow(bandBase, k, cross);
+                int outCol = axis.outCol(bandBase, k, cross);
+                place(canvas, o.sources.get(cross), outRow, outCol, e.getValue());
+                // 反查：若该格有捕获信息，记录到 collector
+                DrillCapture dc = o.drills.get(cross);
                 if (dc != null && drillCollector != null) {
-                    drillCollector.record(outRow, col, dc.drillView, dc.rows);
+                    drillCollector.record(outRow, outCol, dc.drillView, dc.rows);
                 }
             }
         }
 
-        // 分组列合并：相同前缀(0..d)的连续明细行
+        // 分组列合并：相同前缀(0..d)的连续明细行（纵向跨行 / 横向跨列）
         for (int d = 0; d < groupCols.size(); d++) {
             CellBinding gc = groupCols.get(d);
             if (gc.isMergeRepeated()) {
-                mergeColumn(canvas, seq, bandBase, gc.getCell().column(), d + 1);
+                mergeRepeated(axis, canvas, seq, bandBase, axis.cross(gc.getCell()), d + 1);
             }
         }
         // 粗粒度聚合列合并（如总人数按单位跨行合并）
         for (CellBinding ac : aggCols) {
             int p = aggPrefixLen(ac, groupCols, groupByCell);
             if (ac.isMergeRepeated() && p < groupCols.size()) {
-                mergeColumn(canvas, seq, bandBase, ac.getCell().column(), p);
+                mergeRepeated(axis, canvas, seq, bandBase, axis.cross(ac.getCell()), p);
             }
         }
         return seq.size();
     }
 
-    private Out detailOut(Unit unit, List<CellBinding> groupCols, List<CellBinding> listCols,
+    private Out detailOut(Axis axis, Unit unit, List<CellBinding> groupCols, List<CellBinding> listCols,
                           List<CellBinding> aggCols, List<Map<String, Object>> rows,
                           Map<CellRef, CellBinding> groupByCell, ParamContext ctx) {
         Out o = new Out(true, unit.tuple);
         for (int d = 0; d < groupCols.size(); d++) {
             CellBinding gc = groupCols.get(d);
-            o.values.put(gc.getCell().column(), unit.tuple.get(d));
-            o.sources.put(gc.getCell().column(), gc.getCell());
+            o.values.put(axis.cross(gc.getCell()), unit.tuple.get(d));
+            o.sources.put(axis.cross(gc.getCell()), gc.getCell());
         }
         for (CellBinding lc : listCols) {
-            o.values.put(lc.getCell().column(), engine.eval(lc.getValue(), EvalContext.scalar(unit.rows.get(0), ctx)));
-            o.sources.put(lc.getCell().column(), lc.getCell());
+            o.values.put(axis.cross(lc.getCell()), engine.eval(lc.getValue(), EvalContext.scalar(unit.rows.get(0), ctx)));
+            o.sources.put(axis.cross(lc.getCell()), lc.getCell());
         }
         for (CellBinding ac : aggCols) {
             int p = aggPrefixLen(ac, groupCols, groupByCell);
             List<Map<String, Object>> groupRows = rowsWithPrefix(rows, groupCols, unit.tuple, p);
-            o.values.put(ac.getCell().column(), engine.eval(ac.getValue(), EvalContext.aggregate(groupRows, ctx)));
-            o.sources.put(ac.getCell().column(), ac.getCell());
+            o.values.put(axis.cross(ac.getCell()), engine.eval(ac.getValue(), EvalContext.aggregate(groupRows, ctx)));
+            o.sources.put(axis.cross(ac.getCell()), ac.getCell());
             // 反查：仅当 drillEnabled 时记录贡献行（带内聚合列）
             if (ac.isDrillEnabled() && ac.getValue() instanceof Value.Aggregate agg) {
                 String drillView = ac.getDrillView();
@@ -696,7 +825,7 @@ public class ReportRenderer {
                     drillView = fv.ref().datasetId();
                 }
                 if (drillView != null && drillCollector != null) {
-                    o.drills.put(ac.getCell().column(), new DrillCapture(drillView, groupRows));
+                    o.drills.put(axis.cross(ac.getCell()), new DrillCapture(drillView, groupRows));
                 }
             }
         }
@@ -737,6 +866,225 @@ public class ReportRenderer {
             }
         }
         return o;
+    }
+
+    // ============================================================
+    // 交叉表（矩阵）：行维(VERTICAL) × 列维(HORIZONTAL) → 交叉格聚合
+    // ============================================================
+
+    /**
+     * 检测交叉表（矩阵）：纵向分组列(行维) × 横向分组列(列维)，交点处放一个聚合格(交叉格)。
+     *
+     * <h3>几何识别（不引入新字段，零契约变更）</h3>
+     * <p>识别签名：存在一个聚合 CellBinding，其坐标恰好落在「某行维声明行 × 某列维声明列」的交点，
+     * 即 {@code cross.row == rowDim.row && cross.column == colDim.column}。这种正交交点几何
+     * 在普通报表里不会偶然出现，作为强信号判定为矩阵。
+     * <ul>
+     *   <li>行维（rowDim）：{@code VERTICAL + GROUP} 且绑定字段，沿行向下铺开成行表头（动态行数）</li>
+     *   <li>列维（colDim）：{@code HORIZONTAL + GROUP} 且绑定字段，沿列向右铺开成列表头（动态列数）</li>
+     *   <li>交叉格（crossCell）：聚合格，按 (rowVal × colVal) 过滤后求聚合，填满网格</li>
+     * </ul>
+     * <p>每个绑定最多归属一个矩阵（{@code used} 去重）。当前支持报表内存在多个不重叠矩阵。
+     */
+    private List<Matrix> detectMatrices(List<CellBinding> cells) {
+        List<CellBinding> rowDims = new ArrayList<>();
+        List<CellBinding> colDims = new ArrayList<>();
+        for (CellBinding b : cells) {
+            if (fieldOf(b) == null || b.getExpandMode() != ExpandMode.GROUP) {
+                continue;
+            }
+            if (b.getExpansion() == Expansion.VERTICAL) {
+                rowDims.add(b);
+            } else if (b.getExpansion() == Expansion.HORIZONTAL) {
+                colDims.add(b);
+            }
+        }
+        if (rowDims.isEmpty() || colDims.isEmpty()) {
+            return List.of();
+        }
+        List<Matrix> out = new ArrayList<>();
+        Set<CellRef> used = new HashSet<>();
+        for (CellBinding rd : rowDims) {
+            if (used.contains(rd.getCell())) continue;
+            for (CellBinding cd : colDims) {
+                if (used.contains(cd.getCell())) continue;
+                for (CellBinding b : cells) {
+                    if (isAgg(b)
+                            && b.getCell().row() == rd.getCell().row()
+                            && b.getCell().column() == cd.getCell().column()
+                            && !used.contains(b.getCell())) {
+                        Matrix mx = new Matrix(rd, cd, b);
+                        used.add(rd.getCell());
+                        used.add(cd.getCell());
+                        used.add(b.getCell());
+                        attachTotals(mx, cells, used);
+                        out.add(mx);
+                        break;
+                    }
+                }
+                if (used.contains(rd.getCell())) break;
+            }
+        }
+        return out;
+    }
+
+    /** 按"紧邻交叉格"的几何约定，识别并消费矩阵的可选合计格/合计表头（见 {@link Matrix}） */
+    private void attachTotals(Matrix mx, List<CellBinding> cells, Set<CellRef> used) {
+        int cr = mx.crossCell.getCell().row();
+        int cc = mx.crossCell.getCell().column();
+        int rdc = mx.rowDim.getCell().column();
+        int cdr = mx.colDim.getCell().row();
+        mx.rowTotalCell = consumeAggAt(cells, used, cr, cc + 1);
+        mx.colTotalCell = consumeAggAt(cells, used, cr + 1, cc);
+        mx.grandTotalCell = consumeAggAt(cells, used, cr + 1, cc + 1);
+        mx.rowTotalHeader = consumeAnyAt(cells, used, cdr, cc + 1);
+        mx.colTotalHeader = consumeAnyAt(cells, used, cr + 1, rdc);
+    }
+
+    /** 取并消费 (row,col) 处的聚合格；无则返回 null */
+    private CellBinding consumeAggAt(List<CellBinding> cells, Set<CellRef> used, int row, int col) {
+        for (CellBinding b : cells) {
+            if (isAgg(b) && b.getCell().row() == row && b.getCell().column() == col && !used.contains(b.getCell())) {
+                used.add(b.getCell());
+                return b;
+            }
+        }
+        return null;
+    }
+
+    /** 取并消费 (row,col) 处的任意格（用于合计表头标签）；无则返回 null */
+    private CellBinding consumeAnyAt(List<CellBinding> cells, Set<CellRef> used, int row, int col) {
+        for (CellBinding b : cells) {
+            if (b.getCell().row() == row && b.getCell().column() == col && !used.contains(b.getCell())) {
+                used.add(b.getCell());
+                return b;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 渲染一个交叉表：行表头(纵向) + 列表头(横向) + 交叉格(每个 行值×列值 的聚合) + 可选行/列/总合计。
+     *
+     * @return {@code {占据行数, 占据列数}}（含合计行/列），供 renderFree 计算行/列位移
+     */
+    private int[] renderMatrix(Matrix mx, ParamContext ctx, Canvas canvas) {
+        List<CellBinding> dataCells = List.of(mx.rowDim, mx.colDim, mx.crossCell);
+        RawTable combined = buildCombinedTable(dataCells);
+        RawTable filtered = Operators.filter(combined, collectConditions(dataCells), ctx, engine);
+        List<Map<String, Object>> all = filtered.getRows();
+
+        String rowKey = fieldOf(mx.rowDim).qualified();
+        String colKey = fieldOf(mx.colDim).qualified();
+        List<Object> rowVals = distinctSorted(all, rowKey);
+        List<Object> colVals = distinctSorted(all, colKey);
+
+        int rowBase = mx.rowDim.getCell().row();
+        int rowCol = mx.rowDim.getCell().column();
+        int colBase = mx.colDim.getCell().column();
+        int colRow = mx.colDim.getCell().row();
+        // 合计行/列的输出位置（紧邻网格的右缘列、底缘行）
+        int totalCol = colBase + colVals.size();
+        int totalRow = rowBase + rowVals.size();
+        boolean hasRightCol = mx.rowTotalCell != null || mx.grandTotalCell != null || mx.rowTotalHeader != null;
+        boolean hasBottomRow = mx.colTotalCell != null || mx.grandTotalCell != null || mx.colTotalHeader != null;
+
+        // 行表头：沿 rowDim 列向下
+        for (int i = 0; i < rowVals.size(); i++) {
+            place(canvas, mx.rowDim.getCell(), rowBase + i, rowCol, rowVals.get(i));
+        }
+        // 列表头：沿 colDim 行向右
+        for (int j = 0; j < colVals.size(); j++) {
+            place(canvas, mx.colDim.getCell(), colRow, colBase + j, colVals.get(j));
+        }
+        // 交叉格：每个 (rowVal × colVal) 过滤后求聚合
+        for (int i = 0; i < rowVals.size(); i++) {
+            for (int j = 0; j < colVals.size(); j++) {
+                List<Map<String, Object>> cellRows = matchRows(all, rowKey, rowVals.get(i), colKey, colVals.get(j));
+                placeMatrixAgg(canvas, ctx, mx.crossCell, rowBase + i, colBase + j, cellRows);
+            }
+        }
+        // 每行合计（右缘列）：按行值跨全部列聚合
+        if (mx.rowTotalCell != null) {
+            for (int i = 0; i < rowVals.size(); i++) {
+                List<Map<String, Object>> rows = matchRows(all, rowKey, rowVals.get(i), null, null);
+                placeMatrixAgg(canvas, ctx, mx.rowTotalCell, rowBase + i, totalCol, rows);
+            }
+        }
+        // 每列合计（底缘行）：按列值跨全部行聚合
+        if (mx.colTotalCell != null) {
+            for (int j = 0; j < colVals.size(); j++) {
+                List<Map<String, Object>> rows = matchRows(all, colKey, colVals.get(j), null, null);
+                placeMatrixAgg(canvas, ctx, mx.colTotalCell, totalRow, colBase + j, rows);
+            }
+        }
+        // 总计（右下角）：全部行
+        if (mx.grandTotalCell != null) {
+            placeMatrixAgg(canvas, ctx, mx.grandTotalCell, totalRow, totalCol, all);
+        }
+        // 合计表头标签
+        if (mx.rowTotalHeader != null) {
+            place(canvas, mx.rowTotalHeader.getCell(), colRow, totalCol,
+                    engine.eval(mx.rowTotalHeader.getValue(), EvalContext.scalar(null, ctx)));
+        }
+        if (mx.colTotalHeader != null) {
+            place(canvas, mx.colTotalHeader.getCell(), totalRow, rowCol,
+                    engine.eval(mx.colTotalHeader.getValue(), EvalContext.scalar(null, ctx)));
+        }
+        return new int[]{rowVals.size() + (hasBottomRow ? 1 : 0), colVals.size() + (hasRightCol ? 1 : 0)};
+    }
+
+    /** 取 all 中匹配 key1==v1（key2 非 null 时再匹配 key2==v2）的行 */
+    private List<Map<String, Object>> matchRows(List<Map<String, Object>> all, String key1, Object v1,
+                                                String key2, Object v2) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : all) {
+            if (Objects.equals(r.get(key1), v1) && (key2 == null || Objects.equals(r.get(key2), v2))) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /** 对一组行求聚合并落格（交叉格/合计格共用），含反查捕获 */
+    private void placeMatrixAgg(Canvas canvas, ParamContext ctx, CellBinding cell, int outRow, int outCol,
+                                List<Map<String, Object>> rows) {
+        Object v = engine.eval(cell.getValue(), EvalContext.aggregate(rows, ctx));
+        place(canvas, cell.getCell(), outRow, outCol, v);
+        if (cell.isDrillEnabled() && cell.getValue() instanceof Value.Aggregate agg && drillCollector != null) {
+            String drillView = cell.getDrillView();
+            if (drillView == null && agg.operand() instanceof Value.FieldValue fv) {
+                drillView = fv.ref().datasetId();
+            }
+            if (drillView != null) {
+                drillCollector.record(outRow, outCol, drillView, rows);
+            }
+        }
+    }
+
+    /** 取某列的去重值并按自然顺序排序（数值按数值序，其余按字符串序），用于矩阵的行/列维 */
+    private List<Object> distinctSorted(List<Map<String, Object>> rows, String key) {
+        LinkedHashSet<Object> set = new LinkedHashSet<>();
+        for (Map<String, Object> r : rows) {
+            set.add(r.get(key));
+        }
+        List<Object> list = new ArrayList<>(set);
+        list.sort(this::compareCell);
+        return list;
+    }
+
+    /** 维度值比较：null 最小，数值按数值序，同类型 Comparable 按自然序，否则按字符串序 */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private int compareCell(Object a, Object b) {
+        if (a == null) return b == null ? 0 : -1;
+        if (b == null) return 1;
+        if (a instanceof Number na && b instanceof Number nb) {
+            return Double.compare(na.doubleValue(), nb.doubleValue());
+        }
+        if (a instanceof Comparable && a.getClass() == b.getClass()) {
+            return ((Comparable) a).compareTo(b);
+        }
+        return String.valueOf(a).compareTo(String.valueOf(b));
     }
 
     // ============================================================
@@ -1362,11 +1710,14 @@ public class ReportRenderer {
     }
 
     /**
-     * 合并列：把输出序列中"前 prefixLen 个分组分量相同"的连续明细行合并为跨行单元格。
+     * 合并重复值：把输出序列中"前 prefixLen 个分组分量相同"的连续明细单元合并为跨格单元格。
      * <p>用于 GROUP 列的 mergeRepeated 效果（如"总部"跨 3 行合并）和粗粒度聚合列。
      * 小计/总计行（detail=false）不参与合并。
+     * <p>合并方向随 {@code axis}：纵向带沿行跨 span 格（同列），横向带沿列跨 span 格（同行）。
+     *
+     * @param cross 交叉坐标（纵向 = 列号，横向 = 行号），合并区在该坐标上固定
      */
-    private void mergeColumn(Canvas canvas, List<Out> seq, int bandBase, int column, int prefixLen) {
+    private void mergeRepeated(Axis axis, Canvas canvas, List<Out> seq, int bandBase, int cross, int prefixLen) {
         int i = 0;
         while (i < seq.size()) {
             if (!seq.get(i).detail) {
@@ -1379,12 +1730,7 @@ public class ReportRenderer {
                 j++;
             }
             if (j - i > 1) {
-                Merge m = new Merge();
-                m.setStartRow(bandBase + i);
-                m.setStartCol(column);
-                m.setRowSpan(j - i);
-                m.setColSpan(1);
-                canvas.merges.add(m);
+                canvas.merges.add(axis.merge(bandBase, i, cross, j - i));
             }
             i = j;
         }
@@ -1459,6 +1805,89 @@ public class ReportRenderer {
             return NF.booleanNode(b);
         }
         return NF.textNode(String.valueOf(v));
+    }
+
+    /**
+     * 展开轴：把"主轴推进 + 交叉轴固定"的坐标映射统一，使 {@link #renderBand} 同时支持纵向/横向带。
+     * <ul>
+     *   <li>{@link #VERTICAL}：交叉坐标固定在<b>列</b>，主轴沿<b>行</b>向下推进（一条记录一行）。</li>
+     *   <li>{@link #HORIZONTAL}：交叉坐标固定在<b>行</b>，主轴沿<b>列</b>向右推进（一条记录一列）。</li>
+     * </ul>
+     * 带内的序列构建（分组/明细/聚合/小计排序）与轴无关，只有"落格坐标"和"合并方向"随轴变化。
+     */
+    private enum Axis {
+        VERTICAL, HORIZONTAL;
+
+        /** 交叉坐标：纵向带取声明格的列，横向带取声明格的行 */
+        int cross(CellRef c) {
+            return this == VERTICAL ? c.column() : c.row();
+        }
+
+        /** 主轴基准：纵向带取声明格的行（带起始行），横向带取声明格的列（带起始列） */
+        int base(CellRef c) {
+            return this == VERTICAL ? c.row() : c.column();
+        }
+
+        /** 落格行号：纵向 = 主轴基准+偏移，横向 = 交叉坐标 */
+        int outRow(int primaryBase, int offset, int cross) {
+            return this == VERTICAL ? primaryBase + offset : cross;
+        }
+
+        /** 落格列号：纵向 = 交叉坐标，横向 = 主轴基准+偏移 */
+        int outCol(int primaryBase, int offset, int cross) {
+            return this == VERTICAL ? cross : primaryBase + offset;
+        }
+
+        /** 构造合并区：纵向沿行跨 span 格（同列），横向沿列跨 span 格（同行） */
+        Merge merge(int primaryBase, int offset, int cross, int span) {
+            Merge m = new Merge();
+            if (this == VERTICAL) {
+                m.setStartRow(primaryBase + offset);
+                m.setStartCol(cross);
+                m.setRowSpan(span);
+                m.setColSpan(1);
+            } else {
+                m.setStartRow(cross);
+                m.setStartCol(primaryBase + offset);
+                m.setRowSpan(1);
+                m.setColSpan(span);
+            }
+            return m;
+        }
+    }
+
+    /**
+     * 交叉表（矩阵）：行维 × 列维 → 交叉格，可选行/列/总合计。由 {@link #detectMatrices} 按几何识别构造。
+     *
+     * <h3>合计的几何约定（紧邻交叉格）</h3>
+     * <p>设交叉格在 (cr, cc)、行维列为 rdc、列维行为 cdr，则可选合计格按相对位置识别并被消费：
+     * <ul>
+     *   <li>{@code rowTotalCell}（每行合计，聚合）：(cr, cc+1) → 输出搬到矩阵右缘列，随行向下展开</li>
+     *   <li>{@code colTotalCell}（每列合计，聚合）：(cr+1, cc) → 输出搬到矩阵底缘行，随列向右展开</li>
+     *   <li>{@code grandTotalCell}（总计，聚合）：(cr+1, cc+1) → 输出搬到右下角</li>
+     *   <li>{@code rowTotalHeader}（标签）：(cdr, cc+1) → 右合计列的列表头</li>
+     *   <li>{@code colTotalHeader}（标签）：(cr+1, rdc) → 底合计行的行表头</li>
+     * </ul>
+     */
+    private static final class Matrix {
+        /** 行维：VERTICAL + GROUP，沿行向下铺开成行表头 */
+        final CellBinding rowDim;
+        /** 列维：HORIZONTAL + GROUP，沿列向右铺开成列表头 */
+        final CellBinding colDim;
+        /** 交叉格：聚合格，落在 (rowDim.row, colDim.column) 交点，按 行值×列值 求聚合填满网格 */
+        final CellBinding crossCell;
+        // —— 可选合计（紧邻交叉格的几何约定，缺省 null）——
+        CellBinding rowTotalCell;     // 每行合计（右缘列，跨列聚合）
+        CellBinding colTotalCell;     // 每列合计（底缘行，跨行聚合）
+        CellBinding grandTotalCell;   // 总计（右下角）
+        CellBinding rowTotalHeader;   // 右合计列的列表头（标签）
+        CellBinding colTotalHeader;   // 底合计行的行表头（标签）
+
+        Matrix(CellBinding rowDim, CellBinding colDim, CellBinding crossCell) {
+            this.rowDim = rowDim;
+            this.colDim = colDim;
+            this.crossCell = crossCell;
+        }
     }
 
     /**
