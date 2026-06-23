@@ -6,7 +6,7 @@ import java.util.List;
  * 条件算子注册表：内置全部 {@link ConditionPredicate} 实现，按 {@link CompareOperator} 选中并求值。
  *
  * <h3>扩展方式</h3>
- * <p>新增一个比较算子（如 LIKE/IN/BETWEEN）：实现 {@link ConditionPredicate}，
+ * <p>新增一个比较算子（如 REGEX/BETWEEN）：实现 {@link ConditionPredicate}，
  * 在 {@link #REGISTRY} 列表里登记一行即可，无需改动 {@code Operators} 或任何调用方。
  *
  * <h3>与旧实现的区别</h3>
@@ -22,7 +22,13 @@ public final class ConditionPredicates {
             new GtPredicate(),
             new GePredicate(),
             new LtPredicate(),
-            new LePredicate()
+            new LePredicate(),
+            new ContainsPredicate(),
+            new NotContainsPredicate(),
+            new InPredicate(),
+            new NotInPredicate(),
+            new IsNullPredicate(),
+            new IsNotNullPredicate()
     );
 
     private ConditionPredicates() {
