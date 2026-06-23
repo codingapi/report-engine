@@ -12,6 +12,7 @@ import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
 
+import com.codingapi.report.render.grid.Axis;
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.Templates;
@@ -89,7 +90,7 @@ class ReportScenarioTest {
         CellBinding nameCol = listCol(new CellRef("sheet1", 2, 0), new FieldRef("d_prod", "name"));
         CellBinding priceCol = listCol(new CellRef("sheet1", 2, 1), new FieldRef("d_prod", "price"));
         // 总计行：合计 + 总价（groupBy=null）
-        SummaryRow total = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
+        SummaryRow total = SummaryRow.builder().groupBy(null).crossFrom(0).crossTo(1).cells(List.of(
                 SummaryCell.label(0, "合计"),
                 SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
         Report report = report("r_prod", dm, List.of(title, h1, h2, nameCol, priceCol),
@@ -395,12 +396,12 @@ class ReportScenarioTest {
 
         // 单位小计：每个单位结束后，部门列放"${单位}小计"标签，薪资列放 SUM
         SummaryRow unitSubtotal = SummaryRow.builder().groupBy(new FieldRef("d_sd", "unit"))
-                .fromColumn(0).toColumn(3).cells(List.of(
+                .crossFrom(0).crossTo(3).cells(List.of(
                 SummaryCell.label(1, "${group}小计"),
                 SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
         // 总计：全表末尾
         SummaryRow grandTotal = SummaryRow.builder().groupBy(null)
-                .fromColumn(0).toColumn(3).cells(List.of(
+                .crossFrom(0).crossTo(3).cells(List.of(
                 SummaryCell.label(0, "总计"),
                 SummaryCell.agg(3, new FieldRef("d_sd", "salary"), "SUM"))).build();
 
@@ -614,10 +615,10 @@ class ReportScenarioTest {
         CellBinding prodPrice = listCol(new CellRef("sheet1", 1, 3), new FieldRef("d_prod", "price"));
 
         // 各带各自一行总计：staff 落 col 0-1，products 落 col 2-3
-        SummaryRow staffTotal = SummaryRow.builder().groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
+        SummaryRow staffTotal = SummaryRow.builder().groupBy(null).crossFrom(0).crossTo(1).cells(List.of(
                 SummaryCell.label(0, "员工合计"),
                 SummaryCell.agg(1, new FieldRef("d_staff", "name"), "COUNT"))).build();
-        SummaryRow prodTotal = SummaryRow.builder().groupBy(null).fromColumn(2).toColumn(3).cells(List.of(
+        SummaryRow prodTotal = SummaryRow.builder().groupBy(null).crossFrom(2).crossTo(3).cells(List.of(
                 SummaryCell.label(2, "商品合计"),
                 SummaryCell.agg(3, new FieldRef("d_prod", "price"), "SUM"))).build();
 
@@ -735,8 +736,8 @@ class ReportScenarioTest {
         CellBinding priceCol = listCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "price"));
         // summary at template row 1: label("合计") + SUM(price)
         SummaryRow total = SummaryRow.builder()
-                .row(1)
-                .groupBy(null).fromColumn(0).toColumn(1)
+                .mainPos(1)
+                .groupBy(null).crossFrom(0).crossTo(1)
                 .cells(List.of(
                         SummaryCell.label(0, "合计"),
                         SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM")))
@@ -794,7 +795,7 @@ class ReportScenarioTest {
         CellBinding nameCol = listCol(new CellRef("sheet1", 0, 0), new FieldRef("d_prod", "name"));
         CellBinding priceCol = listCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "price"));
         // 汇总在设计 row 1：合计 + SUM(price)
-        SummaryRow total = SummaryRow.builder().row(1).groupBy(null).fromColumn(0).toColumn(1).cells(List.of(
+        SummaryRow total = SummaryRow.builder().mainPos(1).groupBy(null).crossFrom(0).crossTo(1).cells(List.of(
                 SummaryCell.label(0, "合计"),
                 SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
         Report report = report("r_footer", dm, List.of(nameCol, priceCol),
@@ -947,6 +948,43 @@ class ReportScenarioTest {
         // 右侧单值随列扩展右移到 col 7
         assertEquals("备注", text(sheet, 0, 7));
         assertNull(findCell(sheet, 0, 5), "备注原位 col5 应已右移，不残留");
+    }
+
+    @Test
+    @DisplayName("横向汇总：价格横向铺开后，右侧追加合计列（axis=HORIZONTAL，纵向汇总的转置）")
+    void horizontalSummary() throws Exception {
+        DataSource src = csv("ds_prod", "/data/products.csv");
+        Dataset prod = TableDataset.builder().id("d_prod").datasourceId("ds_prod").sourceTable("products.csv")
+                .fields(List.of(
+                        Field.builder().name("name").dataType(DataType.STRING).build(),
+                        Field.builder().name("price").dataType(DataType.NUMBER).build()))
+                .build();
+        DataModel dm = DataModel.builder().id("dm_prod").name("商品模型")
+                .datasources(List.of(src)).datasets(List.of(prod)).relationships(List.of()).build();
+
+        // 行表头（单值）：col 0
+        CellBinding rh0 = label(0, 0, "商品名");
+        CellBinding rh1 = label(1, 0, "价格");
+        // 横向带从 col 1 起：name@row0、price@row1，向右逐列铺开
+        CellBinding nameRow = hListCol(new CellRef("sheet1", 0, 1), new FieldRef("d_prod", "name"));
+        CellBinding priceRow = hListCol(new CellRef("sheet1", 1, 1), new FieldRef("d_prod", "price"));
+        // 横向汇总：在带右侧追加一列合计。交叉区间=行 [0,1]；标签@row0、SUM(price)@row1
+        SummaryRow total = SummaryRow.builder().axis(Axis.HORIZONTAL).groupBy(null)
+                .crossFrom(0).crossTo(1).cells(List.of(
+                        SummaryCell.label(0, "合计"),
+                        SummaryCell.agg(1, new FieldRef("d_prod", "price"), "SUM"))).build();
+
+        Report report = report("r_hsum", dm, List.of(rh0, rh1, nameRow, priceRow), List.of(), List.of(), List.of(total));
+
+        Sheet sheet = run(dm, report, Map.of(), "horizontal-summary");
+
+        // 3 个商品横向铺到 col 1/2/3
+        assertEquals("苹果", text(sheet, 0, 1));
+        assertEquals(5.0, number(sheet, 1, 1), 0.0001);
+        assertEquals(4.0, number(sheet, 1, 3), 0.0001);
+        // 合计列追加到带右侧 col 4：row0 标签、row1 = 5+3+4 = 12
+        assertEquals("合计", text(sheet, 0, 4));
+        assertEquals(12.0, number(sheet, 1, 4), 0.0001);
     }
 
     @Test

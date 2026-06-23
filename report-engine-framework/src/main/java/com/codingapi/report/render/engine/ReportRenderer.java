@@ -8,6 +8,7 @@ import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.render.Report;
+import com.codingapi.report.render.grid.Axis;
 import com.codingapi.report.render.grid.CellBinding;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.operator.condition.Condition;
@@ -83,7 +84,8 @@ import java.util.Set;
  *   <li>交叉表（VERTICAL×HORIZONTAL 矩阵）：行维 × 列维 → 交叉格聚合，由 {@link #detectMatrices} 按几何识别</li>
  *   <li>循环块（LoopBlock）：模板区域重复呈现，每次迭代独立取数</li>
  * </ul>
- * <p>横向带与交叉表暂不接收汇总（{@link SummaryRow} 仅纵向语义）；交叉表当前支持多个不重叠矩阵，
+ * <p>纵向带与横向带均可接收汇总（{@link SummaryRow} 按 {@link Axis} 转置：纵向在下方追加合计行、
+ * 横向在右侧追加合计列）。交叉表当前支持多个不重叠矩阵，其行/列/总合计仍由"紧邻交叉格"几何约定补出，
  * 维度列暂不做表头合并（去重展开）。
  *
  * <h3>内部画布模型</h3>
@@ -276,16 +278,16 @@ public class ReportRenderer {
             }
             globalBandBase = Math.min(globalBandBase, groupBandBase);
 
-            // 渲染带：只把"列落在本带"的汇总行交给本带，避免并列报表互相串扰
-            List<SummaryRow> groupSummaries = summariesForBand(report.getSummaries(), groupBand);
+            // 渲染带：只把"列落在本带"的纵向汇总交给本带，避免并列报表互相串扰
+            List<SummaryRow> groupSummaries = summariesForBand(Axis.VERTICAL, report.getSummaries(), groupBand);
             // 统计本带占用的"汇总声明行"：每个声明行只算一行设计行，不计入插入量
             int maxDesignRow = groupBandBase;
             int designSummaryRows = 0;
             Set<Integer> seenSdRows = new HashSet<>();
             for (SummaryRow s : groupSummaries) {
-                if (s.getRow() != null && seenSdRows.add(s.getRow())) {
+                if (s.getMainPos() != null && seenSdRows.add(s.getMainPos())) {
                     designSummaryRows++;
-                    maxDesignRow = Math.max(maxDesignRow, s.getRow());
+                    maxDesignRow = Math.max(maxDesignRow, s.getMainPos());
                 }
             }
             summaryDesignRows.addAll(seenSdRows);
@@ -313,11 +315,13 @@ public class ReportRenderer {
         }
 
         // 3a-H. 横向带：沿列向右铺开。与纵向带正交、独立成轴——产生"列位移"而非行位移。
-        //   汇总（SummaryRow）目前仅纵向语义，横向带不接收汇总（传空列表）。
+        //   横向汇总（axis=HORIZONTAL）在带右侧追加合计列，与纵向汇总的"下方合计行"互为转置。
         int globalColShift = 0;
         int globalBandBaseCol = Integer.MAX_VALUE;
         // 记录每条横向带的基准列和"净插入列数"，用于后续右移模板 merge / 列宽 / 单值格
         List<int[]> bandColRecords = new ArrayList<>();
+        // 横向汇总位置：模板列号 → 输出列号（用于精确右移跟随汇总的模板 merge，与 summaryOutputRows 镜像）
+        Map<Integer, Integer> summaryOutputCols = new HashMap<>();
         for (List<CellBinding> hGroup : groupByConnectivity(horizontalDataCells)) {
             List<CellBinding> groupBand = new ArrayList<>();
             for (CellBinding b : hGroup) {
@@ -336,9 +340,20 @@ public class ReportRenderer {
             }
             globalBandBaseCol = Math.min(globalBandBaseCol, groupBandBaseCol);
 
-            int n = renderBand(Axis.HORIZONTAL, groupBand, List.of(), filtered, groupBandBaseCol, ctx, canvas);
-            // 净插入列数 = 输出列数 - 1（横向带声明列占 1 列）
-            int insertion = Math.max(0, n - 1);
+            // 只把"行落在本带"的横向汇总交给本带（交叉坐标=行），避免并列横向带互相串扰
+            List<SummaryRow> groupSummaries = summariesForBand(Axis.HORIZONTAL, report.getSummaries(), groupBand);
+            // 统计本带占用的"汇总声明列"：每个声明列只算一列设计列，不计入插入量
+            int designSummaryCols = 0;
+            Set<Integer> seenSdCols = new HashSet<>();
+            for (SummaryRow s : groupSummaries) {
+                if (s.getMainPos() != null && seenSdCols.add(s.getMainPos())) {
+                    designSummaryCols++;
+                }
+            }
+
+            int n = renderBand(Axis.HORIZONTAL, groupBand, groupSummaries, filtered, groupBandBaseCol, ctx, canvas, summaryOutputCols);
+            // 净插入列数 = 输出列数 -（带声明列 1 列 + 各汇总声明列）。汇总声明列已在设计中占位，不重复计入。
+            int insertion = Math.max(0, n - (1 + designSummaryCols));
             globalColShift = Math.max(globalColShift, insertion);
             bandColRecords.add(new int[]{groupBandBaseCol, insertion});
         }
@@ -461,7 +476,11 @@ public class ReportRenderer {
         // 3f. 右移模板 merge：横向带右侧的模板合并区域随列扩展右移（只动 startCol，与 3b 改 startRow 互不冲突）
         for (int mi = 0; mi < templateMergeCount; mi++) {
             Merge m = canvas.merges.get(mi);
-            if (m.getStartCol() >= globalBandBaseCol + 1) {
+            Integer summaryOutCol = summaryOutputCols.get(m.getStartCol());
+            if (summaryOutCol != null) {
+                // 横向汇总列的 merge：直接移至汇总列的输出位置（与 3b 的汇总行处理镜像）
+                m.setStartCol(summaryOutCol);
+            } else if (m.getStartCol() >= globalBandBaseCol + 1) {
                 int colShiftM = 0;
                 for (int[] rec : bandColRecords) {
                     if (m.getStartCol() >= rec[0] + 1) {
@@ -513,26 +532,35 @@ public class ReportRenderer {
         }
     }
 
+    /** 汇总轴：null 视为 {@link Axis#VERTICAL}（向后兼容旧配置）。 */
+    private static Axis axisOf(SummaryRow s) {
+        return s.getAxis() == null ? Axis.VERTICAL : s.getAxis();
+    }
+
     /**
-     * 把汇总行按「列区间归属」过滤到某个数据带。
-     * <p>并列独立报表（多个无关系数据集排在同一批行上）共享同一份 {@link SummaryRow} 列表，
-     * 但每行汇总只应作用于它显式声明的列区间 [fromColumn, toColumn] 所覆盖的那个带。若不过滤，
-     * 一个带的小计/总计会被广播到其它带——尤其是分组小计在别的带里匹配不到分组列时会退化成
+     * 把汇总按「轴 + 交叉区间归属」过滤到某个数据带。
+     * <p>并列独立报表（多个无关系数据集排在同一批记录上）共享同一份 {@link SummaryRow} 列表，
+     * 但每条汇总只应作用于它显式声明的交叉区间 [crossFrom, crossTo] 所覆盖的那个带、且方向相同。
+     * 若不过滤，一个带的小计/总计会被广播到其它带——尤其是分组小计在别的带里匹配不到分组列时会退化成
      * 总计，污染并列报表。
-     * <p>归属判定：汇总行的列区间与本带占据的列集合有交集，即归属本带。
+     * <p>归属判定：汇总的轴 == 本带的轴，且交叉区间与本带占据的交叉坐标集合有交集。
+     * 交叉坐标按轴解读——纵向带是列、横向带是行。
      */
-    private static List<SummaryRow> summariesForBand(List<SummaryRow> summaries, List<CellBinding> groupBand) {
+    private static List<SummaryRow> summariesForBand(Axis axis, List<SummaryRow> summaries, List<CellBinding> groupBand) {
         if (summaries == null || summaries.isEmpty()) {
             return List.of();
         }
-        Set<Integer> bandCols = new HashSet<>();
+        Set<Integer> bandCross = new HashSet<>();
         for (CellBinding b : groupBand) {
-            bandCols.add(b.getCell().column());
+            bandCross.add(axis.cross(b.getCell()));
         }
         List<SummaryRow> result = new ArrayList<>();
         for (SummaryRow s : summaries) {
-            for (int col = s.getFromColumn(); col <= s.getToColumn(); col++) {
-                if (bandCols.contains(col)) {
+            if (axisOf(s) != axis) {
+                continue;
+            }
+            for (int p = s.getCrossFrom(); p <= s.getCrossTo(); p++) {
+                if (bandCross.contains(p)) {
                     result.add(s);
                     break;
                 }
@@ -745,9 +773,9 @@ public class ReportRenderer {
                         List<Map<String, Object>> groupRows = flatten(details, groupStart[d], i);
                         Object groupVal = details.get(i).tuple.get(d);
                         for (SummaryRow s : ss) {
-                            seq.add(summaryOut(s, groupRows, groupVal, ctx));
-                            if (summaryOutputRows != null && s.getRow() != null) {
-                                summaryOutputRows.put(s.getRow(), bandBase + seq.size() - 1);
+                            seq.add(summaryOut(axis, s, groupRows, groupVal, ctx));
+                            if (summaryOutputRows != null && s.getMainPos() != null) {
+                                summaryOutputRows.put(s.getMainPos(), bandBase + seq.size() - 1);
                             }
                         }
                     }
@@ -760,9 +788,9 @@ public class ReportRenderer {
         List<SummaryRow> grand = byLevel.get(-1);
         if (grand != null) {
             for (SummaryRow s : grand) {
-                seq.add(summaryOut(s, rows, null, ctx));
-                if (summaryOutputRows != null && s.getRow() != null) {
-                    summaryOutputRows.put(s.getRow(), bandBase + seq.size() - 1);
+                seq.add(summaryOut(axis, s, rows, null, ctx));
+                if (summaryOutputRows != null && s.getMainPos() != null) {
+                    summaryOutputRows.put(s.getMainPos(), bandBase + seq.size() - 1);
                 }
             }
         }
@@ -832,15 +860,17 @@ public class ReportRenderer {
         return o;
     }
 
-    private Out summaryOut(SummaryRow s, List<Map<String, Object>> groupRows, Object groupVal, ParamContext ctx) {
+    private Out summaryOut(Axis axis, SummaryRow s, List<Map<String, Object>> groupRows, Object groupVal, ParamContext ctx) {
         Out o = new Out(false, null);
+        Integer mainPos = s.getMainPos();
         // 注入 group = 当前分组值，供标签里的 ${group} 解析
         EvalContext ec = EvalContext.aggregate(groupRows, ctx).withLocal("group", groupVal);
         for (SummaryCell sc : s.getCells()) {
-            o.values.put(sc.getColumn(), engine.eval(sc.getValue(), ec));
-            // 汇总行从模板的"汇总声明行"继承样式（边框/字体随汇总行滚动到输出位置）
-            if (s.getRow() != null) {
-                o.sources.put(sc.getColumn(), new CellRef(null, s.getRow(), sc.getColumn()));
+            int pos = sc.getCrossPos();
+            o.values.put(pos, engine.eval(sc.getValue(), ec));
+            // 汇总从模板的"汇总声明位置"继承样式（边框/字体随汇总滚动到输出位置）
+            if (mainPos != null) {
+                o.sources.put(pos, summarySource(axis, mainPos, pos));
             }
             // 反查：仅当 drillEnabled 时记录贡献行（聚合/汇总格）
             if (sc.isDrillEnabled() && sc.getValue() instanceof Value.Aggregate agg) {
@@ -849,23 +879,30 @@ public class ReportRenderer {
                     drillView = fv.ref().datasetId();
                 }
                 if (drillView != null && drillCollector != null) {
-                    o.drills.put(sc.getColumn(), new DrillCapture(drillView, groupRows));
+                    o.drills.put(pos, new DrillCapture(drillView, groupRows));
                 }
             }
         }
-        // 补齐列区间 [fromColumn, toColumn] 内"无汇总格"的空列：从模板汇总声明行继承样式。
-        // 否则未定义汇总格的列在汇总行输出位置完全无格 → 边框等样式缺失（小计行尤其明显：
-        // 它有多个输出实例，靠 renderFree 搬运单条模板声明行的静态格只能补到其中一行）。
-        // 仅在模板态（s.row 非 null）补齐，无模板的测试/数据校验场景保持原样不变。
-        if (s.getRow() != null) {
-            for (int col = s.getFromColumn(); col <= s.getToColumn(); col++) {
-                if (!o.values.containsKey(col)) {
-                    o.values.put(col, null);
-                    o.sources.put(col, new CellRef(null, s.getRow(), col));
+        // 补齐交叉区间 [crossFrom, crossTo] 内"无汇总格"的空位：从模板汇总声明位置继承样式。
+        // 否则未定义汇总格的交叉坐标在汇总输出位置完全无格 → 边框等样式缺失（小计尤其明显：
+        // 它有多个输出实例，靠 renderFree 搬运单条模板声明带的静态格只能补到其中一处）。
+        // 仅在模板态（mainPos 非 null）补齐，无模板的测试/数据校验场景保持原样不变。
+        if (mainPos != null) {
+            for (int pos = s.getCrossFrom(); pos <= s.getCrossTo(); pos++) {
+                if (!o.values.containsKey(pos)) {
+                    o.values.put(pos, null);
+                    o.sources.put(pos, summarySource(axis, mainPos, pos));
                 }
             }
         }
         return o;
+    }
+
+    /** 汇总格的模板样式源：纵向 = (mainPos行, cross列)，横向 = (cross行, mainPos列)。 */
+    private static CellRef summarySource(Axis axis, int mainPos, int cross) {
+        return axis == Axis.VERTICAL
+                ? new CellRef(null, mainPos, cross)
+                : new CellRef(null, cross, mainPos);
     }
 
     // ============================================================
@@ -1815,47 +1852,6 @@ public class ReportRenderer {
      * </ul>
      * 带内的序列构建（分组/明细/聚合/小计排序）与轴无关，只有"落格坐标"和"合并方向"随轴变化。
      */
-    private enum Axis {
-        VERTICAL, HORIZONTAL;
-
-        /** 交叉坐标：纵向带取声明格的列，横向带取声明格的行 */
-        int cross(CellRef c) {
-            return this == VERTICAL ? c.column() : c.row();
-        }
-
-        /** 主轴基准：纵向带取声明格的行（带起始行），横向带取声明格的列（带起始列） */
-        int base(CellRef c) {
-            return this == VERTICAL ? c.row() : c.column();
-        }
-
-        /** 落格行号：纵向 = 主轴基准+偏移，横向 = 交叉坐标 */
-        int outRow(int primaryBase, int offset, int cross) {
-            return this == VERTICAL ? primaryBase + offset : cross;
-        }
-
-        /** 落格列号：纵向 = 交叉坐标，横向 = 主轴基准+偏移 */
-        int outCol(int primaryBase, int offset, int cross) {
-            return this == VERTICAL ? cross : primaryBase + offset;
-        }
-
-        /** 构造合并区：纵向沿行跨 span 格（同列），横向沿列跨 span 格（同行） */
-        Merge merge(int primaryBase, int offset, int cross, int span) {
-            Merge m = new Merge();
-            if (this == VERTICAL) {
-                m.setStartRow(primaryBase + offset);
-                m.setStartCol(cross);
-                m.setRowSpan(span);
-                m.setColSpan(1);
-            } else {
-                m.setStartRow(cross);
-                m.setStartCol(primaryBase + offset);
-                m.setRowSpan(1);
-                m.setColSpan(span);
-            }
-            return m;
-        }
-    }
-
     /**
      * 交叉表（矩阵）：行维 × 列维 → 交叉格，可选行/列/总合计。由 {@link #detectMatrices} 按几何识别构造。
      *

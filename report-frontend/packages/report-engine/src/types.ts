@@ -179,7 +179,8 @@ export interface LoopBlock {
 }
 
 export interface SummaryCell {
-  column: number;
+  /** 落在交叉轴的位置（0-based）——纵向汇总是列号、横向汇总是行号。 */
+  crossPos: number;
   /** 值表达式：标签（Literal/Template）或聚合（Aggregate），统一为 ReportValue */
   value: ReportValue;
   /** 表达式预览（友好文本，导出时附带存储） */
@@ -192,20 +193,28 @@ export interface SummaryCell {
   displayText?: string;
 }
 
+/** 汇总方向：纵向在带下方追加合计行，横向在带右侧追加合计列。 */
+export type SummaryAxis = 'VERTICAL' | 'HORIZONTAL';
+
 export interface SummaryRow {
   id: string;
   /**
-   * 设计态锚定行号（0-based）——汇总行在模板表格中占据的实际行。
-   * 仅前端设计态使用；渲染时 framework 仍按 groupBy 动态追加，后端忽略此字段。
+   * 汇总方向。缺省视为 VERTICAL（向后兼容）。
+   * 由右键选区形状自动判定：横向选区（同一行）→ VERTICAL（下方合计行）；纵向选区（同一列）→ HORIZONTAL（右侧合计列）。
    */
-  row: number;
+  axis?: SummaryAxis;
   /**
-   * 汇总作用的列区间 [fromColumn, toColumn]（0-based，含）。
-   * 由右键框选区域生成：框选起止列即区间。后端按该区间与数据带列集合求交决定归属，
-   * 使同一设计行上的多个并列汇总（各占不同列段）互不串扰。
+   * 设计态锚定的主轴位置（0-based）——纵向是行号、横向是列号。
+   * 仅前端设计态使用；渲染时 framework 仍按 groupBy 动态追加，后端用此字段定位模板样式源。
    */
-  fromColumn: number;
-  toColumn: number;
+  mainPos: number;
+  /**
+   * 汇总作用的交叉区间 [crossFrom, crossTo]（0-based，含）——纵向是列、横向是行。
+   * 由右键框选区域生成。后端按该区间与数据带交叉坐标集合求交决定归属，
+   * 使同一主轴位置上的多个并列汇总（各占不同交叉段）互不串扰。
+   */
+  crossFrom: number;
+  crossTo: number;
   groupBy: { datasetId: string; field: string } | null;
   cells: SummaryCell[];
 }

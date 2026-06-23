@@ -25,8 +25,8 @@ import lombok.Data;
 @Data
 public class SummaryCell {
 
-    /** 落在哪一列（0-based）。 */
-    private int column;
+    /** 落在交叉轴的哪个位置（0-based）——纵向汇总是列号、横向汇总是行号。 */
+    private int crossPos;
 
     /** 值表达式：标签（Template）或聚合（Aggregate）。 */
     private Value value;
@@ -46,12 +46,12 @@ public class SummaryCell {
      */
     private String drillView;
 
-    public SummaryCell(int column, Value value) {
-        this(column, value, false, null);
+    public SummaryCell(int crossPos, Value value) {
+        this(crossPos, value, false, null);
     }
 
-    public SummaryCell(int column, Value value, boolean drillEnabled, String drillView) {
-        this.column = column;
+    public SummaryCell(int crossPos, Value value, boolean drillEnabled, String drillView) {
+        this.crossPos = crossPos;
         this.value = value;
         this.drillEnabled = drillEnabled;
         this.drillView = drillView;
@@ -60,21 +60,21 @@ public class SummaryCell {
     /**
      * 创建标签单元格。
      *
-     * @param column 列坐标
-     * @param label  文本标签，可含 {@code ${group}} 占位符（编译为含 NameRef 的 Template）
+     * @param crossPos 交叉坐标（纵向=列号 / 横向=行号）
+     * @param label    文本标签，可含 {@code ${group}} 占位符（编译为含 NameRef 的 Template）
      */
-    public static SummaryCell label(int column, String label) {
-        return new SummaryCell(column, Templates.parse(label));
+    public static SummaryCell label(int crossPos, String label) {
+        return new SummaryCell(crossPos, Templates.parse(label));
     }
 
     /**
      * 创建聚合单元格。
      *
-     * @param column      列坐标
+     * @param crossPos    交叉坐标（纵向=列号 / 横向=行号）
      * @param field       聚合目标字段
      * @param aggregation 聚合名（如 {@code "SUM"} / {@code "COUNT"}），由注册表分发
      */
-    public static SummaryCell agg(int column, FieldRef field, String aggregation) {
-        return new SummaryCell(column, new Value.Aggregate(aggregation, new Value.FieldValue(field)));
+    public static SummaryCell agg(int crossPos, FieldRef field, String aggregation) {
+        return new SummaryCell(crossPos, new Value.Aggregate(aggregation, new Value.FieldValue(field)));
     }
 }

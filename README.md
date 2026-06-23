@@ -58,7 +58,8 @@
   - 参数域：ParamSource（External / Cell / Constant）
   - 渲染域：CellBinding（值层 Value + 控制层 expansion/merge/conditions）/ LoopBlock / SummaryRow
 - [x] **表达式引擎**：统一 `${...}` 文本语法（`Templates.parse()`），支持字段引用、聚合函数、文本插值、函数调用；内置函数 format / date / round / concat / if（`ValueFunction` SPI 可扩展）；`splitArgs` 支持嵌套括号与字符串字面量
-- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染；汇总行支持列区间作用域（并列报表各带独立汇总互不串扰）
+- [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染；汇总支持交叉区间作用域（并列报表各带独立汇总互不串扰）
+- [x] **双向汇总（纵向 + 横向）**：`SummaryRow` 以 `Axis` 抽象统一两轴——纵向汇总在数据带**下方追加合计行**、横向汇总在数据带**右侧追加合计列**（互为转置，共用 `renderBand`/`summaryOut`）。坐标按轴表达（`mainPos` 主轴位置 / `crossFrom~crossTo` 交叉区间 / `crossPos` 交叉坐标）；前端右键按选区形状自动判轴（横选→纵向合计行、竖选→横向合计列）
 - [x] **横向扩展与交叉表**（`Expansion.HORIZONTAL`）：引擎以 `Axis` 抽象统一纵/横两轴——纵向带（一记录一行）的转置即横向带（一记录一列，向右铺开 + 列位移/横向 GROUP 合并）；进一步支持 **VERTICAL×HORIZONTAL 交叉表（矩阵/透视）**：行维 × 列维 → 交叉格聚合，并按"紧邻交叉格"几何约定自动补出行合计/列合计/总计（零持久化契约变更，现有设计器直接可配）
 - [x] **独立纵向带**（`CellBinding.independent`）：显式配置某列从自身声明行独立向下展开（交错/错位排版），默认仍按"一条记录一行"对齐同源列
 - [x] **样式/布局适配**：模板静态内容（标题/页脚）随带扩展下移、汇总行继承模板样式、合并区边框铺满整个区域、模板行高/列宽随渲染带出
@@ -68,7 +69,7 @@
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
 - [x] **报表配置实体化**：`ReportConfig` 强类型实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/params/template），DTO record（`ConfigDtos`）同时作为持久化字段类型 + 前端 JSON 契约；`ReportRepository.page(SearchRequest)` 分页查询
-- [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 9 个示例报表（含交叉表「区域季度销售交叉表」，写死稳定 id，重启不变）
+- [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
 - [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `ConfigDtos`）+ `RenderDtoConverter` 匹配前端 JSON 格式
 - [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
 - [x] **报表管理界面**：app-pc 报表管理页（antd Table 分页、新建/编辑/预览/删除），首页 + 报表管理两个入口
@@ -78,7 +79,7 @@
 
 #### 引擎能力
 
-- [ ] **横向带 / 交叉表的汇总**：横向带与交叉表暂不接收 `SummaryRow`（仅纵向语义）；交叉表的合计目前由专用的"紧邻交叉格"几何约定补出，维度列暂不做表头合并
+- [ ] **交叉表的汇总归一**：横向带汇总已支持（见已完成）；交叉表的行/列/总合计仍由专用的"紧邻交叉格"几何约定补出，尚未归一到 `SummaryRow` 机制，维度列也暂不做表头合并
 - [ ] **交叉表设计向导**：交叉表当前靠几何摆位（行维纵向分组 × 列维横向分组 + 交点聚合）配置，前端尚无引导式向导与方向可视化提示
 
 #### 数据与存储
@@ -95,7 +96,7 @@
 
 #### 已知限制
 
-- [ ] **条件面板未按类型过滤算子**：`CompareOperator` 注释定义了按 `DataType` 过滤的可用算子表，但前端 `condition-modal` 当前全量展示 12 个算子（后端均已支持），未按字段类型收敛
+- [ ] **条件面板未按类型过滤算子**：`CompareOperator` 注释定义了按 `DataType` 过滤的可用算子表，但前端 `condition-modal` 当前全量展示 13 个算子（后端均已支持），未按字段类型收敛
 - [ ] **前端无自动化测试**：库包用 `bundle: false`，无测试用例；后端 framework/excel 有纯内存测试覆盖
 
 ## 快速开始
