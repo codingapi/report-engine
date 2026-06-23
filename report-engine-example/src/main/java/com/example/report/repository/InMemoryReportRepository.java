@@ -55,6 +55,8 @@ public class InMemoryReportRepository implements ReportRepository {
         int current = Math.max(request.getCurrent(), 1);
         int pageSize = request.getPageSize() > 0 ? request.getPageSize() : 10;
         List<ReportConfig> all = new ArrayList<>(store.values());
+        // 按创建时间倒序排列
+        all.sort((a, b) -> Long.compare(b.getCreateTime(), a.getCreateTime()));
         long total = all.size();
         int from = (int) Math.min((long) (current - 1) * pageSize, total);
         int to = (int) Math.min((long) from + pageSize, total);

@@ -142,6 +142,12 @@ const ReportsPage = () => {
             render: (_, record) => formatTime(record.createTime),
           },
           {
+            title: '更新时间',
+            key: 'updateTime',
+            width: 180,
+            render: (_, record) => formatTime(record.updateTime),
+          },
+          {
             title: '操作',
             key: 'actions',
             width: 200,

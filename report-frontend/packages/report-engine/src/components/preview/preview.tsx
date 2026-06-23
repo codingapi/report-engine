@@ -1,6 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import { Button, Drawer, Empty, Tabs, message } from 'antd';
-import { ExportOutlined } from '@ant-design/icons';
+import { Button, Drawer, Empty, Space, Tabs, message } from 'antd';
+import { CloseOutlined, ExportOutlined } from '@ant-design/icons';
 import type {
   ExcelWorkbook, ExcelSheet, ExcelCell, ExcelStyle, ExcelBorder, ExcelBorderStyle,
 } from '@coding-report/report-univer';
@@ -84,17 +84,23 @@ const ReportPreview = forwardRef<ReportPreviewHandle, ReportPreviewProps>(
           width="100%"
           open={previewOpen}
           onClose={closePreview}
+          closable={false}
           destroyOnHidden
           styles={{ body: { padding: 0, background: '#fff' } }}
           extra={
-            <Button
-              type="primary"
-              icon={<ExportOutlined />}
-              loading={exportingPreview}
-              onClick={exportFromPreview}
-            >
-              导出报表
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                icon={<ExportOutlined />}
+                loading={exportingPreview}
+                onClick={exportFromPreview}
+              >
+                导出报表
+              </Button>
+              <Button icon={<CloseOutlined />} onClick={closePreview}>
+                关闭
+              </Button>
+            </Space>
           }
         >
           <WorkbookTable
