@@ -91,4 +91,36 @@ class ConditionPredicatesTest {
         assertFalse(ConditionPredicates.test(CompareOperator.IS_NOT_NULL, "", null));
         assertFalse(ConditionPredicates.test(CompareOperator.IS_NOT_NULL, null, null));
     }
+
+    // ─── BETWEEN（闭区间 "low,high"，数值优先比较）───────────────────────
+
+    @Test
+    void between_inRange_shouldBeTrue() {
+        assertTrue(ConditionPredicates.test(CompareOperator.BETWEEN, 50, "1,100"));
+    }
+
+    @Test
+    void between_outOfRange_shouldBeFalse() {
+        assertFalse(ConditionPredicates.test(CompareOperator.BETWEEN, 0, "1,100"));
+        assertFalse(ConditionPredicates.test(CompareOperator.BETWEEN, 101, "1,100"));
+    }
+
+    @Test
+    void between_boundaryInclusive() {
+        // 闭区间：端点值也算命中
+        assertTrue(ConditionPredicates.test(CompareOperator.BETWEEN, 1, "1,100"));
+        assertTrue(ConditionPredicates.test(CompareOperator.BETWEEN, 100, "1,100"));
+    }
+
+    @Test
+    void between_numericValueAcrossType() {
+        // CSV 数值字符串 "8000" 与数值边界跨类型比较
+        assertTrue(ConditionPredicates.test(CompareOperator.BETWEEN, "8000", "1000,9999"));
+    }
+
+    @Test
+    void between_missingBound_shouldBeFalse() {
+        // 缺少上界（只一个值）无法构成区间
+        assertFalse(ConditionPredicates.test(CompareOperator.BETWEEN, 50, "1"));
+    }
 }

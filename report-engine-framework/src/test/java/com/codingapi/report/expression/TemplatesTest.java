@@ -174,6 +174,34 @@ class TemplatesTest {
         assertEquals("date", ((Value.FunctionCall) v).name());
     }
 
+    @Test
+    @DisplayName("${if(d.flag, '是', '否')} → 三参数 FunctionCall")
+    void ifFunctionCall() {
+        Value v = Templates.parse("${if(d.flag, '是', '否')}");
+        assertInstanceOf(Value.FunctionCall.class, v);
+        Value.FunctionCall fc = (Value.FunctionCall) v;
+        assertEquals("if", fc.name());
+        assertEquals(3, fc.args().size());
+        assertInstanceOf(Value.Literal.class, fc.args().get(1));
+        assertEquals("是", ((Value.Literal) fc.args().get(1)).value());
+    }
+
+    @Test
+    @DisplayName("${concat(f(a), \"x,y\")} → 嵌套括号与字符串字面量中的逗号不参与分割")
+    void nestedArgsAndQuotedComma() {
+        Value v = Templates.parse("${concat(round(d.salary, 2), \"x,y\")}");
+        assertInstanceOf(Value.FunctionCall.class, v);
+        Value.FunctionCall fc = (Value.FunctionCall) v;
+        assertEquals("concat", fc.name());
+        assertEquals(2, fc.args().size());
+        // 第一参数是嵌套的 round(...) FunctionCall
+        assertInstanceOf(Value.FunctionCall.class, fc.args().get(0));
+        assertEquals("round", ((Value.FunctionCall) fc.args().get(0)).name());
+        // 第二参数是含逗号的字符串字面量，不应被拆分
+        assertInstanceOf(Value.Literal.class, fc.args().get(1));
+        assertEquals("x,y", ((Value.Literal) fc.args().get(1)).value());
+    }
+
     // ============================================================
     // 文本 + 表达式混合（Template）
     // ============================================================

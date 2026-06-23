@@ -136,7 +136,7 @@ function exprToSource(v: ReportValue | undefined): string {
 }
 
 const HOLE_RE = /\$\{([^}]*)\}/g;
-const AGG_RE = /^(COUNT_DISTINCT|COUNT|SUM|AVG|MAX|MIN)\(([^)]*)\)$/;
+const AGG_NAMES = new Set(['COUNT_DISTINCT', 'COUNT', 'SUM', 'AVG', 'MAX', 'MIN']);
 
 /**
  * `${...}` 文本 → Value 节点（对齐 Java `Templates.parse`，含归约规则）：
@@ -169,11 +169,71 @@ export function parseTemplate(str: string, loopBlocks: LoopBlock[] = []): Report
   return { type: 'Template', parts };
 }
 
-/** 洞内表达式源码 → Value 节点 */
+/**
+ * 按顶层逗号分割参数（对齐 Java `Templates.splitArgs`）：括号深度与引号内的逗号不参与分割。
+ * 支持 `if(f(a), b, c)` 嵌套括号与 `concat("a,b", x)` 字符串字面量。
+ */
+function splitArgs(argsStr: string, loopBlocks: LoopBlock[] = []): ReportValue[] {
+  const args: ReportValue[] = [];
+  let cur = '';
+  let depth = 0;
+  let quote = '';
+  for (let i = 0; i < argsStr.length; i++) {
+    const c = argsStr[i];
+    if (quote) {
+      cur += c;
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      cur += c;
+    } else if (c === '(') {
+      depth++;
+      cur += c;
+    } else if (c === ')') {
+      depth--;
+      cur += c;
+    } else if (c === ',' && depth === 0) {
+      args.push(parseExpr(cur.trim(), loopBlocks));
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  const tail = cur.trim();
+  if (tail || args.length > 0) {
+    args.push(parseExpr(tail, loopBlocks));
+  }
+  return args;
+}
+
+/**
+ * 洞内表达式源码 → Value 节点（对齐 Java `Templates.parseHole`）：
+ * 字符串字面量 → Literal；`name(...)` → 聚合名 Aggregate / 否则 FunctionCall；
+ * `a.b` → FieldValue / LoopFieldValue；其余 → NameRef。
+ */
 function parseExpr(expr: string, loopBlocks: LoopBlock[] = []): ReportValue {
-  const agg = AGG_RE.exec(expr);
-  if (agg) {
-    return { type: 'Aggregate', aggregation: agg[1] as ReportValue['aggregation'], operand: parseExpr(agg[2].trim(), loopBlocks) };
+  // 字符串字面量："..." 或 '...'
+  if (expr.length >= 2) {
+    const q = expr[0];
+    if ((q === '"' || q === "'") && expr[expr.length - 1] === q) {
+      return { type: 'Literal', payload: expr.slice(1, -1) };
+    }
+  }
+  // 函数 / 聚合调用 name(args)
+  const parenIdx = expr.indexOf('(');
+  if (parenIdx > 0 && expr.endsWith(')')) {
+    const name = expr.slice(0, parenIdx).trim();
+    const argsStr = expr.slice(parenIdx + 1, expr.length - 1).trim();
+    if (AGG_NAMES.has(name.toUpperCase())) {
+      return {
+        type: 'Aggregate',
+        aggregation: name.toUpperCase() as ReportValue['aggregation'],
+        operand: argsStr ? parseExpr(argsStr, loopBlocks) : { type: 'Literal', payload: '' },
+      };
+    }
+    return { type: 'FunctionCall', funcName: name, args: argsStr ? splitArgs(argsStr, loopBlocks) : [] };
   }
   if (expr.includes('.')) {
     // 检查是否是循环块字段引用

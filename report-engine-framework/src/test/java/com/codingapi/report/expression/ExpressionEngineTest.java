@@ -90,6 +90,29 @@ class ExpressionEngineTest {
     }
 
     @Test
+    @DisplayName("函数：round / concat / if")
+    void roundConcatIf() {
+        ParamContext params = new ParamContext(Map.of());
+        EvalContext ctx = EvalContext.scalar(null, params);
+
+        // round(3.14159, 2) → 3.14；round(3.5) → 4.0
+        Value r2 = new Value.FunctionCall("round", List.of(new Value.Literal(3.14159), new Value.Literal(2)));
+        assertEquals(3.14, engine.eval(r2, ctx));
+        Value r0 = new Value.FunctionCall("round", List.of(new Value.Literal(3.5)));
+        assertEquals(4.0, engine.eval(r0, ctx));
+
+        // concat("a", "b") → "ab"；null 跳过
+        Value cat = new Value.FunctionCall("concat", List.of(new Value.Literal("a"), new Value.Literal(null), new Value.Literal("b")));
+        assertEquals("ab", engine.eval(cat, ctx));
+
+        // if(true, "是", "否") → "是"；if(0, ...) → "否"
+        Value ifTrue = new Value.FunctionCall("if", List.of(new Value.Literal(true), new Value.Literal("是"), new Value.Literal("否")));
+        assertEquals("是", engine.eval(ifTrue, ctx));
+        Value ifZero = new Value.FunctionCall("if", List.of(new Value.Literal(0), new Value.Literal("是"), new Value.Literal("否")));
+        assertEquals("否", engine.eval(ifZero, ctx));
+    }
+
+    @Test
     @DisplayName("未注册函数显式抛异常")
     void unknownFunction() {
         Value call = new Value.FunctionCall("nope", List.of());

@@ -13,7 +13,7 @@ export type DataType = 'STRING' | 'NUMBER' | 'DATE' | 'DATETIME' | 'BOOLEAN' | '
 export type Expansion = 'VERTICAL' | 'HORIZONTAL' | 'NONE';
 export type ExpandMode = 'GROUP' | 'LIST';
 export type Aggregation = 'NONE' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'AVG' | 'MAX' | 'MIN';
-export type CompareOperator = 'EQ' | 'NE' | 'GT' | 'LT' | 'GE' | 'LE' | 'CONTAINS' | 'NOT_CONTAINS' | 'IN' | 'NOT_IN' | 'IS_NULL' | 'IS_NOT_NULL';
+export type CompareOperator = 'EQ' | 'NE' | 'GT' | 'LT' | 'GE' | 'LE' | 'CONTAINS' | 'NOT_CONTAINS' | 'IN' | 'NOT_IN' | 'IS_NULL' | 'IS_NOT_NULL' | 'BETWEEN';
 export type ValueType = 'Literal' | 'FieldValue' | 'ParamValue' | 'LoopFieldValue' | 'Template' | 'Aggregate' | 'FunctionCall' | 'NameRef';
 export type JoinType = 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
 export type ParamSourceType = 'External' | 'Cell' | 'Constant';
@@ -46,7 +46,7 @@ export const EXPANSION_LABELS: Record<Expansion, string> = {
 export const OPERATOR_LABELS: Record<CompareOperator, string> = {
   EQ: '等于', NE: '不等于', GT: '大于', LT: '小于',
   GE: '大于等于', LE: '小于等于', CONTAINS: '包含', NOT_CONTAINS: '不包含',
-  IN: '在...之中', NOT_IN: '不在...之中', IS_NULL: '为空', IS_NOT_NULL: '不为空',
+  IN: '在...之中', NOT_IN: '不在...之中', IS_NULL: '为空', IS_NOT_NULL: '不为空', BETWEEN: '介于',
 };
 
 export const VALUE_TYPE_LABELS: Record<ValueType, string> = {

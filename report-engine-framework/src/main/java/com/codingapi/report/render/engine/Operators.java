@@ -1,6 +1,7 @@
 package com.codingapi.report.render.engine;
 
 import com.codingapi.report.data.datasource.RawTable;
+import com.codingapi.report.data.relation.JoinType;
 import com.codingapi.report.data.relation.Relationship;
 import com.codingapi.report.expression.EvalContext;
 import com.codingapi.report.expression.ExpressionEngine;
@@ -9,10 +10,13 @@ import com.codingapi.report.operator.condition.ConditionPredicates;
 import com.codingapi.report.param.ParamContext;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 内存关系算子：跨数据源的<b>过滤</b>与<b>关联</b>都在这里完成，与数据源类型无关。
@@ -26,14 +30,19 @@ import java.util.Map;
  * <ul>
  *   <li><b>过滤</b>（{@link #filter}）：逐行求值条件，单条件的比较判断委托给
  *       {@link ConditionPredicates}（条件算子注册表）——本类不内嵌任何算子 switch</li>
- *   <li><b>关联</b>（{@link #join}）：两表按 {@link Relationship} 做 INNER JOIN（hash join）</li>
+ *   <li><b>关联</b>（{@link #join}）：两表按 {@link Relationship} 做 hash join，支持 INNER/LEFT/RIGHT/FULL</li>
  *   <li><b>聚合</b>：不在本类，见 {@code operator.aggregation.Aggregators}</li>
  * </ul>
  *
- * <h3>当前实现的限制（最小引擎）</h3>
+ * <h3>JOIN 语义与方向约定</h3>
+ * <p>JOIN 类型取自 {@link Relationship#getJoinType()}（null 视为 INNER）。LEFT/RIGHT 的"保留哪一侧"
+ * 相对 {@link #join} 的<b>参数位置</b>：LEFT 保留 {@code left} 参数表（无匹配行补 null），
+ * RIGHT 保留 {@code right} 参数表，FULL 保留两侧。不依赖 {@code Relationship.left/right} 端点方向——
+ * 调用方（{@code ReportRenderer}）始终以累积表为 {@code left} 参数，语义由此固定。
+ *
+ * <h3>当前实现的限制</h3>
  * <ul>
- *   <li>JOIN 仅实现 INNER JOIN（LEFT/RIGHT/FULL 预留枚举未实现）</li>
- *   <li>JOIN 算法为 hash join（小表建索引，大表探测），适合中小数据量</li>
+ *   <li>JOIN 算法为 hash join（右表建索引，左表探测），适合中小数据量</li>
  *   <li>比较算子的覆盖范围由 {@link ConditionPredicates} 决定（未注册的算子会抛异常）</li>
  * </ul>
  */
@@ -77,17 +86,26 @@ public final class Operators {
     }
 
     /**
-     * 内连接（hash join）：按 {@link Relationship} 定义的左右键合并两张表，只保留两侧都能匹配上的行。
+     * 连接（hash join）：按 {@link Relationship} 定义的键合并两张表，JOIN 类型由 {@link Relationship#getJoinType()} 决定。
+     *
+     * <ul>
+     *   <li>INNER：只保留两侧匹配上的行（交集）</li>
+     *   <li>LEFT：保留 {@code left} 参数表全部行，右表无匹配则补 null</li>
+     *   <li>RIGHT：保留 {@code right} 参数表全部行，左表无匹配则补 null</li>
+     *   <li>FULL：两侧全部保留，各自无匹配补 null</li>
+     * </ul>
+     * <p>LEFT/RIGHT 的保留侧相对参数位置（见类注释），不依赖 {@code Relationship} 端点方向。
      *
      * <h3>算法</h3>
      * <ol>
      *   <li>自动判断关系的左右端点各属于哪张表（通过列名是否出现在 columns 中）</li>
      *   <li>用右表建哈希索引（key = join 键的字符串值，value = 行列表，处理一对多）</li>
      *   <li>左表逐行探测索引，匹配到的行合并（左行 + 右行字段 putAll）</li>
+     *   <li>LEFT/FULL：左行无匹配时保留并补 null；RIGHT/FULL：循环后输出未匹配的右行并补 null</li>
      * </ol>
      *
-     * @param left  左表
-     * @param right 右表
+     * @param left  左表（LEFT/FULL 的保留侧）
+     * @param right 右表（RIGHT/FULL 的保留侧）
      * @param rel   关联关系（左右 FieldRef + JoinType）
      * @return 合并后的 RawTable，列 = 左表列 + 右表列（去重）
      */
@@ -98,23 +116,52 @@ public final class Operators {
         String leftKey = left.getColumns().contains(e1) ? e1 : e2;
         String rightKey = leftKey.equals(e1) ? e2 : e1;
 
+        JoinType jt = rel.getJoinType();
+        boolean leftJoin = jt == JoinType.LEFT;
+        boolean rightJoin = jt == JoinType.RIGHT;
+        boolean fullJoin = jt == JoinType.FULL;
+        boolean keepUnmatchedLeft = leftJoin || fullJoin;
+        boolean keepUnmatchedRight = rightJoin || fullJoin;
+
         // 用右表建哈希索引（处理一对多：同一 join 键可能对应多行）
         Map<String, List<Map<String, Object>>> index = new HashMap<>();
         for (Map<String, Object> rr : right.getRows()) {
             index.computeIfAbsent(String.valueOf(rr.get(rightKey)), k -> new ArrayList<>()).add(rr);
         }
 
+        // 右表行的匹配记录（按对象身份判重），用于 RIGHT/FULL 输出未匹配右行
+        Set<Map<String, Object>> matchedRight = keepUnmatchedRight
+                ? Collections.newSetFromMap(new IdentityHashMap<>())
+                : null;
+
         // 左表逐行探测索引，匹配行合并
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> lr : left.getRows()) {
             List<Map<String, Object>> matches = index.get(String.valueOf(lr.get(leftKey)));
             if (matches == null) {
+                // 左行无匹配：LEFT/FULL 保留并补 null；INNER/RIGHT 丢弃
+                if (keepUnmatchedLeft) {
+                    out.add(fillNull(lr, right.getColumns()));
+                }
                 continue;
             }
             for (Map<String, Object> rr : matches) {
                 Map<String, Object> merged = new LinkedHashMap<>(lr);
                 merged.putAll(rr);
                 out.add(merged);
+                if (matchedRight != null) {
+                    matchedRight.add(rr);
+                }
+            }
+        }
+
+        // RIGHT/FULL：输出未匹配的右行，左表列补 null
+        if (matchedRight != null) {
+            for (Map<String, Object> rr : right.getRows()) {
+                if (matchedRight.contains(rr)) {
+                    continue;
+                }
+                out.add(fillNull(rr, left.getColumns()));
             }
         }
 
@@ -126,5 +173,14 @@ public final class Operators {
             }
         }
         return new RawTable(cols, out);
+    }
+
+    /** 复制 base 行，对 missingColumns 中尚未存在的列补 null（用于外连接无匹配侧）。 */
+    private static Map<String, Object> fillNull(Map<String, Object> base, List<String> missingColumns) {
+        Map<String, Object> merged = new LinkedHashMap<>(base);
+        for (String c : missingColumns) {
+            merged.putIfAbsent(c, null);
+        }
+        return merged;
     }
 }

@@ -22,9 +22,11 @@ package com.codingapi.report.operator.condition;
  *   NOT_IN            ✓       ✓      ✓      ✓        ✗
  *   IS_NULL           ✓       ✓      ✓      ✓        ✓
  *   IS_NOT_NULL       ✓       ✓      ✓      ✓        ✓
+ *   BETWEEN           ✗       ✓      ✓      ✓        ✗
  * </pre>
- * <p>STRING 不支持大小比较（GT/GE/LT/LE），因为没有自然的排序关系。
+ * <p>STRING 不支持大小比较（GT/GE/LT/LE/BETWEEN），因为没有自然的排序关系。
  * CONTAINS 为子串包含（Java {@code String.contains}），仅用于 STRING 类型。
+ * BETWEEN 为闭区间（{@code low ≤ field ≤ high}），右值为逗号分隔的 "low,high"。
  */
 public enum CompareOperator {
     /** 等于：field = value */
@@ -50,5 +52,7 @@ public enum CompareOperator {
     /** 为空：field IS NULL（null 或空串） */
     IS_NULL,
     /** 不为空：field IS NOT NULL */
-    IS_NOT_NULL
+    IS_NOT_NULL,
+    /** 范围：field BETWEEN low AND high（闭区间，右值为逗号分隔 "low,high"，仅数值/日期） */
+    BETWEEN
 }
