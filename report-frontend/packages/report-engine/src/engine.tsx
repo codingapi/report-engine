@@ -554,8 +554,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           },
           {
             id: 'set-summary-row',
-            title: '设为汇总行',
-            tooltip: '将选中的同行单元格设为汇总行（小计/总计），框选列段即作用区间',
+            title: '设为汇总',
+            tooltip: '框选行段（同一行）→ 纵向汇总（下方合计行）；框选列段（同一列）→ 横向汇总（右侧合计列）',
             onClick: handleCreateSummaryFromRange,
           },
         ],

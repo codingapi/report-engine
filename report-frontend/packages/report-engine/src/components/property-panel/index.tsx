@@ -231,12 +231,18 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
               范围:{summaryRangeText}
             </span>
           )}
-          {summaryRow && <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />}
+          {summaryRow && (
+            <Badge color="gold" text={summaryAxis(summaryRow) === 'HORIZONTAL' ? '汇总列' : '汇总行'} style={{ marginLeft: 8 }} />
+          )}
         </span>
         {(summaryRow || binding) && (
           <Popconfirm
             title={summaryRow ? '取消该汇总配置？' : '确定清除此绑定？'}
-            description={summaryRow ? '将移除本汇总（列区间）的所有单元格' : undefined}
+            description={summaryRow
+              ? summaryAxis(summaryRow) === 'HORIZONTAL'
+                ? '将移除本汇总（行区间）的所有单元格'
+                : '将移除本汇总（列区间）的所有单元格'
+              : undefined}
             onConfirm={() => {
               if (summaryRow) onSummaryRowDelete(summaryRow.id);
               else if (binding) onBindingDelete(cellKey);
@@ -252,7 +258,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
       <div className="re-panel__content">
         {summaryRow ? (
-          /* ── 汇总行：单页展示 ── */
+          /* ── 汇总：单页展示 ── */
           <SummaryRowEditor
             summaryRow={summaryRow}
             crossPos={summaryCrossPos}
@@ -275,7 +281,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           /* ── 空白单元格 ── */
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。"
+            description="未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总」。"
             style={{ margin: '24px 0' }}
           >
             <Button

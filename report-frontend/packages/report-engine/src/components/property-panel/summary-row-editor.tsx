@@ -157,7 +157,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
               )}
             </Form.Item>
 
-            <Form.Item label="本格内容" tooltip="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
+            <Form.Item label="本格内容" tooltip="当前选中格在汇总显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
               {cell && (
                 <>
                   <ExpressionBuilder
