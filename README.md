@@ -33,7 +33,7 @@
 | 扩展什么 | 怎么扩展 |
 |---|---|
 | 新数据源类型（DB/API/…） | 实现 `DataExtractor`，注册到 `ReportRenderer` 的 extractors 列表 |
-| 新比较算子（LIKE/IN/BETWEEN…） | 实现 `ConditionPredicate`，登记到注册表 |
+| 新比较算子（REGEX/BETWEEN…） | 实现 `ConditionPredicate`，登记到注册表 |
 | 新聚合方式（COUNT_TRUE…） | 实现 `Aggregator`，登记到注册表 |
 | 新表达式函数（round/concat/if…） | 实现 `ValueFunction`，登记到注册表 |
 
@@ -53,7 +53,7 @@
 - [x] **单元格操作句柄**（`CellHandle`）：样式读写、值设置、富文本支持
 - [x] **声明式数据模型**（`report-engine-framework`）：
   - 数据域：DataSource（`DataSourceType` 枚举：CSV/JSON/DB/API/EXCEL）/ Dataset（sealed → TableDataset / UnionDataset）/ Field / Relationship
-  - 算子域：Aggregation（SUM/COUNT/AVG/MAX/MIN/COUNT_DISTINCT）/ Condition + 比较算子 SPI
+  - 算子域：Aggregation（SUM/COUNT/AVG/MAX/MIN/COUNT_DISTINCT）/ Condition（已实现 12 种比较算子：EQ/NE/GT/GE/LT/LE/CONTAINS/NOT_CONTAINS/IN/NOT_IN/IS_NULL/IS_NOT_NULL + SPI 扩展）
   - 表达式域：Value（sealed，8 种节点：Literal / FieldValue / ParamValue / LoopFieldValue / NameRef / Template / Aggregate / FunctionCall）/ ExpressionEngine 注册表分发 / ValueFunction SPI
   - 参数域：ParamSource（External / Cell / Constant）
   - 渲染域：CellBinding（值层 Value + 控制层 expansion/merge/conditions）/ LoopBlock / SummaryRow
@@ -75,10 +75,29 @@
 
 ### 待开发
 
-- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD
-- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型（当前 `GET /api/datamodels` 已支持多模型列举，仅 example 注册了 `"default"` 一个）
+#### 引擎能力
+
+- [ ] **横向扩展与交叉表**：`Expansion.HORIZONTAL` 枚举已存在、前端属性面板可选「↔ 横向」，但 `ReportRenderer` 尚未实现横向铺开与 VERTICAL×HORIZONTAL 交叉表渲染。⚠️ 当前选横向扩展后渲染行为未定义，需先隐藏入口或补实现
+- [ ] **JOIN 类型扩展**：`JoinType` 预留 LEFT/RIGHT/FULL，`Operators.join()` 仅实现 INNER JOIN。左外连接（如"员工 + 可选学历"）暂不可用，hash join 算法可按需扩展
+- [ ] **表达式函数扩充**：`ValueFunction` 仅实现 `format` / `date`，缺 round / concat / if 等常用函数（SPI 可扩展，开箱未提供）
+- [ ] **BETWEEN 范围算子**：枚举已移除（前端未暴露、未实现），日期/数值范围比较需重新加入枚举 + `ConditionPredicate` 实现 + 前端双右值入口
+
+#### 数据与存储
+
+- [ ] **多数据源提取器**：`DataSourceType` 有 DB/API/EXCEL/CSV/JSON 五种，`DataExtractor` 仅实现 `CsvDataExtractor`。DB/API/EXCEL/JSON 提取器未实现，运行时会抛异常（需先补 `JdbcDataExtractor` 等，前端数据源管理才有意义）
+- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD（后端提取器是前置依赖）
+- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型（`GET /api/datamodels` 已支持多模型列举，仅 example 注册了 `"default"` 一个）
+- [ ] **持久化存储实现**：`ReportRepository` 接口齐全，starter 不提供默认实现（`@ConditionalOnMissingBean` 交使用方），example 为 `InMemoryReportRepository`（重启丢失）。生产接入需自实现 JPA/文件等持久化
+
+#### 产品演进
+
 - [ ] **报表权限与共享**：报表配置的权限控制、多人协作、版本管理
 - [ ] **打印与分页**：报表分页设置、打印预览、页眉页脚配置
+
+#### 已知限制
+
+- [ ] **条件面板未按类型过滤算子**：`CompareOperator` 注释定义了按 `DataType` 过滤的可用算子表，但前端 `condition-modal` 当前全量展示 12 个算子（后端均已支持），未按字段类型收敛
+- [ ] **前端无自动化测试**：库包用 `bundle: false`，无测试用例；后端 framework/excel 有纯内存测试覆盖
 
 ## 快速开始
 
