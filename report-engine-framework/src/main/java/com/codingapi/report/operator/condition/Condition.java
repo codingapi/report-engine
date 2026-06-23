@@ -34,7 +34,7 @@ public class Condition {
     /** 左值表达式（通常是 {@link Value.FieldValue}，也可是算术等更复杂表达式）。 */
     private Value left;
 
-    /** 比较算子（EQ/NE/GT/LIKE/IN/BETWEEN 等）。 */
+    /** 比较算子（EQ/NE/GT/CONTAINS/IN/IS_NULL 等，见 {@link CompareOperator}）。 */
     private CompareOperator operator;
 
     /**
