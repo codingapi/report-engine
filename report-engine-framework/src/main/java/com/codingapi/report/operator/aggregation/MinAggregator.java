@@ -1,7 +1,6 @@
 package com.codingapi.report.operator.aggregation;
 
 import com.codingapi.report.expression.function.FunctionMeta;
-
 import java.util.List;
 import java.util.stream.DoubleStream;
 

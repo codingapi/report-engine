@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'antd';
-import type { Dataset, Relationship, ReportParam } from '../../types';
-import DatasetTree from '../dataset-tree';
+import type { Dataset, Relationship, ReportParam } from '@/types';
+import DatasetTree from '@/components/dataset-tree';
 import RelationshipList from './relationship-list';
 import ParamManager from './param-manager';
 
@@ -24,7 +24,9 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
 }) => {
   return (
     <div className="re-panel">
-      <div className="re-panel__title" style={{ paddingLeft: 12 }}>数据模型</div>
+      <div className="re-panel__title" style={{ paddingLeft: 12 }}>
+        数据模型
+      </div>
       <div className="re-panel__content">
         <Tabs
           size="small"

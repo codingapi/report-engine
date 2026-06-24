@@ -20,14 +20,14 @@
 
 ## 2. 技术选型
 
-| 用途 | 工具 |
-|---|---|
-| 测试运行器 | **rstest**（rsbuild 生态，Jest 兼容 API，复用现有 rsbuild/rspack 配置） |
-| 组件渲染 + 查询 | **@testing-library/react**（按 role/label/text 查询，反对 test-id） |
-| 用户交互模拟 | **@testing-library/user-event** |
-| 接口模拟 | **MSW**（Node 端 `setupServer`；浏览器端 `setupWorker`） |
-| DOM 环境 | **happy-dom**（逻辑/结构层，仓库已装、快、零环境依赖） |
-| 真浏览器（仅样式层用） | rstest Browser Mode / Playwright，**headless**，只读结构化渲染数据 |
+| 用途                   | 工具                                                                    |
+| ---------------------- | ----------------------------------------------------------------------- |
+| 测试运行器             | **rstest**（rsbuild 生态，Jest 兼容 API，复用现有 rsbuild/rspack 配置） |
+| 组件渲染 + 查询        | **@testing-library/react**（按 role/label/text 查询，反对 test-id）     |
+| 用户交互模拟           | **@testing-library/user-event**                                         |
+| 接口模拟               | **MSW**（Node 端 `setupServer`；浏览器端 `setupWorker`）                |
+| DOM 环境               | **happy-dom**（逻辑/结构层，仓库已装、快、零环境依赖）                  |
+| 真浏览器（仅样式层用） | rstest Browser Mode / Playwright，**headless**，只读结构化渲染数据      |
 
 > 注：rstest Browser Mode 目前为 experimental，落地时确认当前版本对所需 API 的支持情况。
 
@@ -39,12 +39,12 @@
 
 按成本从低到高分四层，绝大多数验证落在前两层：
 
-| 层 | 跑在哪 | 验证什么 | 失败输出 |
-|---|---|---|---|
-| 交互逻辑层（主力） | jsdom | 输入/点击后状态与渲染是否正确 | RTL 断言文本 |
-| 结构层 | jsdom | DOM 结构、ARIA 可访问性树（语义/层级） | 文本 diff |
-| 样式层 | 真浏览器 headless | 关键元素的 computed style + 几何（尺寸/坐标/遮挡） | 文本/数字 diff |
-| 像素层（默认禁用） | 真浏览器 headless | 像素级视觉回归 | PNG diff |
+| 层                 | 跑在哪            | 验证什么                                           | 失败输出       |
+| ------------------ | ----------------- | -------------------------------------------------- | -------------- |
+| 交互逻辑层（主力） | jsdom             | 输入/点击后状态与渲染是否正确                      | RTL 断言文本   |
+| 结构层             | jsdom             | DOM 结构、ARIA 可访问性树（语义/层级）             | 文本 diff      |
+| 样式层             | 真浏览器 headless | 关键元素的 computed style + 几何（尺寸/坐标/遮挡） | 文本/数字 diff |
+| 像素层（默认禁用） | 真浏览器 headless | 像素级视觉回归                                     | PNG diff       |
 
 **视觉验证用结构化对比，不用截图。** 原则是：不问「整体看起来对不对」，而是**显式声明在乎哪些属性**（背景色、文字颜色、高度、是否被遮挡、相对位置等），把它们读成 JSON 做断言或文本快照（「视觉指纹」）。
 
@@ -137,14 +137,16 @@ import { defineConfig } from '@rstest/core';
 import { withRslibConfig } from '@rstest/adapter-rslib';
 
 export default defineConfig({
-  extends: withRslibConfig(),   // 继承 rslib.config.ts 的 alias(@/) / define / source
+  extends: withRslibConfig(), // 继承 rslib.config.ts 的 alias(@/) / define / source
   testEnvironment: 'happy-dom', // 顶层！非 test.environment
   setupFiles: ['./test/setup.ts'], // 顶层！非 test.setupFiles
   globals: true,
 });
 ```
 
-**全局 API 与 vitest 不同**：rstest 没有 `vi`。`describe/it/test/expect/beforeAll/afterEach` 等开启 `globals: true` 后注入全局；mock 函数用全局 **`rs.fn()`**（或 `rstest.fn()`），`rs.spyOn()` 取代 `vi.spyOn()`。全局类型集中在 `test/globals.d.ts` 统一引用 `@rstest/core/globals`（`tsconfig.json` 的 `include` 含 `test/` 故自动加载），各测试文件无需逐个加 `/// <reference>`。`@/` alias 同理靠 tsconfig `paths` + rslib `resolve.alias` 解析（test 目录纳入 tsconfig 后 IDE/tsc 也能识别）。
+**全局 API 与 vitest 不同**：rstest 没有 `vi`。`describe/it/test/expect/beforeAll/afterEach` 等开启 `globals: true` 后注入全局；mock 函数用全局 **`rs.fn()`**（或 `rstest.fn()`），`rs.spyOn()` 取代 `vi.spyOn()`。全局类型集中在 `test/globals.d.ts` 统一引用 `@rstest/core/globals`，各测试文件无需逐个加 `/// <reference>`。
+
+**build 与 test 的 tsconfig 必须分离**（踩坑）：不要把 `test/` 加进主 `tsconfig.json` 的 `include`——rslib 生成 dts 时会把 test 文件纳入 TS program，test 的 devDep（@testing-library 等）在 build 上下文解析失败，导致 `Failed to generate declaration files`，`dist/index.d.ts` 缺失，依赖该包的下游（如 app-pc）IDE 全报 `Cannot find module`。正确做法：主 `tsconfig.json` 只 `include: ["src"]`（build/dts 用，rslib 默认读它）；另建 `test/tsconfig.json`（`extends "../tsconfig.json"` + `include: ["../src", "./**/*"]`）给测试/IDE 用——VS Code 对 `test/` 下文件会就近取 `test/tsconfig.json`，`@/`（paths 继承）与全局类型都能解析。`@/` 运行时仍靠 rslib `resolve.alias`（rstest 经 `extends: withRslibConfig()` 继承）。
 
 **setup 必须**：`import '@testing-library/jest-dom'`（注册 `toBeInTheDocument`/`toBeChecked` 等 matcher）+ `matchMedia` / `ResizeObserver` polyfill（happy-dom 缺，antd 组件依赖）+ MSW 生命周期（`server.listen` / `afterEach(resetHandlers)` / `server.close`）。
 
@@ -199,11 +201,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from './setup';
 
 test('成功后展示结果', async () => {
-  server.use(
-    http.post('/api/login', () =>
-      HttpResponse.json({ token: 'abc', name: 'Alice' }),
-    ),
-  );
+  server.use(http.post('/api/login', () => HttpResponse.json({ token: 'abc', name: 'Alice' })));
   const user = userEvent.setup();
   // render(<LoginPage />);
   await user.type(screen.getByLabelText('用户名'), 'alice');

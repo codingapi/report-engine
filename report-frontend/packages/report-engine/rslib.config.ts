@@ -1,30 +1,28 @@
-import {defineConfig} from '@rslib/core';
+import { defineConfig } from '@rslib/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 
 import * as path from 'node:path';
 
 export default defineConfig({
-    source: {
-        entry: {
-            index: ['./src/**'],
-        },
+  source: {
+    entry: {
+      index: ['./src/**'],
     },
-    lib: [
-        {
-            bundle: false,
-            dts: true,
-            format: 'esm',
-        },
-    ],
-    resolve: {
-        alias: {
-            "@/": path.resolve(__dirname, "src"),
-        }
+  },
+  lib: [
+    {
+      bundle: false,
+      dts: true,
+      format: 'esm',
     },
-    output: {
-        target: 'web',
+  ],
+  resolve: {
+    alias: {
+      '@/': path.resolve(__dirname, 'src'),
     },
-    plugins: [
-        pluginReact()
-    ]
+  },
+  output: {
+    target: 'web',
+  },
+  plugins: [pluginReact()],
 });

@@ -4,9 +4,9 @@ import lombok.Data;
 
 /**
  * 报表参数定义（持久化契约），对齐前端 {@code ReportParam}。
- * <p>
- * 扁平结构（name/alias/dataType/defaultValue），不引入 framework {@code Parameter} 的 {@code ParamSource} sealed
- * （后者无 Jackson 注解，不便于持久化）。dataType 用 String 存储枚举名。
+ *
+ * <p>扁平结构（name/alias/dataType/defaultValue），不引入 framework {@code Parameter} 的 {@code ParamSource}
+ * sealed （后者无 Jackson 注解，不便于持久化）。dataType 用 String 存储枚举名。
  */
 @Data
 public class ReportParam {

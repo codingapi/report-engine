@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Select } from 'antd';
-import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '../../types';
-import { OPERATOR_LABELS, genId } from '../../types';
+import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '@/types';
+import { OPERATOR_LABELS, genId } from '@/types';
 import ValueEditor from './value-editor';
 
 /** 不需要右值的运算符 */
@@ -100,7 +100,14 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
         </Form.Item>
 
         {!hideRight && (
-          <Form.Item label="右值" tooltip={operator === 'BETWEEN' ? '范围比较：输入 小值,大值，如 1,100' : '条件判断的右侧值，可以是文本、字段或参数'}>
+          <Form.Item
+            label="右值"
+            tooltip={
+              operator === 'BETWEEN'
+                ? '范围比较：输入 小值,大值，如 1,100'
+                : '条件判断的右侧值，可以是文本、字段或参数'
+            }
+          >
             <ValueEditor
               value={right || { type: 'Literal', payload: '' }}
               datasets={datasets}

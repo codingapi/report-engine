@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Tree, Tag } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
-import type { Dataset, DatasetField, Relationship, DataSourceType } from '../types';
-import { dataTypeLabel } from '../types';
+import type { Dataset, DatasetField, Relationship, DataSourceType } from '@/types';
+import { dataTypeLabel } from '@/types';
 
 interface DatasetTreeProps {
   datasets: Dataset[];
@@ -28,7 +28,10 @@ const SOURCE_COLORS: Record<DataSourceType, string> = {
 function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
   if (!sourceType) return null;
   return (
-    <Tag color={SOURCE_COLORS[sourceType] || 'default'} style={{ marginRight: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+    <Tag
+      color={SOURCE_COLORS[sourceType] || 'default'}
+      style={{ marginRight: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
+    >
       {sourceType}
     </Tag>
   );
@@ -128,10 +131,7 @@ function buildFieldNode(
 }
 
 /** 数据集节点（含字段子节点） */
-function buildDatasetNode(
-  ds: Dataset,
-  fieldRelationMap: Map<string, FieldRelation[]>,
-) {
+function buildDatasetNode(ds: Dataset, fieldRelationMap: Map<string, FieldRelation[]>) {
   return {
     key: ds.id,
     title: (
@@ -160,12 +160,7 @@ const DatasetTree: React.FC<DatasetTreeProps> = ({ datasets, relationships = [] 
 
   return (
     <div className="re-dataset-tree">
-      <Tree
-        treeData={treeData}
-        defaultExpandAll
-        blockNode
-        showLine={{ showLeafIcon: false }}
-      />
+      <Tree treeData={treeData} defaultExpandAll blockNode showLine={{ showLeafIcon: false }} />
     </div>
   );
 };

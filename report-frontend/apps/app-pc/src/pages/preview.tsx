@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Spin, Space, message } from 'antd';
+import { Button, message, Space, Spin } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { ReportPreview } from '@coding-report/report-engine';
 import type {
   CellBinding,
   LoopBlock,
-  SummaryRow,
-  ReportParam,
-  ReportConfig,
   RenderConfig,
-  DataModelInfo,
+  ReportConfig,
+  ReportParam,
+  SummaryRow,
 } from '@coding-report/report-engine';
+import { ReportPreview } from '@coding-report/report-engine';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 import {
+  type DataModelInfo,
+  drillReport,
   loadReportConfig,
   previewReport,
   renderReport,
-  drillReport,
 } from '@coding-report/report-api';
 
 /** 加载的报表配置（附带后端注入的数据模型信息） */
@@ -66,7 +66,9 @@ const AppPreview = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}
+      >
         <Spin size="large" description="加载报表..." />
       </div>
     );

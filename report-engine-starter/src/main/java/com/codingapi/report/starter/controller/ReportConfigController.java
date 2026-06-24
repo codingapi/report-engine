@@ -9,6 +9,7 @@ import com.codingapi.report.starter.converter.DataModelDtoAssembler;
 import com.codingapi.springboot.framework.dto.request.SearchRequest;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,15 +19,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 /**
  * 报表配置的保存 / 加载 / 列表 / 删除。
- * <p>
- * 配置以强类型 {@link ReportConfig} 实体存取（name/cellBindings/loopBlocks/summaries/params/template + 时间戳），
- * 打开报表时整体恢复前端状态。加载时附带数据模型信息（datasets + relationships）。
- * <p>
- * 存储交给 {@link ReportRepository}（使用方提供实现）。
+ *
+ * <p>配置以强类型 {@link ReportConfig} 实体存取（name/cellBindings/loopBlocks/summaries/params/template +
+ * 时间戳）， 打开报表时整体恢复前端状态。加载时附带数据模型信息（datasets + relationships）。
+ *
+ * <p>存储交给 {@link ReportRepository}（使用方提供实现）。
  */
 @RestController
 @RequestMapping("/api/report")
@@ -71,17 +70,20 @@ public class ReportConfigController {
         // Spring 入参 → framework 分页类型（接口本身不依赖 Spring）
         PageQuery query = new PageQuery(searchRequest.getCurrent(), searchRequest.getPageSize());
         PageResult<ReportConfig> result = repository.page(query);
-        List<ReportBrief> briefs = result.content().stream()
-                .map(r -> new ReportBrief(
-                        r.getId(),
-                        r.getName() != null ? r.getName() : "未命名报表",
-                        r.getDataModelId(),
-                        r.getCreateTime(),
-                        r.getUpdateTime()))
-                .toList();
+        List<ReportBrief> briefs =
+                result.content().stream()
+                        .map(
+                                r ->
+                                        new ReportBrief(
+                                                r.getId(),
+                                                r.getName() != null ? r.getName() : "未命名报表",
+                                                r.getDataModelId(),
+                                                r.getCreateTime(),
+                                                r.getUpdateTime()))
+                        .toList();
         return MultiResponse.of(briefs, result.total());
     }
 
-    public record ReportBrief(String id, String name, String dataModelId, long createTime, long updateTime) {
-    }
+    public record ReportBrief(
+            String id, String name, String dataModelId, long createTime, long updateTime) {}
 }

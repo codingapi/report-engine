@@ -1,15 +1,14 @@
 package com.codingapi.report.expression;
 
-import com.codingapi.report.param.ParamContext;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.codingapi.report.param.ParamContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 /**
  * 端到端集成测试：{@link Templates#parse} 解析 + {@link ExpressionEngine#eval} 求值。
@@ -72,10 +71,9 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("${COUNT(d.name)} 聚合：3 行 → 3")
     void countAggregate() {
         Value v = Templates.parse("${COUNT(d.name)}");
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("d.name", "张三"),
-                row("d.name", "李四"),
-                row("d.name", "王五")));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(row("d.name", "张三"), row("d.name", "李四"), row("d.name", "王五")));
         EvalContext ctx = EvalContext.aggregate(rows, new ParamContext(Map.of()));
         Object result = engine.eval(v, ctx);
         assertEquals(3L, result);
@@ -85,10 +83,12 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("${SUM(d.salary)} 聚合：8000+9000+7500 → 24500.0")
     void sumAggregate() {
         Value v = Templates.parse("${SUM(d.salary)}");
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("d.salary", 8000.0),
-                row("d.salary", 9000.0),
-                row("d.salary", 7500.0)));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(
+                                row("d.salary", 8000.0),
+                                row("d.salary", 9000.0),
+                                row("d.salary", 7500.0)));
         EvalContext ctx = EvalContext.aggregate(rows, new ParamContext(Map.of()));
         assertEquals(24500.0, engine.eval(v, ctx));
     }
@@ -97,10 +97,9 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("${AVG(d.score)} 聚合：80+90+70 → 80.0")
     void avgAggregate() {
         Value v = Templates.parse("${AVG(d.score)}");
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("d.score", 80.0),
-                row("d.score", 90.0),
-                row("d.score", 70.0)));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(row("d.score", 80.0), row("d.score", 90.0), row("d.score", 70.0)));
         EvalContext ctx = EvalContext.aggregate(rows, new ParamContext(Map.of()));
         assertEquals(80.0, engine.eval(v, ctx));
     }
@@ -113,10 +112,9 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("部门人数为 ${COUNT(d.name)} → 部门人数为 3")
     void textWithCountAggregate() {
         Value v = Templates.parse("部门人数为 ${COUNT(d.name)}");
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("d.name", "张三"),
-                row("d.name", "李四"),
-                row("d.name", "王五")));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(row("d.name", "张三"), row("d.name", "李四"), row("d.name", "王五")));
         EvalContext ctx = EvalContext.aggregate(rows, new ParamContext(Map.of()));
         assertEquals("部门人数为 3", engine.eval(v, ctx));
     }
@@ -125,10 +123,12 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("合计 ${SUM(d.salary)} 元 → 合计 24500 元")
     void textWithSumAggregate() {
         Value v = Templates.parse("合计 ${SUM(d.salary)} 元");
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("d.salary", 8000.0),
-                row("d.salary", 9000.0),
-                row("d.salary", 7500.0)));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(
+                                row("d.salary", 8000.0),
+                                row("d.salary", 9000.0),
+                                row("d.salary", 7500.0)));
         EvalContext ctx = EvalContext.aggregate(rows, new ParamContext(Map.of()));
         assertEquals("合计 24500 元", engine.eval(v, ctx));
     }
@@ -137,9 +137,9 @@ class ExpressionEvalWithTemplateTest {
     @DisplayName("${d.name} 的薪资为 ${d.salary} → 张三 的薪资为 8000")
     void textWithMultipleFieldRefs() {
         Value v = Templates.parse("${d.name} 的薪资为 ${d.salary}");
-        EvalContext ctx = EvalContext.scalar(
-                row("d.name", "张三", "d.salary", 8000.0),
-                new ParamContext(Map.of()));
+        EvalContext ctx =
+                EvalContext.scalar(
+                        row("d.name", "张三", "d.salary", 8000.0), new ParamContext(Map.of()));
         assertEquals("张三 的薪资为 8000", engine.eval(v, ctx));
     }
 

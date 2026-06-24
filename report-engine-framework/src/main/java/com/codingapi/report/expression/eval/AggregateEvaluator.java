@@ -6,7 +6,6 @@ import com.codingapi.report.expression.ExpressionEngine;
 import com.codingapi.report.expression.Value;
 import com.codingapi.report.expression.ValueEvaluator;
 import com.codingapi.report.operator.aggregation.Aggregators;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,8 +15,8 @@ import java.util.Map;
  * {@link Value.Aggregate} 求值：在上下文行集合上聚合子表达式的逐行结果，委托 {@link Aggregators}。
  *
  * <ul>
- *   <li>子表达式是 {@link Value.FieldValue}：直接用 {@link Aggregators} 聚合该列（快路径）</li>
- *   <li>子表达式是任意表达式（如 {@code base+bonus}）：逐行求值成临时列再聚合（通用路径）</li>
+ *   <li>子表达式是 {@link Value.FieldValue}：直接用 {@link Aggregators} 聚合该列（快路径）
+ *   <li>子表达式是任意表达式（如 {@code base+bonus}）：逐行求值成临时列再聚合（通用路径）
  * </ul>
  */
 public class AggregateEvaluator implements ValueEvaluator {

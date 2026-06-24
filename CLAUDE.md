@@ -12,6 +12,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **Goal-Driven Execution** — Define success criteria. Transform tasks into verifiable goals. Loop until verified.
 5. **代码提交纪律** — 完成修改后不要立即 git commit/push，等用户确认后再提交。先展示变更摘要。
 6. **优先使用 antd 组件** — 凡引入 antd 的前端项目，开发组件时先检查 antd 是否已有可直接使用的组件（如 Empty、List、Tag、Descriptions、Steps 等）。优先用 antd 原生组件实现，不自造轮子；仅当 antd 确实无法满足需求时才自行封装。
+7. **前端 import 路径规范** — 包内导入按目录深度选择写法：
+   - **同目录文件**用相对路径 `./xxx`（如 `./workbook-table`、`./condition-editor`）。
+   - **跨目录引用（含 `../` 的任何形式）一律用 `@/` 别名**，禁止 `../` 或 `../../` 相对路径。例：`from '@/types'`、`from '@/utils/excel-cell'`、`from '@/components/sheet-panel'`，不要写 `from '../../types'` 或 `from '../sheet-panel'`。
+   - **跨包引用**用包名（`@coding-report/report-univer` 等），不走相对路径。
+   - 理由：`../` 深度随文件位置变化、重构移文件易断、可读性差；`@/` 以 `src/` 为根、稳定且直观。各包 `rslib.config.ts` 与 `tsconfig.json` 均已配 `@/` → `src/` 的 alias/paths。
 
 ## Project Overview
 

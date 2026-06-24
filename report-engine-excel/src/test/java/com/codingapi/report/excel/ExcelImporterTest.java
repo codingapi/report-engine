@@ -1,18 +1,16 @@
 package com.codingapi.report.excel;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.codingapi.report.excel.pojo.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.InputStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.InputStream;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
- * Excel 导入器测试 — 验证 export → import 的 round-trip 正确性。
- * 先用 ExcelExporter 将 JSON 构建为 .xlsx，再用 ExcelImporter 解析回 Workbook，
- * 对比关键字段确认数据完整性。
+ * Excel 导入器测试 — 验证 export → import 的 round-trip 正确性。 先用 ExcelExporter 将 JSON 构建为 .xlsx，再用
+ * ExcelImporter 解析回 Workbook， 对比关键字段确认数据完整性。
  */
 class ExcelImporterTest {
 
@@ -185,16 +183,14 @@ class ExcelImporterTest {
         assertNotNull(sheet.getColumns());
 
         // Column 0: 200px width
-        Column col0 = sheet.getColumns().stream()
-                .filter(c -> c.getIndex() == 0)
-                .findFirst().orElse(null);
+        Column col0 =
+                sheet.getColumns().stream().filter(c -> c.getIndex() == 0).findFirst().orElse(null);
         assertNotNull(col0, "Column 0 should have custom width");
         assertEquals(200.0, col0.getWidth(), 5.0);
 
         // Column 1: 60px width
-        Column col1 = sheet.getColumns().stream()
-                .filter(c -> c.getIndex() == 1)
-                .findFirst().orElse(null);
+        Column col1 =
+                sheet.getColumns().stream().filter(c -> c.getIndex() == 1).findFirst().orElse(null);
         assertNotNull(col1, "Column 1 should have custom width");
         assertEquals(60.0, col1.getWidth(), 5.0);
     }

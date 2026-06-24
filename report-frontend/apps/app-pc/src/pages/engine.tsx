@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Spin, Button, message } from 'antd';
+import { Button, message, Spin } from 'antd';
 import { CloseOutlined, PrinterOutlined } from '@ant-design/icons';
+import type {
+  Dataset,
+  ExpressionCatalog,
+  Relationship,
+  ReportConfig,
+  ReportEngineHandle,
+} from '@coding-report/report-engine';
 import { ReportEngine } from '@coding-report/report-engine';
-import type { ReportEngineHandle, ReportConfig } from '@coding-report/report-engine';
-import type { Dataset, Relationship, ExpressionCatalog, DataModelInfo } from '@coding-report/report-engine';
 import {
-  importExcel, fetchFonts, renderReport, previewReport, drillReport, fetchFunctions,
-  saveReportConfig, loadReportConfig,
+  type DataModelInfo,
+  drillReport,
+  fetchFonts,
+  fetchFunctions,
+  importExcel,
+  loadReportConfig,
+  previewReport,
+  renderReport,
+  saveReportConfig,
 } from '@coding-report/report-api';
 
 // ─── 页面组件 ──────────────────────────────────
@@ -99,7 +111,9 @@ const AppReport = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}
+      >
         <Spin size="large" description="加载报表..." />
       </div>
     );

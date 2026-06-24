@@ -4,10 +4,8 @@ import lombok.Data;
 
 /**
  * Excel 字体样式模型，对应前端 ExcelFont 快照结构。
- * <p>
- * 所有字段均为可选（null 表示不覆盖默认字体设置）。
- * 可直接映射到 Apache POI 的 Font API。
- * </p>
+ *
+ * <p>所有字段均为可选（null 表示不覆盖默认字体设置）。 可直接映射到 Apache POI 的 Font API。
  */
 @Data
 public class Font {

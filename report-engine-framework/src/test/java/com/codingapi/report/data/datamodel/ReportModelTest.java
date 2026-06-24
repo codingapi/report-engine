@@ -1,37 +1,5 @@
 package com.codingapi.report.data.datamodel;
 
-import com.codingapi.report.render.Report;
-
-
-import com.codingapi.report.render.grid.CellBinding;
-import com.codingapi.report.expression.Value;
-import com.codingapi.report.expression.Templates;
-import com.codingapi.report.render.grid.CellRef;
-import com.codingapi.report.operator.condition.CompareOperator;
-import com.codingapi.report.operator.condition.Condition;
-import com.codingapi.report.render.grid.ExpandMode;
-import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.LoopBlock;
-import com.codingapi.report.param.ParamSource;
-import com.codingapi.report.param.Parameter;
-import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.DataSourceType;
-import com.codingapi.report.data.dataset.DataType;
-import com.codingapi.report.data.dataset.Dataset;
-import com.codingapi.report.data.dataset.TableDataset;
-import com.codingapi.report.data.dataset.Field;
-import com.codingapi.report.data.dataset.FieldRef;
-import com.codingapi.report.data.relation.JoinType;
-import com.codingapi.report.data.dataset.Query;
-import com.codingapi.report.data.relation.RelationOrigin;
-import com.codingapi.report.data.relation.Relationship;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -39,18 +7,47 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.codingapi.report.data.dataset.DataType;
+import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.dataset.FieldRef;
+import com.codingapi.report.data.dataset.Query;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.DataSourceType;
+import com.codingapi.report.data.relation.JoinType;
+import com.codingapi.report.data.relation.RelationOrigin;
+import com.codingapi.report.data.relation.Relationship;
+import com.codingapi.report.expression.Templates;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.operator.condition.CompareOperator;
+import com.codingapi.report.operator.condition.Condition;
+import com.codingapi.report.param.ParamSource;
+import com.codingapi.report.param.Parameter;
+import com.codingapi.report.render.Report;
+import com.codingapi.report.render.grid.CellBinding;
+import com.codingapi.report.render.grid.CellRef;
+import com.codingapi.report.render.grid.ExpandMode;
+import com.codingapi.report.render.grid.Expansion;
+import com.codingapi.report.render.grid.LoopBlock;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 /**
  * 用典型场景验证报表模型，同时充当模型设计的"可执行文档"。
  *
- * <p>核心结构：可复用的 {@link DataModel}（连接/数据集/关系）+ 引用它的多个 {@link Report}
- * （参数/格子/循环）。覆盖：
+ * <p>核心结构：可复用的 {@link DataModel}（连接/数据集/关系）+ 引用它的多个 {@link Report} （参数/格子/循环）。覆盖：
+ *
  * <ol>
- *   <li>DataModel 复用、跨源关系</li>
- *   <li>部门报表 —— 显式外部参数</li>
- *   <li>薪资条 —— 循环驱动 Query、LoopField 免登记、循环字段发现</li>
- *   <li>成绩交叉表 —— 行 × 列 + 参数化标题文本</li>
- *   <li>多级分组统计表 —— 父格链 + GROUP + 合并</li>
- *   <li>文本格 vs 字段格的密封区分</li>
+ *   <li>DataModel 复用、跨源关系
+ *   <li>部门报表 —— 显式外部参数
+ *   <li>薪资条 —— 循环驱动 Query、LoopField 免登记、循环字段发现
+ *   <li>成绩交叉表 —— 行 × 列 + 参数化标题文本
+ *   <li>多级分组统计表 —— 父格链 + GROUP + 合并
+ *   <li>文本格 vs 字段格的密封区分
  * </ol>
  */
 class ReportModelTest {
@@ -70,8 +67,12 @@ class ReportModelTest {
         assertEquals(hr.getId(), payslip.getDataModelId());
 
         assertEquals(1, hr.getRelationships().size());
-        assertTrue(deptReport.getExtraRelationships() == null || deptReport.getExtraRelationships().isEmpty());
-        assertTrue(payslip.getExtraRelationships() == null || payslip.getExtraRelationships().isEmpty());
+        assertTrue(
+                deptReport.getExtraRelationships() == null
+                        || deptReport.getExtraRelationships().isEmpty());
+        assertTrue(
+                payslip.getExtraRelationships() == null
+                        || payslip.getExtraRelationships().isEmpty());
     }
 
     @Test
@@ -107,8 +108,9 @@ class ReportModelTest {
 
         CellBinding nameCell = findFieldCell(report, new FieldRef("d_emp", "name"));
         assertEquals(Expansion.VERTICAL, nameCell.getExpansion());
-        Value.ParamValue ref = assertInstanceOf(Value.ParamValue.class,
-                nameCell.getConditions().get(0).getRight());
+        Value.ParamValue ref =
+                assertInstanceOf(
+                        Value.ParamValue.class, nameCell.getConditions().get(0).getRight());
         assertEquals("deptId", ref.name());
     }
 
@@ -124,7 +126,9 @@ class ReportModelTest {
 
         assertEquals("d_emp", q.getDatasetId());
         assertEquals(1, q.getFilters().size());
-        assertEquals(new Value.FieldValue(new FieldRef("d_emp", "status")), q.getFilters().get(0).getLeft());
+        assertEquals(
+                new Value.FieldValue(new FieldRef("d_emp", "status")),
+                q.getFilters().get(0).getLeft());
         assertTrue(q.getGroupBy() == null || q.getGroupBy().isEmpty());
     }
 
@@ -135,8 +139,11 @@ class ReportModelTest {
         LoopBlock loop = report.getLoopBlocks().get(0);
 
         CellBinding baseCell = findFieldCell(report, new FieldRef("d_salary", "base"));
-        Value.LoopFieldValue ref = assertInstanceOf(Value.LoopFieldValue.class,
-                baseCell.getConditions().get(0).getRight(), "应为循环字段引用而非预登记参数");
+        Value.LoopFieldValue ref =
+                assertInstanceOf(
+                        Value.LoopFieldValue.class,
+                        baseCell.getConditions().get(0).getRight(),
+                        "应为循环字段引用而非预登记参数");
         assertEquals(loop.getId(), ref.loopBlockId());
         assertEquals("id", ref.field());
 
@@ -171,8 +178,12 @@ class ReportModelTest {
     void crossTab_rowAndColumnExpansion() {
         Report report = scoreCrossTab(eduDataModel());
 
-        assertEquals(Expansion.VERTICAL, findFieldCell(report, new FieldRef("d_score", "student")).getExpansion());
-        assertEquals(Expansion.HORIZONTAL, findFieldCell(report, new FieldRef("d_score", "subject")).getExpansion());
+        assertEquals(
+                Expansion.VERTICAL,
+                findFieldCell(report, new FieldRef("d_score", "student")).getExpansion());
+        assertEquals(
+                Expansion.HORIZONTAL,
+                findFieldCell(report, new FieldRef("d_score", "subject")).getExpansion());
 
         CellBinding scoreCell = findFieldCell(report, new FieldRef("d_score", "score"));
         assertEquals(Expansion.NONE, scoreCell.getExpansion());
@@ -186,13 +197,19 @@ class ReportModelTest {
         Report report = scoreCrossTab(eduDataModel());
 
         // 标题是文本格：值为 Template（文本插值），而非字段/聚合
-        CellBinding title = report.getCellBindings().stream()
-                .filter(b -> b.getValue() instanceof Value.Template)
-                .findFirst().orElseThrow();
+        CellBinding title =
+                report.getCellBindings().stream()
+                        .filter(b -> b.getValue() instanceof Value.Template)
+                        .findFirst()
+                        .orElseThrow();
         Value.Template tpl = (Value.Template) title.getValue();
         // 模板含静态文本片段「年度成绩交叉表」
-        assertTrue(tpl.parts().stream().anyMatch(
-                p -> p instanceof Value.Template.Text t && t.text().equals("年度成绩交叉表")));
+        assertTrue(
+                tpl.parts().stream()
+                        .anyMatch(
+                                p ->
+                                        p instanceof Value.Template.Text t
+                                                && t.text().equals("年度成绩交叉表")));
 
         // 文本里的参数占位符都能在报表参数里找到（与条件共用同一套参数系统）
         Set<String> placeholders = templatePlaceholders(tpl);
@@ -232,38 +249,79 @@ class ReportModelTest {
 
     /** 人事数据模型：员工(人事库) + 薪资(薪资库) + 跨库关系。被部门报表与薪资条共享。 */
     private static DataModel hrDataModel() {
-        DataSource hrDb = DataSource.builder()
-                .id("ds_hr").name("人事库").type(DataSourceType.DB).build();
-        DataSource payDb = DataSource.builder()
-                .id("ds_pay").name("薪资库").type(DataSourceType.DB).build();
+        DataSource hrDb =
+                DataSource.builder().id("ds_hr").name("人事库").type(DataSourceType.DB).build();
+        DataSource payDb =
+                DataSource.builder().id("ds_pay").name("薪资库").type(DataSourceType.DB).build();
 
-        Dataset emp = TableDataset.builder()
-                .id("d_emp").datasourceId("ds_hr").sourceTable("employee").alias("员工")
-                .fields(List.of(
-                        Field.builder().name("id").alias("ID").dataType(DataType.NUMBER).primaryKey(true).build(),
-                        Field.builder().name("name").alias("姓名").dataType(DataType.STRING).build(),
-                        Field.builder().name("dept_id").alias("部门").dataType(DataType.NUMBER).build(),
-                        Field.builder().name("status").alias("状态").dataType(DataType.STRING).build()))
-                .build();
+        Dataset emp =
+                TableDataset.builder()
+                        .id("d_emp")
+                        .datasourceId("ds_hr")
+                        .sourceTable("employee")
+                        .alias("员工")
+                        .fields(
+                                List.of(
+                                        Field.builder()
+                                                .name("id")
+                                                .alias("ID")
+                                                .dataType(DataType.NUMBER)
+                                                .primaryKey(true)
+                                                .build(),
+                                        Field.builder()
+                                                .name("name")
+                                                .alias("姓名")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("dept_id")
+                                                .alias("部门")
+                                                .dataType(DataType.NUMBER)
+                                                .build(),
+                                        Field.builder()
+                                                .name("status")
+                                                .alias("状态")
+                                                .dataType(DataType.STRING)
+                                                .build()))
+                        .build();
 
-        Dataset salary = TableDataset.builder()
-                .id("d_salary").datasourceId("ds_pay").sourceTable("salary").alias("薪资")
-                .fields(List.of(
-                        Field.builder().name("emp_id").alias("员工").dataType(DataType.NUMBER).build(),
-                        Field.builder().name("base").alias("基本工资").dataType(DataType.NUMBER).build(),
-                        Field.builder().name("bonus").alias("奖金").dataType(DataType.NUMBER).build()))
-                .build();
+        Dataset salary =
+                TableDataset.builder()
+                        .id("d_salary")
+                        .datasourceId("ds_pay")
+                        .sourceTable("salary")
+                        .alias("薪资")
+                        .fields(
+                                List.of(
+                                        Field.builder()
+                                                .name("emp_id")
+                                                .alias("员工")
+                                                .dataType(DataType.NUMBER)
+                                                .build(),
+                                        Field.builder()
+                                                .name("base")
+                                                .alias("基本工资")
+                                                .dataType(DataType.NUMBER)
+                                                .build(),
+                                        Field.builder()
+                                                .name("bonus")
+                                                .alias("奖金")
+                                                .dataType(DataType.NUMBER)
+                                                .build()))
+                        .build();
 
-        Relationship rel = Relationship.builder()
-                .id("rel_emp_salary")
-                .left(new FieldRef("d_salary", "emp_id"))
-                .right(new FieldRef("d_emp", "id"))
-                .joinType(JoinType.INNER)
-                .origin(RelationOrigin.MANUAL)
-                .build();
+        Relationship rel =
+                Relationship.builder()
+                        .id("rel_emp_salary")
+                        .left(new FieldRef("d_salary", "emp_id"))
+                        .right(new FieldRef("d_emp", "id"))
+                        .joinType(JoinType.INNER)
+                        .origin(RelationOrigin.MANUAL)
+                        .build();
 
         return DataModel.builder()
-                .id("dm_hr").name("人事数据模型")
+                .id("dm_hr")
+                .name("人事数据模型")
                 .datasources(List.of(hrDb, payDb))
                 .datasets(List.of(emp, salary))
                 .relationships(List.of(rel))
@@ -272,36 +330,80 @@ class ReportModelTest {
 
     /** 教务数据模型：成绩宽表（单数据集，无需关系） */
     private static DataModel eduDataModel() {
-        DataSource edu = DataSource.builder()
-                .id("ds_edu").name("教务库").type(DataSourceType.DB).build();
-        Dataset score = TableDataset.builder()
-                .id("d_score").datasourceId("ds_edu").sourceTable("score_view").alias("成绩")
-                .fields(List.of(
-                        Field.builder().name("student").alias("学生").dataType(DataType.STRING).build(),
-                        Field.builder().name("subject").alias("科目").dataType(DataType.STRING).build(),
-                        Field.builder().name("score").alias("分数").dataType(DataType.NUMBER).build()))
-                .build();
+        DataSource edu =
+                DataSource.builder().id("ds_edu").name("教务库").type(DataSourceType.DB).build();
+        Dataset score =
+                TableDataset.builder()
+                        .id("d_score")
+                        .datasourceId("ds_edu")
+                        .sourceTable("score_view")
+                        .alias("成绩")
+                        .fields(
+                                List.of(
+                                        Field.builder()
+                                                .name("student")
+                                                .alias("学生")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("subject")
+                                                .alias("科目")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("score")
+                                                .alias("分数")
+                                                .dataType(DataType.NUMBER)
+                                                .build()))
+                        .build();
         return DataModel.builder()
-                .id("dm_edu").name("教务数据模型")
-                .datasources(List.of(edu)).datasets(List.of(score)).relationships(List.of())
+                .id("dm_edu")
+                .name("教务数据模型")
+                .datasources(List.of(edu))
+                .datasets(List.of(score))
+                .relationships(List.of())
                 .build();
     }
 
     /** 统计数据模型：单位/部门/明细 宽表 */
     private static DataModel statDataModel() {
-        DataSource db = DataSource.builder()
-                .id("ds_stat").name("统计库").type(DataSourceType.DB).build();
-        Dataset stat = TableDataset.builder()
-                .id("d_stat").datasourceId("ds_stat").sourceTable("stat_view").alias("统计")
-                .fields(List.of(
-                        Field.builder().name("unit").alias("单位").dataType(DataType.STRING).build(),
-                        Field.builder().name("dept").alias("部门").dataType(DataType.STRING).build(),
-                        Field.builder().name("name").alias("姓名").dataType(DataType.STRING).build(),
-                        Field.builder().name("amount").alias("金额").dataType(DataType.NUMBER).build()))
-                .build();
+        DataSource db =
+                DataSource.builder().id("ds_stat").name("统计库").type(DataSourceType.DB).build();
+        Dataset stat =
+                TableDataset.builder()
+                        .id("d_stat")
+                        .datasourceId("ds_stat")
+                        .sourceTable("stat_view")
+                        .alias("统计")
+                        .fields(
+                                List.of(
+                                        Field.builder()
+                                                .name("unit")
+                                                .alias("单位")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("dept")
+                                                .alias("部门")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("name")
+                                                .alias("姓名")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("amount")
+                                                .alias("金额")
+                                                .dataType(DataType.NUMBER)
+                                                .build()))
+                        .build();
         return DataModel.builder()
-                .id("dm_stat").name("统计数据模型")
-                .datasources(List.of(db)).datasets(List.of(stat)).relationships(List.of())
+                .id("dm_stat")
+                .name("统计数据模型")
+                .datasources(List.of(db))
+                .datasets(List.of(stat))
+                .relationships(List.of())
                 .build();
     }
 
@@ -311,25 +413,35 @@ class ReportModelTest {
 
     /** 部门报表：员工明细列表，按运行时传入的 deptId 过滤 */
     private static Report departmentReport(DataModel dm) {
-        Parameter deptId = Parameter.builder()
-                .name("deptId").dataType(DataType.NUMBER)
-                .source(new ParamSource.External(true, null))
-                .build();
+        Parameter deptId =
+                Parameter.builder()
+                        .name("deptId")
+                        .dataType(DataType.NUMBER)
+                        .source(new ParamSource.External(true, null))
+                        .build();
 
-        CellBinding nameCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 1, 0))
-                .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST)
-                
-                .conditions(List.of(Condition.builder()
-                        .left(new Value.FieldValue(new FieldRef("d_emp", "dept_id")))
-                        .operator(CompareOperator.EQ)
-                        .right(new Value.ParamValue("deptId"))
-                        .build()))
-                .build();
+        CellBinding nameCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 1, 0))
+                        .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
+                        .expansion(Expansion.VERTICAL)
+                        .expandMode(ExpandMode.LIST)
+                        .conditions(
+                                List.of(
+                                        Condition.builder()
+                                                .left(
+                                                        new Value.FieldValue(
+                                                                new FieldRef("d_emp", "dept_id")))
+                                                .operator(CompareOperator.EQ)
+                                                .right(new Value.ParamValue("deptId"))
+                                                .build()))
+                        .build();
 
         return Report.builder()
-                .id("r_dept").name("部门员工报表").dataModelId(dm.getId()).templateId("tpl_dept")
+                .id("r_dept")
+                .name("部门员工报表")
+                .dataModelId(dm.getId())
+                .templateId("tpl_dept")
                 .parameters(List.of(deptId))
                 .cellBindings(List.<CellBinding>of(nameCell))
                 .loopBlocks(List.of())
@@ -338,44 +450,65 @@ class ReportModelTest {
 
     /** 薪资条：循环按在职员工迭代，每张条只查当前 empId 的薪资 */
     private static Report payslipReport(DataModel dm) {
-        LoopBlock loop = LoopBlock.builder()
-                .id("loop_emp").label("按员工循环")
-                .start(new CellRef("sheet1", 0, 0)).end(new CellRef("sheet1", 3, 2))
-                .source(Query.builder()
-                        .datasetId("d_emp")
-                        .filters(List.of(Condition.builder()
-                                .left(new Value.FieldValue(new FieldRef("d_emp", "status")))
-                                .operator(CompareOperator.EQ)
-                                .right(new Value.Literal("在职"))
-                                .build()))
-                        .groupBy(List.of())
-                        .build())
-                .build();
+        LoopBlock loop =
+                LoopBlock.builder()
+                        .id("loop_emp")
+                        .label("按员工循环")
+                        .start(new CellRef("sheet1", 0, 0))
+                        .end(new CellRef("sheet1", 3, 2))
+                        .source(
+                                Query.builder()
+                                        .datasetId("d_emp")
+                                        .filters(
+                                                List.of(
+                                                        Condition.builder()
+                                                                .left(
+                                                                        new Value.FieldValue(
+                                                                                new FieldRef(
+                                                                                        "d_emp",
+                                                                                        "status")))
+                                                                .operator(CompareOperator.EQ)
+                                                                .right(new Value.Literal("在职"))
+                                                                .build()))
+                                        .groupBy(List.of())
+                                        .build())
+                        .build();
 
-        Parameter deptId = Parameter.builder()
-                .name("deptId").dataType(DataType.NUMBER)
-                .source(new ParamSource.External(false, null))
-                .build();
+        Parameter deptId =
+                Parameter.builder()
+                        .name("deptId")
+                        .dataType(DataType.NUMBER)
+                        .source(new ParamSource.External(false, null))
+                        .build();
 
-        CellBinding nameCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 0, 1))
-                .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
-                .expansion(Expansion.NONE)
-                .build();
+        CellBinding nameCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 0, 1))
+                        .value(new Value.FieldValue(new FieldRef("d_emp", "name")))
+                        .expansion(Expansion.NONE)
+                        .build();
 
-        CellBinding baseCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 1, 1))
-                .value(new Value.FieldValue(new FieldRef("d_salary", "base")))
-                .expansion(Expansion.NONE)
-                .conditions(List.of(Condition.builder()
-                        .left(new Value.FieldValue(new FieldRef("d_salary", "emp_id")))
-                        .operator(CompareOperator.EQ)
-                        .right(new Value.LoopFieldValue("loop_emp", "id"))
-                        .build()))
-                .build();
+        CellBinding baseCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 1, 1))
+                        .value(new Value.FieldValue(new FieldRef("d_salary", "base")))
+                        .expansion(Expansion.NONE)
+                        .conditions(
+                                List.of(
+                                        Condition.builder()
+                                                .left(
+                                                        new Value.FieldValue(
+                                                                new FieldRef("d_salary", "emp_id")))
+                                                .operator(CompareOperator.EQ)
+                                                .right(new Value.LoopFieldValue("loop_emp", "id"))
+                                                .build()))
+                        .build();
 
         return Report.builder()
-                .id("r_payslip").name("员工薪资条").dataModelId(dm.getId()).templateId("tpl_payslip")
+                .id("r_payslip")
+                .name("员工薪资条")
+                .dataModelId(dm.getId())
+                .templateId("tpl_payslip")
                 .parameters(List.of(deptId))
                 .cellBindings(List.<CellBinding>of(nameCell, baseCell))
                 .loopBlocks(List.of(loop))
@@ -384,35 +517,49 @@ class ReportModelTest {
 
     /** 成绩交叉表：行=学生(纵向)、列=科目(横向)、交叉=平均分；标题含参数 ${year} */
     private static Report scoreCrossTab(DataModel dm) {
-        Parameter year = Parameter.builder()
-                .name("year").dataType(DataType.NUMBER)
-                .source(new ParamSource.External(true, null))
-                .build();
+        Parameter year =
+                Parameter.builder()
+                        .name("year")
+                        .dataType(DataType.NUMBER)
+                        .source(new ParamSource.External(true, null))
+                        .build();
 
-        CellBinding title = CellBinding.builder()
-                .cell(new CellRef("sheet1", 0, 0))
-                .value(Templates.parse("${year}年度成绩交叉表"))
-                .build();
+        CellBinding title =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 0, 0))
+                        .value(Templates.parse("${year}年度成绩交叉表"))
+                        .build();
 
-        CellBinding studentCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 2, 0))
-                .value(new Value.FieldValue(new FieldRef("d_score", "student")))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP)
-                .build();
-        CellBinding subjectCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 1, 1))
-                .value(new Value.FieldValue(new FieldRef("d_score", "subject")))
-                .expansion(Expansion.HORIZONTAL).expandMode(ExpandMode.GROUP)
-                .build();
-        CellBinding scoreCell = CellBinding.builder()
-                .cell(new CellRef("sheet1", 2, 1))
-                .value(new Value.Aggregate("AVG", new Value.FieldValue(new FieldRef("d_score", "score"))))
-                .expansion(Expansion.NONE)
-                .parentCell(new CellRef("sheet1", 2, 0))
-                .build();
+        CellBinding studentCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 2, 0))
+                        .value(new Value.FieldValue(new FieldRef("d_score", "student")))
+                        .expansion(Expansion.VERTICAL)
+                        .expandMode(ExpandMode.GROUP)
+                        .build();
+        CellBinding subjectCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 1, 1))
+                        .value(new Value.FieldValue(new FieldRef("d_score", "subject")))
+                        .expansion(Expansion.HORIZONTAL)
+                        .expandMode(ExpandMode.GROUP)
+                        .build();
+        CellBinding scoreCell =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 2, 1))
+                        .value(
+                                new Value.Aggregate(
+                                        "AVG",
+                                        new Value.FieldValue(new FieldRef("d_score", "score"))))
+                        .expansion(Expansion.NONE)
+                        .parentCell(new CellRef("sheet1", 2, 0))
+                        .build();
 
         return Report.builder()
-                .id("r_crosstab").name("学生成绩交叉表").dataModelId(dm.getId()).templateId("tpl_crosstab")
+                .id("r_crosstab")
+                .name("学生成绩交叉表")
+                .dataModelId(dm.getId())
+                .templateId("tpl_crosstab")
                 .parameters(List.of(year))
                 .cellBindings(List.<CellBinding>of(title, studentCell, subjectCell, scoreCell))
                 .loopBlocks(List.of())
@@ -424,23 +571,38 @@ class ReportModelTest {
         CellRef unitRef = new CellRef("sheet1", 1, 0);
         CellRef deptRef = new CellRef("sheet1", 1, 1);
 
-        CellBinding unit = CellBinding.builder()
-                .cell(unitRef).value(new Value.FieldValue(new FieldRef("d_stat", "unit")))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
-                .build();
-        CellBinding dept = CellBinding.builder()
-                .cell(deptRef).value(new Value.FieldValue(new FieldRef("d_stat", "dept")))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.GROUP).mergeRepeated(true)
-                .parentCell(unitRef)
-                .build();
-        CellBinding detail = CellBinding.builder()
-                .cell(new CellRef("sheet1", 1, 2)).value(new Value.FieldValue(new FieldRef("d_stat", "amount")))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).mergeRepeated(false)
-                .parentCell(deptRef)
-                .build();
+        CellBinding unit =
+                CellBinding.builder()
+                        .cell(unitRef)
+                        .value(new Value.FieldValue(new FieldRef("d_stat", "unit")))
+                        .expansion(Expansion.VERTICAL)
+                        .expandMode(ExpandMode.GROUP)
+                        .mergeRepeated(true)
+                        .build();
+        CellBinding dept =
+                CellBinding.builder()
+                        .cell(deptRef)
+                        .value(new Value.FieldValue(new FieldRef("d_stat", "dept")))
+                        .expansion(Expansion.VERTICAL)
+                        .expandMode(ExpandMode.GROUP)
+                        .mergeRepeated(true)
+                        .parentCell(unitRef)
+                        .build();
+        CellBinding detail =
+                CellBinding.builder()
+                        .cell(new CellRef("sheet1", 1, 2))
+                        .value(new Value.FieldValue(new FieldRef("d_stat", "amount")))
+                        .expansion(Expansion.VERTICAL)
+                        .expandMode(ExpandMode.LIST)
+                        .mergeRepeated(false)
+                        .parentCell(deptRef)
+                        .build();
 
         return Report.builder()
-                .id("r_orgstat").name("单位部门统计表").dataModelId(dm.getId()).templateId("tpl_orgstat")
+                .id("r_orgstat")
+                .name("单位部门统计表")
+                .dataModelId(dm.getId())
+                .templateId("tpl_orgstat")
                 .parameters(List.of())
                 .cellBindings(List.<CellBinding>of(unit, dept, detail))
                 .loopBlocks(List.of())
@@ -451,27 +613,33 @@ class ReportModelTest {
     // ---- 辅助方法 ----
     // ============================================================
 
-
     private static Parameter findParam(Report report, String name) {
         return report.getParameters().stream()
-                .filter(p -> p.getName().equals(name)).findFirst().orElseThrow();
+                .filter(p -> p.getName().equals(name))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static Dataset findDataset(DataModel dm, String id) {
         return dm.getDatasets().stream()
-                .filter(d -> d.getId().equals(id)).findFirst().orElseThrow();
+                .filter(d -> d.getId().equals(id))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static DataSource findDatasource(DataModel dm, String id) {
         return dm.getDatasources().stream()
-                .filter(d -> d.getId().equals(id)).findFirst().orElseThrow();
+                .filter(d -> d.getId().equals(id))
+                .findFirst()
+                .orElseThrow();
     }
 
     /** 在报表里找值绑定了指定字段的 CellBinding（FieldValue 或 Aggregate(FieldValue)） */
     private static CellBinding findFieldCell(Report report, FieldRef field) {
         return report.getCellBindings().stream()
                 .filter(b -> field.equals(fieldOf(b)))
-                .findFirst().orElseThrow();
+                .findFirst()
+                .orElseThrow();
     }
 
     /** 取格子值绑定的字段：FieldValue 或 Aggregate(FieldValue) 时返回 FieldRef，否则 null。 */
@@ -509,8 +677,8 @@ class ReportModelTest {
     }
 
     /**
-     * 计算某个格子可引用的"取值来源"，演示循环字段的免登记可发现性：
-     * 报表参数（{@code :name}） ∪ 落在循环块范围内时该循环驱动数据集的字段（{@code loopId.field}）。
+     * 计算某个格子可引用的"取值来源"，演示循环字段的免登记可发现性： 报表参数（{@code :name}） ∪ 落在循环块范围内时该循环驱动数据集的字段（{@code
+     * loopId.field}）。
      */
     private static Set<String> availableValueSources(DataModel dm, Report report, CellRef cell) {
         Set<String> sources = new HashSet<>();
@@ -532,7 +700,9 @@ class ReportModelTest {
         CellRef s = loop.getStart();
         CellRef e = loop.getEnd();
         return s.sheetId().equals(cell.sheetId())
-                && cell.row() >= s.row() && cell.row() <= e.row()
-                && cell.column() >= s.column() && cell.column() <= e.column();
+                && cell.row() >= s.row()
+                && cell.row() <= e.row()
+                && cell.column() >= s.column()
+                && cell.column() <= e.column();
     }
 }

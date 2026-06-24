@@ -49,9 +49,7 @@ const DrillModal: React.FC<DrillModalProps> = ({ open, loading, result, onClose 
       styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
     >
       {rows.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>
-          无明细数据
-        </div>
+        <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>无明细数据</div>
       ) : (
         <Table
           dataSource={rows}

@@ -3,6 +3,11 @@ package com.codingapi.report.excel;
 import com.codingapi.report.excel.pojo.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
@@ -16,21 +21,12 @@ import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Excel 导出器，将 {@link Workbook} JSON 模型转换为 Apache POI 的 .xlsx 字节流。
- * <p>
- * 支持完整的样式映射：字体、对齐、边框（13 种线型）、填充、旋转、换行、数字格式、
- * 富文本分段样式、合并区域、自定义行高列宽、隐藏行列等。
- * </p>
- * <p>
- * 此类为纯 Java 实现，不依赖任何 Web 框架，可在任意 Java 环境中使用。
- * </p>
+ *
+ * <p>支持完整的样式映射：字体、对齐、边框（13 种线型）、填充、旋转、换行、数字格式、 富文本分段样式、合并区域、自定义行高列宽、隐藏行列等。
+ *
+ * <p>此类为纯 Java 实现，不依赖任何 Web 框架，可在任意 Java 环境中使用。
  *
  * @see Workbook
  * @see ExcelImporter
@@ -38,21 +34,21 @@ import java.util.Map;
 public class ExcelExporter {
 
     /** 前端边框线型字符串 → POI BorderStyle 枚举的映射表 */
-    private static final Map<String, BorderStyle> BORDER_STYLE_MAP = Map.ofEntries(
-            Map.entry("thin", BorderStyle.THIN),
-            Map.entry("hair", BorderStyle.HAIR),
-            Map.entry("dotted", BorderStyle.DOTTED),
-            Map.entry("dashed", BorderStyle.DASHED),
-            Map.entry("dashDot", BorderStyle.DASH_DOT),
-            Map.entry("dashDotDot", BorderStyle.DASH_DOT_DOT),
-            Map.entry("double", BorderStyle.DOUBLE),
-            Map.entry("medium", BorderStyle.MEDIUM),
-            Map.entry("mediumDashed", BorderStyle.MEDIUM_DASHED),
-            Map.entry("mediumDashDot", BorderStyle.MEDIUM_DASH_DOT),
-            Map.entry("mediumDashDotDot", BorderStyle.MEDIUM_DASH_DOT_DOT),
-            Map.entry("slantDashDot", BorderStyle.SLANTED_DASH_DOT),
-            Map.entry("thick", BorderStyle.THICK)
-    );
+    private static final Map<String, BorderStyle> BORDER_STYLE_MAP =
+            Map.ofEntries(
+                    Map.entry("thin", BorderStyle.THIN),
+                    Map.entry("hair", BorderStyle.HAIR),
+                    Map.entry("dotted", BorderStyle.DOTTED),
+                    Map.entry("dashed", BorderStyle.DASHED),
+                    Map.entry("dashDot", BorderStyle.DASH_DOT),
+                    Map.entry("dashDotDot", BorderStyle.DASH_DOT_DOT),
+                    Map.entry("double", BorderStyle.DOUBLE),
+                    Map.entry("medium", BorderStyle.MEDIUM),
+                    Map.entry("mediumDashed", BorderStyle.MEDIUM_DASHED),
+                    Map.entry("mediumDashDot", BorderStyle.MEDIUM_DASH_DOT),
+                    Map.entry("mediumDashDotDot", BorderStyle.MEDIUM_DASH_DOT_DOT),
+                    Map.entry("slantDashDot", BorderStyle.SLANTED_DASH_DOT),
+                    Map.entry("thick", BorderStyle.THICK));
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -71,7 +67,7 @@ public class ExcelExporter {
     /**
      * 将 Workbook 模型导出到指定的输出流。
      *
-     * @param workbook   工作簿模型
+     * @param workbook 工作簿模型
      * @param outputStream 目标输出流（调用方负责关闭）
      */
     public void export(Workbook workbook, OutputStream outputStream) {
@@ -88,7 +84,8 @@ public class ExcelExporter {
     }
 
     private void buildSheet(XSSFWorkbook wb, Sheet dto) {
-        String sheetName = (dto.getName() != null && !dto.getName().isEmpty()) ? dto.getName() : "Sheet";
+        String sheetName =
+                (dto.getName() != null && !dto.getName().isEmpty()) ? dto.getName() : "Sheet";
         org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet(sheetName);
 
         sheet.setDefaultRowHeightInPoints(pixelsToPoints(dto.getDefaultRowHeight()));
@@ -123,12 +120,12 @@ public class ExcelExporter {
 
         if (dto.getMerges() != null) {
             for (Merge m : dto.getMerges()) {
-                sheet.addMergedRegion(new CellRangeAddress(
-                        m.getStartRow(),
-                        m.getStartRow() + m.getRowSpan() - 1,
-                        m.getStartCol(),
-                        m.getStartCol() + m.getColSpan() - 1
-                ));
+                sheet.addMergedRegion(
+                        new CellRangeAddress(
+                                m.getStartRow(),
+                                m.getStartRow() + m.getRowSpan() - 1,
+                                m.getStartCol(),
+                                m.getStartCol() + m.getColSpan() - 1));
             }
             // 合并区边框补全：锚点格的边框需铺到整个合并区周边，否则只在左上角画出残缺边框
             for (Merge m : dto.getMerges()) {
@@ -139,12 +136,16 @@ public class ExcelExporter {
 
     /**
      * 把合并区锚点格（左上格）的边框铺满整个合并区域：
-     * <p>POI 中合并单元格只有左上格的样式生效，若边框只设在锚点格上，Excel 仅在该格四周描边，
-     * 视觉上合并区边框残缺。此方法按位置把锚点边框分配到周边各格——顶边铺到首行各格、
+     *
+     * <p>POI 中合并单元格只有左上格的样式生效，若边框只设在锚点格上，Excel 仅在该格四周描边， 视觉上合并区边框残缺。此方法按位置把锚点边框分配到周边各格——顶边铺到首行各格、
      * 底边铺到末行各格、左/右边铺到首/末列各格——并保留 RGB 颜色与锚点的字体/填充。
      */
-    private void applyMergeBorders(XSSFWorkbook wb, org.apache.poi.ss.usermodel.Sheet sheet,
-                                   Sheet dto, Merge m, Map<String, CellStyle> styleCache) {
+    private void applyMergeBorders(
+            XSSFWorkbook wb,
+            org.apache.poi.ss.usermodel.Sheet sheet,
+            Sheet dto,
+            Merge m,
+            Map<String, CellStyle> styleCache) {
         int r1 = m.getStartRow();
         int r2 = m.getStartRow() + m.getRowSpan() - 1;
         int c1 = m.getStartCol();
@@ -157,7 +158,10 @@ public class ExcelExporter {
             return;
         }
         Borders bd = anchor.getStyle().getBorders();
-        if (bd.getTop() == null && bd.getBottom() == null && bd.getLeft() == null && bd.getRight() == null) {
+        if (bd.getTop() == null
+                && bd.getBottom() == null
+                && bd.getLeft() == null
+                && bd.getRight() == null) {
             return;
         }
         for (int r = r1; r <= r2; r++) {
@@ -167,8 +171,10 @@ public class ExcelExporter {
                 if (r == r2) edges.setBottom(bd.getBottom());
                 if (c == c1) edges.setLeft(bd.getLeft());
                 if (c == c2) edges.setRight(bd.getRight());
-                if (edges.getTop() == null && edges.getBottom() == null
-                        && edges.getLeft() == null && edges.getRight() == null) {
+                if (edges.getTop() == null
+                        && edges.getBottom() == null
+                        && edges.getLeft() == null
+                        && edges.getRight() == null) {
                     continue; // 内部格无周边边框
                 }
                 Style cellStyle = styleWithBorders(anchor.getStyle(), edges);
@@ -209,7 +215,11 @@ public class ExcelExporter {
         return null;
     }
 
-    private void buildCell(XSSFWorkbook wb, org.apache.poi.ss.usermodel.Sheet sheet, Cell dto, Map<String, CellStyle> styleCache) {
+    private void buildCell(
+            XSSFWorkbook wb,
+            org.apache.poi.ss.usermodel.Sheet sheet,
+            Cell dto,
+            Map<String, CellStyle> styleCache) {
         org.apache.poi.ss.usermodel.Row row = getOrCreateRow(sheet, dto.getRow());
         org.apache.poi.ss.usermodel.Cell cell = row.createCell(dto.getCol());
 
@@ -352,10 +362,22 @@ public class ExcelExporter {
         XSSFColor color = parseColor(border.getColor());
         XSSFCellStyle xssfStyle = (XSSFCellStyle) style;
         switch (side) {
-            case "top" -> { xssfStyle.setBorderTop(bs); if (color != null) xssfStyle.setTopBorderColor(color); }
-            case "right" -> { xssfStyle.setBorderRight(bs); if (color != null) xssfStyle.setRightBorderColor(color); }
-            case "bottom" -> { xssfStyle.setBorderBottom(bs); if (color != null) xssfStyle.setBottomBorderColor(color); }
-            case "left" -> { xssfStyle.setBorderLeft(bs); if (color != null) xssfStyle.setLeftBorderColor(color); }
+            case "top" -> {
+                xssfStyle.setBorderTop(bs);
+                if (color != null) xssfStyle.setTopBorderColor(color);
+            }
+            case "right" -> {
+                xssfStyle.setBorderRight(bs);
+                if (color != null) xssfStyle.setRightBorderColor(color);
+            }
+            case "bottom" -> {
+                xssfStyle.setBorderBottom(bs);
+                if (color != null) xssfStyle.setBottomBorderColor(color);
+            }
+            case "left" -> {
+                xssfStyle.setBorderLeft(bs);
+                if (color != null) xssfStyle.setLeftBorderColor(color);
+            }
         }
     }
 
@@ -410,7 +432,8 @@ public class ExcelExporter {
         };
     }
 
-    private static org.apache.poi.ss.usermodel.Row getOrCreateRow(org.apache.poi.ss.usermodel.Sheet sheet, int rowIndex) {
+    private static org.apache.poi.ss.usermodel.Row getOrCreateRow(
+            org.apache.poi.ss.usermodel.Sheet sheet, int rowIndex) {
         org.apache.poi.ss.usermodel.Row row = sheet.getRow(rowIndex);
         return row != null ? row : sheet.createRow(rowIndex);
     }

@@ -4,10 +4,8 @@ import lombok.Data;
 
 /**
  * 富文本分段模型，对应前端 ExcelRichText 的 segments 元素。
- * <p>
- * 每个分段包含一段文本和可选的字体样式。
- * 所有分段的 text 按顺序拼接应等于 RichText.text 的完整内容。
- * </p>
+ *
+ * <p>每个分段包含一段文本和可选的字体样式。 所有分段的 text 按顺序拼接应等于 RichText.text 的完整内容。
  */
 @Data
 public class RichTextSegment {

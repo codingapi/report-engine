@@ -1,4 +1,4 @@
-import type { SummaryRow, SummaryAxis } from '../types';
+import type { SummaryRow, SummaryAxis } from '@/types';
 
 /** 汇总方向，缺省视为纵向（向后兼容旧配置）。 */
 export const summaryAxis = (s: Pick<SummaryRow, 'axis'>): SummaryAxis => s.axis ?? 'VERTICAL';
@@ -27,7 +27,9 @@ export const mainPosOf = (axis: SummaryAxis, row: number, col: number): number =
 /** (row, col) 是否命中某汇总：主轴位置相符且交叉坐标落在 [crossFrom, crossTo] 内。 */
 export const summaryHit = (s: SummaryRow, row: number, col: number): boolean => {
   const axis = summaryAxis(s);
-  return mainPosOf(axis, row, col) === s.mainPos
-    && crossPosOf(axis, row, col) >= s.crossFrom
-    && crossPosOf(axis, row, col) <= s.crossTo;
+  return (
+    mainPosOf(axis, row, col) === s.mainPos &&
+    crossPosOf(axis, row, col) >= s.crossFrom &&
+    crossPosOf(axis, row, col) <= s.crossTo
+  );
 };

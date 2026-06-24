@@ -13,16 +13,41 @@ export type DataType = 'STRING' | 'NUMBER' | 'DATE' | 'DATETIME' | 'BOOLEAN' | '
 export type Expansion = 'VERTICAL' | 'HORIZONTAL' | 'NONE';
 export type ExpandMode = 'GROUP' | 'LIST';
 export type Aggregation = 'NONE' | 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'AVG' | 'MAX' | 'MIN';
-export type CompareOperator = 'EQ' | 'NE' | 'GT' | 'LT' | 'GE' | 'LE' | 'CONTAINS' | 'NOT_CONTAINS' | 'IN' | 'NOT_IN' | 'IS_NULL' | 'IS_NOT_NULL' | 'BETWEEN';
-export type ValueType = 'Literal' | 'FieldValue' | 'ParamValue' | 'LoopFieldValue' | 'Template' | 'Aggregate' | 'FunctionCall' | 'NameRef';
+export type CompareOperator =
+  | 'EQ'
+  | 'NE'
+  | 'GT'
+  | 'LT'
+  | 'GE'
+  | 'LE'
+  | 'CONTAINS'
+  | 'NOT_CONTAINS'
+  | 'IN'
+  | 'NOT_IN'
+  | 'IS_NULL'
+  | 'IS_NOT_NULL'
+  | 'BETWEEN';
+export type ValueType =
+  | 'Literal'
+  | 'FieldValue'
+  | 'ParamValue'
+  | 'LoopFieldValue'
+  | 'Template'
+  | 'Aggregate'
+  | 'FunctionCall'
+  | 'NameRef';
 export type JoinType = 'INNER' | 'LEFT' | 'RIGHT' | 'FULL';
 export type ParamSourceType = 'External' | 'Cell' | 'Constant';
 
 // ─── 标签映射 ──────────────────────────────────
 
 export const DATA_TYPE_LABELS: Record<DataType, string> = {
-  STRING: '字符串', NUMBER: '数字', DATE: '日期',
-  DATETIME: '日期时间', BOOLEAN: '布尔值', JSON: 'JSON',
+  STRING: '字符串',
+  NUMBER: '数字',
+  DATE: '日期',
+  DATETIME: '日期时间',
+  BOOLEAN: '布尔值',
+  JSON: 'JSON',
 };
 
 /** DataType → 中文标签（找不到回退原始值） */
@@ -31,27 +56,51 @@ export function dataTypeLabel(dt: DataType | string): string {
 }
 
 /** Select 组件 options（参数弹窗等表单复用） */
-export const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> =
-  Object.entries(DATA_TYPE_LABELS).map(([value, label]) => ({ value: value as DataType, label }));
+export const DATA_TYPE_OPTIONS: Array<{ value: DataType; label: string }> = Object.entries(
+  DATA_TYPE_LABELS,
+).map(([value, label]) => ({ value: value as DataType, label }));
 
 export const AGG_LABELS: Record<Aggregation, string> = {
-  NONE: '不聚合', COUNT: '计数', COUNT_DISTINCT: '去重计数',
-  SUM: '求和', AVG: '平均值', MAX: '最大值', MIN: '最小值',
+  NONE: '不聚合',
+  COUNT: '计数',
+  COUNT_DISTINCT: '去重计数',
+  SUM: '求和',
+  AVG: '平均值',
+  MAX: '最大值',
+  MIN: '最小值',
 };
 
 export const EXPANSION_LABELS: Record<Expansion, string> = {
-  VERTICAL: '↕ 纵向', HORIZONTAL: '↔ 横向', NONE: '· 不扩展',
+  VERTICAL: '↕ 纵向',
+  HORIZONTAL: '↔ 横向',
+  NONE: '· 不扩展',
 };
 
 export const OPERATOR_LABELS: Record<CompareOperator, string> = {
-  EQ: '等于', NE: '不等于', GT: '大于', LT: '小于',
-  GE: '大于等于', LE: '小于等于', CONTAINS: '包含', NOT_CONTAINS: '不包含',
-  IN: '在...之中', NOT_IN: '不在...之中', IS_NULL: '为空', IS_NOT_NULL: '不为空', BETWEEN: '介于',
+  EQ: '等于',
+  NE: '不等于',
+  GT: '大于',
+  LT: '小于',
+  GE: '大于等于',
+  LE: '小于等于',
+  CONTAINS: '包含',
+  NOT_CONTAINS: '不包含',
+  IN: '在...之中',
+  NOT_IN: '不在...之中',
+  IS_NULL: '为空',
+  IS_NOT_NULL: '不为空',
+  BETWEEN: '介于',
 };
 
 export const VALUE_TYPE_LABELS: Record<ValueType, string> = {
-  Literal: '文本', FieldValue: '字段', ParamValue: '参数', LoopFieldValue: '循环字段',
-  Template: '模板', Aggregate: '聚合', FunctionCall: '函数', NameRef: '名称引用',
+  Literal: '文本',
+  FieldValue: '字段',
+  ParamValue: '参数',
+  LoopFieldValue: '循环字段',
+  Template: '模板',
+  Aggregate: '聚合',
+  FunctionCall: '函数',
+  NameRef: '名称引用',
 };
 
 // ─── 数据域 ────────────────────────────────────
@@ -225,8 +274,7 @@ let _idCounter = 0;
 export const genId = () => `r-${Date.now().toString(36)}-${++_idCounter}`;
 
 /** 按 datasetId 查找数据集 */
-export const findDataset = (datasets: Dataset[], id: string) =>
-  datasets.find((d) => d.id === id);
+export const findDataset = (datasets: Dataset[], id: string) => datasets.find((d) => d.id === id);
 
 /** 按 "datasetId.field" 查找字段 */
 export const findField = (datasets: Dataset[], ref: string): DatasetField | null => {
@@ -287,11 +335,15 @@ export interface ReportConfig {
  */
 export interface RenderService {
   /** 网页预览：发送配置 + 模板 → 返回填充数据的工作簿 + 反查格坐标 */
-  preview: (request: import('@coding-report/report-api').RenderRequest) => Promise<import('@coding-report/report-api').PreviewResult>;
+  preview: (
+    request: import('@coding-report/report-api').RenderRequest,
+  ) => Promise<import('@coding-report/report-api').PreviewResult>;
   /** 导出：发送配置 + 模板 → 返回 .xlsx Blob */
   export: (request: import('@coding-report/report-api').RenderRequest) => Promise<Blob>;
   /** 反查：渲染配置 + 目标格坐标 → 返回明细行 */
-  drill: (params: import('@coding-report/report-api').DrillRequestParams) => Promise<import('@coding-report/report-api').DrillResult>;
+  drill: (
+    params: import('@coding-report/report-api').DrillRequestParams,
+  ) => Promise<import('@coding-report/report-api').DrillResult>;
 }
 
 /** 渲染入参：单元格绑定 + 循环块 + 汇总行 + 模板快照 + 报表参数。 */

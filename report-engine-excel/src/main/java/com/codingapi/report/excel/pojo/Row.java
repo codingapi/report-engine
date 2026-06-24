@@ -4,10 +4,8 @@ import lombok.Data;
 
 /**
  * 自定义行配置模型，对应前端 ExcelRow 快照结构。
- * <p>
- * 仅需要自定义行高或隐藏状态的行才需要出现在 Sheet.rows 列表中，
- * 未列出的行使用 Sheet.defaultRowHeight 作为行高且默认可见。
- * </p>
+ *
+ * <p>仅需要自定义行高或隐藏状态的行才需要出现在 Sheet.rows 列表中， 未列出的行使用 Sheet.defaultRowHeight 作为行高且默认可见。
  */
 @Data
 public class Row {

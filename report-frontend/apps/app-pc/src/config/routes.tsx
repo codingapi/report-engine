@@ -3,7 +3,7 @@ import HomePage from '@/pages/home';
 import ReportsPage from '@/pages/reports';
 import AppReport from '@/pages/engine';
 import AppPreview from '@/pages/preview';
-import React from "react";
+import React from 'react';
 
 export interface RouteConfig {
   path: string;

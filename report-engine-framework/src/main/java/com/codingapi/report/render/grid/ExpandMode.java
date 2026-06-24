@@ -4,7 +4,9 @@ package com.codingapi.report.render.grid;
  * 扩展模式：决定扩展时是否对数据去重。仅当 {@link Expansion} 不为 NONE 时有意义。
  *
  * <h3>两种模式的区别</h3>
+ *
  * <p>以员工数据（3 人，2 个部门）为例：
+ *
  * <pre>
  *   原始数据：
  *   部门    姓名    工资
@@ -23,10 +25,13 @@ package com.codingapi.report.render.grid;
  * </pre>
  *
  * <h3>典型组合</h3>
+ *
  * <p>多级分组表中，外层分组列用 GROUP，内层明细列用 LIST：
+ *
  * <pre>
  *   单位(GROUP) → 部门(GROUP) → 姓名(LIST) → 工资(LIST)
  * </pre>
+ *
  * GROUP 列通常配合 {@link CellBinding#isMergeRepeated()} 把相邻相同值合并为跨行单元格。
  */
 public enum ExpandMode {

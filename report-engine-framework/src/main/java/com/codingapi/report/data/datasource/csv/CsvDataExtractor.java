@@ -1,13 +1,12 @@
 package com.codingapi.report.data.datasource.csv;
 
+import com.codingapi.report.data.dataset.DataType;
+import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.DataSourceType;
-import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.RawTable;
-import com.codingapi.report.data.dataset.Dataset;
-import com.codingapi.report.data.dataset.DataType;
-import com.codingapi.report.data.dataset.Field;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -22,7 +21,9 @@ import java.util.Map;
  * CSV 数据提取器：从 classpath 资源读取 CSV 文件，转为 {@link RawTable}。
  *
  * <h3>数据源配置</h3>
+ *
  * <p>CSV 文件路径通过 {@code DataSource.config["path"]} 指定，如：
+ *
  * <pre>
  *   DataSource.builder()
  *     .id("csv_employees")
@@ -32,19 +33,21 @@ import java.util.Map;
  * </pre>
  *
  * <h3>提取过程</h3>
+ *
  * <ol>
- *   <li>读取 CSV 全部行（第一行为表头）</li>
- *   <li>用 Dataset 的字段名列表匹配 CSV 表头，建立"字段名 → 列索引"映射</li>
- *   <li>逐行提取，按字段的 {@link com.codingapi.report.data.dataset.DataType} 归一化值：
- *       NUMBER → Double，BOOLEAN → Boolean，其余 → String</li>
- *   <li>列名使用限定名 {@code datasetId.field}（由 {@link RawTable} 约定），避免多表 join 后字段冲突</li>
+ *   <li>读取 CSV 全部行（第一行为表头）
+ *   <li>用 Dataset 的字段名列表匹配 CSV 表头，建立"字段名 → 列索引"映射
+ *   <li>逐行提取，按字段的 {@link com.codingapi.report.data.dataset.DataType} 归一化值： NUMBER → Double，BOOLEAN
+ *       → Boolean，其余 → String
+ *   <li>列名使用限定名 {@code datasetId.field}（由 {@link RawTable} 约定），避免多表 join 后字段冲突
  * </ol>
  *
  * <h3>当前实现的限制（最小引擎）</h3>
+ *
  * <ul>
- *   <li>逗号分隔，不处理引号转义（字段值不能包含逗号）</li>
- *   <li>取整表，不做过滤下推（过滤交给 {@link Operators} 在 Java 层完成）</li>
- *   <li>无编码检测，固定 UTF-8</li>
+ *   <li>逗号分隔，不处理引号转义（字段值不能包含逗号）
+ *   <li>取整表，不做过滤下推（过滤交给 {@link Operators} 在 Java 层完成）
+ *   <li>无编码检测，固定 UTF-8
  * </ul>
  *
  * <p>这些限制对测试和演示场景足够，生产环境可扩展为完整的 CSV 解析（如引入 OpenCSV）。
@@ -84,9 +87,10 @@ public class CsvDataExtractor implements DataExtractor {
             for (Field f : dataset.getFields()) {
                 Integer idx = headerIndex.get(f.getName());
                 // 字段名在 CSV 表头中找不到，或列数不够 → null
-                Object val = (idx == null || idx >= parts.length)
-                        ? null
-                        : coerce(parts[idx].trim(), f.getDataType());
+                Object val =
+                        (idx == null || idx >= parts.length)
+                                ? null
+                                : coerce(parts[idx].trim(), f.getDataType());
                 // 限定列名：datasetId.field（join 后不会与其他表的同名字段冲突）
                 row.put(dataset.getId() + "." + f.getName(), val);
             }
@@ -106,11 +110,13 @@ public class CsvDataExtractor implements DataExtractor {
 
     /**
      * 类型归一化：将 CSV 字符串值按字段的 DataType 转换为 Java 类型。
+     *
      * <ul>
-     *   <li>NUMBER → {@code Double}（使 Operators 的数值比较和聚合能正确工作）</li>
-     *   <li>BOOLEAN → {@code Boolean}</li>
-     *   <li>其余（STRING/DATE/DATETIME/JSON）→ 保持 {@code String}</li>
+     *   <li>NUMBER → {@code Double}（使 Operators 的数值比较和聚合能正确工作）
+     *   <li>BOOLEAN → {@code Boolean}
+     *   <li>其余（STRING/DATE/DATETIME/JSON）→ 保持 {@code String}
      * </ul>
+     *
      * 空字符串或 null → 返回 null。
      */
     private static Object coerce(String s, DataType type) {
@@ -129,7 +135,8 @@ public class CsvDataExtractor implements DataExtractor {
             if (in == null) {
                 throw new IllegalStateException("找不到 CSV 资源: " + path);
             }
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             List<String> lines = new ArrayList<>();
             String line;
             while ((line = reader.readLine()) != null) {

@@ -37,7 +37,11 @@ function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
 }
 
 /** "loopId.field" → "循环块标签.字段别名"（如 员工循环.姓名） */
-function loopFieldLabel(ref: string | undefined, datasets: Dataset[], loopBlocks: LoopBlock[]): string {
+function loopFieldLabel(
+  ref: string | undefined,
+  datasets: Dataset[],
+  loopBlocks: LoopBlock[],
+): string {
   if (!ref) return '';
   const dot = ref.indexOf('.');
   const loopId = dot === -1 ? ref : ref.slice(0, dot);
@@ -55,7 +59,12 @@ function loopFieldLabel(ref: string | undefined, datasets: Dataset[], loopBlocks
  * 表达式 → `${}` 内部的友好字符串（不含 ${} 包裹）。
  * 数据模型字段显示别名；参数（NameRef/ParamValue）显示别名。
  */
-function exprToDisplay(v: ReportValue, datasets: Dataset[], loopBlocks: LoopBlock[], params: ReportParam[] = []): string {
+function exprToDisplay(
+  v: ReportValue,
+  datasets: Dataset[],
+  loopBlocks: LoopBlock[],
+  params: ReportParam[] = [],
+): string {
   switch (v.type) {
     case 'Literal':
       return v.payload || '';
@@ -92,7 +101,11 @@ export function valueDisplayText(
   if (value.type === 'Template') {
     if (!value.parts) return '';
     return value.parts
-      .map((p) => (p.kind === 'text' ? p.text || '' : `\${${exprToDisplay(p.value!, datasets, loopBlocks, params)}}`))
+      .map((p) =>
+        p.kind === 'text'
+          ? p.text || ''
+          : `\${${exprToDisplay(p.value!, datasets, loopBlocks, params)}}`,
+      )
       .join('');
   }
   return `\${${exprToDisplay(value, datasets, loopBlocks, params)}}`;
@@ -233,7 +246,11 @@ function parseExpr(expr: string, loopBlocks: LoopBlock[] = []): ReportValue {
         operand: argsStr ? parseExpr(argsStr, loopBlocks) : { type: 'Literal', payload: '' },
       };
     }
-    return { type: 'FunctionCall', funcName: name, args: argsStr ? splitArgs(argsStr, loopBlocks) : [] };
+    return {
+      type: 'FunctionCall',
+      funcName: name,
+      args: argsStr ? splitArgs(argsStr, loopBlocks) : [],
+    };
   }
   if (expr.includes('.')) {
     // 检查是否是循环块字段引用

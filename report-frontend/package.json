@@ -20,7 +20,8 @@
     "lint": "rslint",
     "lint:fix": "rslint --fix",
     "test:report-engine": "pnpm -F @coding-report/report-engine test",
-    "test": "pnpm run test:report-engine",
+    "test:report-univer": "pnpm -F @coding-report/report-univer test",
+    "test": "pnpm run test:report-univer && pnpm run test:report-engine",
     "clean": "pnpm cleaninstall-node"
   },
   "keywords": [],
@@ -45,6 +46,7 @@
     "@types/react-dom": "^18.3.5",
     "cleaninstall-node": "^2.2.3",
     "happy-dom": "^20.8.3",
+    "prettier": "^3.8.4",
     "typescript": "^5.9.3"
   }
 }

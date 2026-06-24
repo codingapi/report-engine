@@ -2,7 +2,6 @@ package com.codingapi.report.operator.aggregation;
 
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.expression.function.FunctionMeta;
-
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +15,11 @@ public class CountDistinctAggregator implements Aggregator {
 
     @Override
     public FunctionMeta meta() {
-        return new FunctionMeta("COUNT_DISTINCT", "去重计数", List.of("字段"), "统计不重复的行数，如 COUNT_DISTINCT(employees.dept)");
+        return new FunctionMeta(
+                "COUNT_DISTINCT",
+                "去重计数",
+                List.of("字段"),
+                "统计不重复的行数，如 COUNT_DISTINCT(employees.dept)");
     }
 
     @Override

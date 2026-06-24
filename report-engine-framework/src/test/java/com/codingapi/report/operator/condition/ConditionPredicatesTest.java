@@ -1,12 +1,12 @@
 package com.codingapi.report.operator.condition;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.Test;
+
 /**
- * 条件算子注册表测试：覆盖 CONTAINS/NOT_CONTAINS/IN/NOT_IN/IS_NULL/IS_NOT_NULL 六个算子，
- * 验证 {@link ConditionPredicates#test} 的策略分发与各算子语义（均在 Java 内存完成，不下推 SQL）。
+ * 条件算子注册表测试：覆盖 CONTAINS/NOT_CONTAINS/IN/NOT_IN/IS_NULL/IS_NOT_NULL 六个算子， 验证 {@link
+ * ConditionPredicates#test} 的策略分发与各算子语义（均在 Java 内存完成，不下推 SQL）。
  */
 class ConditionPredicatesTest {
 

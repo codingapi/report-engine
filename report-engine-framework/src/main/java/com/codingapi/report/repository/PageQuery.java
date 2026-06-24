@@ -2,9 +2,8 @@ package com.codingapi.report.repository;
 
 /**
  * 分页查询参数（framework 纯类型，不依赖 Spring）。
- * <p>
- * 归一逻辑下沉到访问器：{@code current<1 → 1}，{@code pageSize<=0 → 10}，
- * 使用方无需各自重复防御。
+ *
+ * <p>归一逻辑下沉到访问器：{@code current<1 → 1}，{@code pageSize<=0 → 10}， 使用方无需各自重复防御。
  */
 public record PageQuery(int current, int pageSize) {
 

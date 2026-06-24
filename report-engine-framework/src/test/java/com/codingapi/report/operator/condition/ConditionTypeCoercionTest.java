@@ -1,16 +1,14 @@
 package com.codingapi.report.operator.condition;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.codingapi.report.operator.Values;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 条件比较的类型转换测试。
  *
- * 核心策略：
- * - EQ/NE：统一转字符串比较（泛化能力强）
- * - GT/GE/LT/LE：数值优先（两端都能转 double 时按数值比）
+ * <p>核心策略： - EQ/NE：统一转字符串比较（泛化能力强） - GT/GE/LT/LE：数值优先（两端都能转 double 时按数值比）
  */
 class ConditionTypeCoercionTest {
 
