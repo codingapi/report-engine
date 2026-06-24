@@ -97,7 +97,6 @@
 #### 已知限制
 
 - [ ] **条件面板未按类型过滤算子**：`CompareOperator` 注释定义了按 `DataType` 过滤的可用算子表，但前端 `condition-modal` 当前全量展示 13 个算子（后端均已支持），未按字段类型收敛
-- [ ] **前端无自动化测试**：库包用 `bundle: false`，无测试用例；后端 framework/excel 有纯内存测试覆盖
 
 ## 快速开始
 
@@ -125,11 +124,24 @@ cd report-frontend
 # 安装依赖
 pnpm install
 
-# 构建库包（report-univer → report-api → report-engine）
+# 构建库包（report-univer → report-api → report-engine）+ app-pc
 pnpm build
+
+# 跑库包单测（report-univer + report-engine，rstest）
+pnpm test
 
 # 启动演示应用
 pnpm dev:app-pc
+```
+
+### 代码格式化
+
+前后端格式化能力已接入，手动触发：
+
+```bash
+./scripts/format.sh              # 全量（前端 prettier + 后端 spotless）
+./scripts/format.sh frontend     # 仅前端：prettier（单引号/分号/2空格，配置见 report-frontend/.prettierrc）
+./scripts/format.sh backend      # 仅后端：./mvnw spotless:apply（AOSP / 4 空格）
 ```
 
 ### 自定义字体
