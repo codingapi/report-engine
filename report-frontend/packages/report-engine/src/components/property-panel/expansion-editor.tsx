@@ -1,8 +1,8 @@
 import React from 'react';
 import { Form, Radio, Select, Switch } from 'antd';
-import type { CellBinding, Expansion, ExpandMode } from '../../types';
-import { EXPANSION_LABELS } from '../../types';
-import { parseCellKey, cellA1 } from '../../utils/excel-cell';
+import type { CellBinding, Expansion, ExpandMode } from '@/types';
+import { EXPANSION_LABELS } from '@/types';
+import { parseCellKey, cellA1 } from '@/utils/excel-cell';
 
 interface ExpansionEditorProps {
   expansion: Expansion;

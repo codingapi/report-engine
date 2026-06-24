@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type { SheetPanelHandle } from '../components/sheet-panel';
-import type { CellBinding, LoopBlock, SummaryRow, ReportParam, Dataset, ReportConfig, ReportEngineProps } from '../types';
-import { valueDisplayText, templateToString } from '../value-text';
-import { summaryAxis, summaryHit, crossPosOf } from '../utils/summary-axis';
+import type { SheetPanelHandle } from '@/components/sheet-panel';
+import type { CellBinding, LoopBlock, SummaryRow, ReportParam, Dataset, ReportConfig, ReportEngineProps } from '@/types';
+import { valueDisplayText, templateToString } from '@/value-text';
+import { summaryAxis, summaryHit, crossPosOf } from '@/utils/summary-axis';
 
 export interface UseReportIOOptions {
   sheetRef: React.RefObject<SheetPanelHandle>;

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Form, Select, Radio, Alert, Space, Tabs } from 'antd';
-import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '../../types';
-import { findDataset } from '../../types';
-import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
-import { valueDisplayText } from '../../value-text';
+import type { SummaryRow, SummaryCell, Dataset, LoopBlock, ReportParam, ExpressionCatalog, ReportValue } from '@/types';
+import { findDataset } from '@/types';
+import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
+import { valueDisplayText } from '@/value-text';
 import ExpressionBuilder from './expression-builder';
 import DrillEditor from './drill-editor';
 

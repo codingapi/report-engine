@@ -6,8 +6,8 @@ import type {
   RenderRequest,
 } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
-import type { ReportParam, RenderConfig, RenderService } from '../types';
-import { toBindingDTO } from '../utils/render-dto';
+import type { ReportParam, RenderConfig, RenderService } from '@/types';
+import { toBindingDTO } from '@/utils/render-dto';
 
 export interface UseReportPreviewOptions {
   renderService: RenderService;

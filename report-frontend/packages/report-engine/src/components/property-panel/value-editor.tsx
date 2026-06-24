@@ -7,14 +7,14 @@ import type {
   Aggregation,
   Dataset,
   LoopBlock,
-} from '../../types';
+} from '@/types';
 import {
   VALUE_TYPE_LABELS,
   AGG_LABELS,
   findDataset,
-} from '../../types';
-import { templateToString, parseTemplate } from '../../value-text';
-import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
+} from '@/types';
+import { templateToString, parseTemplate } from '@/value-text';
+import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
 
 interface ValueEditorProps {
   value: ReportValue;

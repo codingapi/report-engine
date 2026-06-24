@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Popconfirm, Badge, Tabs, Empty, Form } from 'antd';
 import { PlusOutlined, DeleteOutlined, MenuFoldOutlined } from '@ant-design/icons';
-import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '../../types';
-import type { SheetCellSelectInfo } from '../sheet-panel';
+import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '@/types';
+import type { SheetCellSelectInfo } from '@/components/sheet-panel';
 import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
 import ConditionEditor from './condition-editor';
 import SummaryRowEditor from './summary-row-editor';
 import DrillEditor from './drill-editor';
-import { valueDisplayText } from '../../value-text';
-import { cellA1 } from '../../utils/excel-cell';
-import { summaryAxis, summaryCellRC, summaryHit, crossPosOf } from '../../utils/summary-axis';
+import { valueDisplayText } from '@/value-text';
+import { cellA1 } from '@/utils/excel-cell';
+import { summaryAxis, summaryCellRC, summaryHit, crossPosOf } from '@/utils/summary-axis';
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;

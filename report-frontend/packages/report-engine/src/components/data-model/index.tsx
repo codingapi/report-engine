@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'antd';
-import type { Dataset, Relationship, ReportParam } from '../../types';
-import DatasetTree from '../dataset-tree';
+import type { Dataset, Relationship, ReportParam } from '@/types';
+import DatasetTree from '@/components/dataset-tree';
 import RelationshipList from './relationship-list';
 import ParamManager from './param-manager';
 

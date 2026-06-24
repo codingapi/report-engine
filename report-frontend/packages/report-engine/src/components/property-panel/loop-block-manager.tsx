@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Form, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import type { LoopBlock, Dataset, ReportParam } from '../../types';
-import { describeRange } from '../../utils/excel-cell';
-import { datasetOptions, fieldOptions } from '../../utils/dataset-options';
+import type { LoopBlock, Dataset, ReportParam } from '@/types';
+import { describeRange } from '@/utils/excel-cell';
+import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
 import ConditionEditor from './condition-editor';
 
 interface LoopBlockManagerProps {

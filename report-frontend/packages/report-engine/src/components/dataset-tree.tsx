@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Tree, Tag } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
-import type { Dataset, DatasetField, Relationship, DataSourceType } from '../types';
-import { dataTypeLabel } from '../types';
+import type { Dataset, DatasetField, Relationship, DataSourceType } from '@/types';
+import { dataTypeLabel } from '@/types';
 
 interface DatasetTreeProps {
   datasets: Dataset[];

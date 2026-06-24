@@ -6,8 +6,8 @@ import {
   DeleteOutlined,
   HolderOutlined,
 } from '@ant-design/icons';
-import type { ReportParam } from '../../types';
-import { genId, dataTypeLabel } from '../../types';
+import type { ReportParam } from '@/types';
+import { genId, dataTypeLabel } from '@/types';
 import ParamModal from './param-modal';
 
 const { Text } = Typography;

@@ -2,10 +2,10 @@ import React, { useRef, useState, useMemo } from 'react';
 import { Input, Menu, List, Empty } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { InputRef } from 'antd';
-import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '../../types';
-import { findDataset, dataTypeLabel } from '../../types';
-import { templateToString, parseTemplate } from '../../value-text';
-import { matchWithPinyin } from '../../pinyin';
+import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '@/types';
+import { findDataset, dataTypeLabel } from '@/types';
+import { templateToString, parseTemplate } from '@/value-text';
+import { matchWithPinyin } from '@/pinyin';
 
 interface ExpressionBuilderProps {
   value: ReportValue;

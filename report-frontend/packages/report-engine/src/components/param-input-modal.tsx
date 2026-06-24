@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Switch, message } from 'antd';
-import type { ReportParam } from '../types';
+import type { ReportParam } from '@/types';
 
 interface ParamInputModalProps {
   params: ReportParam[];

@@ -1,5 +1,5 @@
-import type { Dataset } from '../types';
-import { findDataset } from '../types';
+import type { Dataset } from '@/types';
+import { findDataset } from '@/types';
 
 export interface SelectOption {
   value: string;

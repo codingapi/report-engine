@@ -1,4 +1,4 @@
-import type { SummaryRow, SummaryAxis } from '../types';
+import type { SummaryRow, SummaryAxis } from '@/types';
 
 /** 汇总方向，缺省视为纵向（向后兼容旧配置）。 */
 export const summaryAxis = (s: Pick<SummaryRow, 'axis'>): SummaryAxis => s.axis ?? 'VERTICAL';

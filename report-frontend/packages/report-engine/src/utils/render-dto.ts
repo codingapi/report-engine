@@ -1,4 +1,4 @@
-import type { CellBinding, ReportValue } from '../types';
+import type { CellBinding, ReportValue } from '@/types';
 import type { RenderBindingDTO, RenderValueDTO } from '@coding-report/report-api';
 
 /** 强类型 ReportValue → 弱类型 RenderValueDTO（递归映射，对齐后端 Value 契约）。 */

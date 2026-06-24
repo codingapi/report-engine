@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Select } from 'antd';
-import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '../../types';
-import { OPERATOR_LABELS, genId } from '../../types';
+import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '@/types';
+import { OPERATOR_LABELS, genId } from '@/types';
 import ValueEditor from './value-editor';
 
 /** 不需要右值的运算符 */

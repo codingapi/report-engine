@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Empty, Tag, Tree, Divider, List } from 'antd';
 import { SwapOutlined, KeyOutlined } from '@ant-design/icons';
-import type { Relationship, Dataset, DataSourceType } from '../../types';
-import { findDataset, dataTypeLabel } from '../../types';
+import type { Relationship, Dataset, DataSourceType } from '@/types';
+import { findDataset, dataTypeLabel } from '@/types';
 
 interface RelationshipListProps {
   relationships: Relationship[];

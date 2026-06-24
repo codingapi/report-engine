@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
-import type { ReportParam, DataType } from '../../types';
-import { DATA_TYPE_OPTIONS } from '../../types';
+import type { ReportParam, DataType } from '@/types';
+import { DATA_TYPE_OPTIONS } from '@/types';
 
 interface ParamModalProps {
   open: boolean;

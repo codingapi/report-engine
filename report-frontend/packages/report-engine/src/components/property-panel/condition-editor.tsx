@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Tag, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import type { Condition, Dataset, LoopBlock, CompareOperator, ReportParam } from '../../types';
-import { OPERATOR_LABELS } from '../../types';
+import type { Condition, Dataset, LoopBlock, CompareOperator, ReportParam } from '@/types';
+import { OPERATOR_LABELS } from '@/types';
 import ConditionModal from './condition-modal';
 
 interface ConditionEditorProps {

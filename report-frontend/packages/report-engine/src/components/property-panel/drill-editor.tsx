@@ -1,7 +1,7 @@
 import React from 'react';
 import { Form, Switch, Select, Alert } from 'antd';
-import type { Dataset } from '../../types';
-import { datasetOptions } from '../../utils/dataset-options';
+import type { Dataset } from '@/types';
+import { datasetOptions } from '@/utils/dataset-options';
 
 interface DrillEditorProps {
   drillEnabled?: boolean;
