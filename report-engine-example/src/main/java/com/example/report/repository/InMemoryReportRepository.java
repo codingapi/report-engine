@@ -1,12 +1,9 @@
 package com.example.report.repository;
 
 import com.codingapi.report.config.ReportConfig;
-import com.codingapi.report.starter.repository.ReportRepository;
-import com.codingapi.springboot.framework.dto.request.SearchRequest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import com.codingapi.report.repository.PageQuery;
+import com.codingapi.report.repository.PageResult;
+import com.codingapi.report.repository.ReportRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,9 +48,9 @@ public class InMemoryReportRepository implements ReportRepository {
     }
 
     @Override
-    public Page<ReportConfig> page(SearchRequest request) {
-        int current = Math.max(request.getCurrent(), 1);
-        int pageSize = request.getPageSize() > 0 ? request.getPageSize() : 10;
+    public PageResult<ReportConfig> page(PageQuery query) {
+        int current = query.current();
+        int pageSize = query.pageSize();
         List<ReportConfig> all = new ArrayList<>(store.values());
         // 按创建时间倒序排列
         all.sort((a, b) -> Long.compare(b.getCreateTime(), a.getCreateTime()));
@@ -61,8 +58,7 @@ public class InMemoryReportRepository implements ReportRepository {
         int from = (int) Math.min((long) (current - 1) * pageSize, total);
         int to = (int) Math.min((long) from + pageSize, total);
         List<ReportConfig> pageList = all.subList(from, to);
-        Pageable pageable = PageRequest.of(current - 1, pageSize);
-        return new PageImpl<>(pageList, pageable, total);
+        return new PageResult<>(pageList, total);
     }
 
     @Override

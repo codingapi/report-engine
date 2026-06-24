@@ -8,9 +8,9 @@
 
 ```
 后端 (Java 17 + Maven)
-├── report-engine-framework   报表核心框架（声明式数据模型 + 内存渲染引擎）
+├── report-engine-framework   报表核心框架（声明式数据模型 + 内存渲染引擎 + 存储抽象）
 ├── report-engine-excel       Excel 构建/解析 + 字体管理（Apache POI 封装）
-├── report-engine-starter     Spring Boot 自动配置 + 全部通用 REST API + 存储/DTO 抽象
+├── report-engine-starter     Spring Boot 自动配置 + 全部通用 REST API + DTO 转换适配
 └── report-engine-example     示例应用（数据集配置 + 示例报表预存）
 
 前端 (React 18 + TypeScript + pnpm monorepo)
@@ -46,7 +46,7 @@
 - [x] **字体管理系统**：
   - 后端：双目录扫描（内置 + 自定义）、文件名前缀排序、JVM 注册
   - 前端：`onFontRequest` 回调机制、localStorage 缓存、@font-face 动态注入
-- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 CRUD / 数据模型列表 / 字体 / Excel）；`ReportRepository` 接口（`save/find/page(SearchRequest)/delete`）+ 强类型 `ReportConfig` 实体（含 createTime/updateTime 时间戳），`@ConditionalOnMissingBean` 允许使用方覆盖
+- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 CRUD / 数据模型列表 / 字体 / Excel）；`ReportRepository` 接口（`save/find/page(PageQuery):PageResult/delete`）+ 强类型 `ReportConfig` 实体均在 **framework**（零 Spring 依赖，分页用 framework 纯类型 `PageQuery`/`PageResult`），starter 仅在 Controller 边界做 `SearchRequest↔PageQuery` / `PageResult↔MultiResponse` 适配，`@ConditionalOnMissingBean` 允许使用方覆盖实现
 - [x] **API 响应标准化**：统一使用 `SingleResponse` / `MultiResponse` 包装，前端 axios 拦截器自动解包
 - [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据模型 / 表格 / 属性），可拖拽调整宽度，面板可收缩
 - [x] **循环块管理**：右键菜单创建/删除，Tab 化多循环块管理，蓝色虚线高亮，循环字段级联选择
@@ -68,7 +68,7 @@
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（CSV/JSON/DB/API/EXCEL）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
-- [x] **报表配置实体化**：`ReportConfig` 强类型实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/params/template），DTO record（`ConfigDtos`）同时作为持久化字段类型 + 前端 JSON 契约；`ReportRepository.page(SearchRequest)` 分页查询
+- [x] **报表配置实体化**：`ReportConfig` 强类型实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/params/template），DTO record（`ConfigDtos`）同时作为持久化字段类型 + 前端 JSON 契约；`ReportRepository.page(PageQuery):PageResult` 分页查询（接口在 framework）
 - [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
 - [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `ConfigDtos`）+ `RenderDtoConverter` 匹配前端 JSON 格式
 - [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
@@ -148,7 +148,7 @@ report.fonts.dir=/path/to/custom/fonts
 
 如果您是字体版权方，认为本项目中的字体使用侵犯了您的权益，请联系我们进行移除：
 
-- 邮箱：wangliang@codingapi.com
+- 邮箱：1024lorne@gmail.com
 - 或通过 GitHub Issues 提交移除请求
 
 收到合理请求后，我们将在第一时间删除相关字体文件。

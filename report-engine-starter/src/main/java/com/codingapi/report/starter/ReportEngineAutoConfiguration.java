@@ -10,7 +10,7 @@ import com.codingapi.report.starter.controller.ExpressionController;
 import com.codingapi.report.starter.controller.FontController;
 import com.codingapi.report.starter.controller.ReportConfigController;
 import com.codingapi.report.starter.controller.ReportRenderController;
-import com.codingapi.report.starter.repository.ReportRepository;
+import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.properties.ReportFontProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

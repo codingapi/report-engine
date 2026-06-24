@@ -2,13 +2,14 @@ package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.config.ReportConfig;
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.repository.PageQuery;
+import com.codingapi.report.repository.PageResult;
+import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.converter.DataModelDtoAssembler;
-import com.codingapi.report.starter.repository.ReportRepository;
 import com.codingapi.springboot.framework.dto.request.SearchRequest;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -67,8 +68,10 @@ public class ReportConfigController {
     /** 报表列表（id + name + dataModelId + 时间戳），按 SearchRequest 分页。 */
     @GetMapping("/configs")
     public MultiResponse<ReportBrief> list(SearchRequest searchRequest) {
-        Page<ReportConfig> page = repository.page(searchRequest);
-        List<ReportBrief> briefs = page.getContent().stream()
+        // Spring 入参 → framework 分页类型（接口本身不依赖 Spring）
+        PageQuery query = new PageQuery(searchRequest.getCurrent(), searchRequest.getPageSize());
+        PageResult<ReportConfig> result = repository.page(query);
+        List<ReportBrief> briefs = result.content().stream()
                 .map(r -> new ReportBrief(
                         r.getId(),
                         r.getName() != null ? r.getName() : "未命名报表",
@@ -76,7 +79,7 @@ public class ReportConfigController {
                         r.getCreateTime(),
                         r.getUpdateTime()))
                 .toList();
-        return MultiResponse.of(briefs, page.getTotalElements());
+        return MultiResponse.of(briefs, result.total());
     }
 
     public record ReportBrief(String id, String name, String dataModelId, long createTime, long updateTime) {
