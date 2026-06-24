@@ -20,7 +20,8 @@
     "lint": "rslint",
     "lint:fix": "rslint --fix",
     "test:report-engine": "pnpm -F @coding-report/report-engine test",
-    "test": "pnpm run test:report-engine",
+    "test:report-univer": "pnpm -F @coding-report/report-univer test",
+    "test": "pnpm run test:report-univer && pnpm run test:report-engine",
     "clean": "pnpm cleaninstall-node"
   },
   "keywords": [],
