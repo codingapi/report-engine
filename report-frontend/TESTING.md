@@ -144,7 +144,9 @@ export default defineConfig({
 });
 ```
 
-**全局 API 与 vitest 不同**：rstest 没有 `vi`。`describe/it/test/expect/beforeAll/afterEach` 等开启 `globals: true` 后注入全局；mock 函数用全局 **`rs.fn()`**（或 `rstest.fn()`），`rs.spyOn()` 取代 `vi.spyOn()`。全局类型集中在 `test/globals.d.ts` 统一引用 `@rstest/core/globals`（`tsconfig.json` 的 `include` 含 `test/` 故自动加载），各测试文件无需逐个加 `/// <reference>`。`@/` alias 同理靠 tsconfig `paths` + rslib `resolve.alias` 解析（test 目录纳入 tsconfig 后 IDE/tsc 也能识别）。
+**全局 API 与 vitest 不同**：rstest 没有 `vi`。`describe/it/test/expect/beforeAll/afterEach` 等开启 `globals: true` 后注入全局；mock 函数用全局 **`rs.fn()`**（或 `rstest.fn()`），`rs.spyOn()` 取代 `vi.spyOn()`。全局类型集中在 `test/globals.d.ts` 统一引用 `@rstest/core/globals`，各测试文件无需逐个加 `/// <reference>`。
+
+**build 与 test 的 tsconfig 必须分离**（踩坑）：不要把 `test/` 加进主 `tsconfig.json` 的 `include`——rslib 生成 dts 时会把 test 文件纳入 TS program，test 的 devDep（@testing-library 等）在 build 上下文解析失败，导致 `Failed to generate declaration files`，`dist/index.d.ts` 缺失，依赖该包的下游（如 app-pc）IDE 全报 `Cannot find module`。正确做法：主 `tsconfig.json` 只 `include: ["src"]`（build/dts 用，rslib 默认读它）；另建 `test/tsconfig.json`（`extends "../tsconfig.json"` + `include: ["../src", "./**/*"]`）给测试/IDE 用——VS Code 对 `test/` 下文件会就近取 `test/tsconfig.json`，`@/`（paths 继承）与全局类型都能解析。`@/` 运行时仍靠 rslib `resolve.alias`（rstest 经 `extends: withRslibConfig()` 继承）。
 
 **setup 必须**：`import '@testing-library/jest-dom'`（注册 `toBeInTheDocument`/`toBeChecked` 等 matcher）+ `matchMedia` / `ResizeObserver` polyfill（happy-dom 缺，antd 组件依赖）+ MSW 生命周期（`server.listen` / `afterEach(resetHandlers)` / `server.close`）。
 
