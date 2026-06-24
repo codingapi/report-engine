@@ -28,7 +28,10 @@ const LoopBlockForm: React.FC<{
 }> = ({ lb, datasets, allLoops, params, onUpdate }) => {
   return (
     <Form layout="vertical" size="small" className="re-prop-loop-item__body">
-      <Form.Item label="循环块名称" tooltip="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）">
+      <Form.Item
+        label="循环块名称"
+        tooltip="自定义名称，用于标识此循环块（如：员工薪资条、订单明细）"
+      >
         <Input
           value={lb.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
@@ -37,14 +40,13 @@ const LoopBlockForm: React.FC<{
       </Form.Item>
 
       <Form.Item label="模板区域" tooltip="循环块在表格中覆盖的矩形区域，由创建时选中的区域决定。">
-        <Input
-          value={describeRegion(lb)}
-          readOnly
-          style={{ background: '#f5f5f5' }}
-        />
+        <Input value={describeRegion(lb)} readOnly style={{ background: '#f5f5f5' }} />
       </Form.Item>
 
-      <Form.Item label="驱动数据集" tooltip="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。">
+      <Form.Item
+        label="驱动数据集"
+        tooltip="循环的数据来源。数据集有多少行（或多少分组），循环就执行多少次。"
+      >
         <Select
           value={lb.source.datasetId || undefined}
           onChange={(dsId) => onUpdate({ source: { ...lb.source, datasetId: dsId } })}
@@ -53,7 +55,10 @@ const LoopBlockForm: React.FC<{
         />
       </Form.Item>
 
-      <Form.Item label="分组字段" tooltip="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。">
+      <Form.Item
+        label="分组字段"
+        tooltip="指定后按分组去重迭代（如按部门循环），不指定则逐行迭代（如每个员工一次）。"
+      >
         <Select
           mode="multiple"
           value={lb.source.groupBy}
@@ -73,7 +78,10 @@ const LoopBlockForm: React.FC<{
         />
       </Form.Item>
 
-      <Form.Item label="过滤条件" tooltip="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。">
+      <Form.Item
+        label="过滤条件"
+        tooltip="只迭代满足条件的行（如 status = 在职）。多个条件之间为 AND 关系。"
+      >
         <ConditionEditor
           conditions={lb.source.filters}
           datasets={datasets}

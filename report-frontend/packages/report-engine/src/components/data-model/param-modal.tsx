@@ -55,9 +55,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
       message.error('参数名只能包含字母、数字和下划线，且以字母或下划线开头');
       return;
     }
-    const isDuplicate = existingNames.some(
-      (n) => n === name && n !== editingParam?.name,
-    );
+    const isDuplicate = existingNames.some((n) => n === name && n !== editingParam?.name);
     if (isDuplicate) {
       message.error('参数名已存在');
       return;
@@ -93,11 +91,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
         </Form.Item>
 
         <Form.Item label="数据类型" tooltip="决定导出预览时的输入控件类型">
-          <Select
-            value={dataType}
-            onChange={setDataType}
-            options={DATA_TYPE_OPTIONS}
-          />
+          <Select value={dataType} onChange={setDataType} options={DATA_TYPE_OPTIONS} />
         </Form.Item>
 
         <Form.Item label="别名" tooltip="可选的中文名称，便于识别">

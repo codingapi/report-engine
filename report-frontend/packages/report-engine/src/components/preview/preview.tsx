@@ -42,11 +42,25 @@ const ReportPreview = forwardRef<ReportPreviewHandle, ReportPreviewProps>(
   ({ renderService, config, onPreviewingChange, onExportingChange, onClose }, ref) => {
     const [messageApi, messageContextHolder] = message.useMessage();
     const {
-      openPreview, openExport, previewing, exporting,
-      previewOpen, previewWorkbook, previewDrillable, exportingPreview,
-      closePreview, exportFromPreview, drill,
-      paramModalOpen, pendingParams, confirmParams, cancelParams,
-      drillModalOpen, drillResult, drillLoading, closeDrill,
+      openPreview,
+      openExport,
+      previewing,
+      exporting,
+      previewOpen,
+      previewWorkbook,
+      previewDrillable,
+      exportingPreview,
+      closePreview,
+      exportFromPreview,
+      drill,
+      paramModalOpen,
+      pendingParams,
+      confirmParams,
+      cancelParams,
+      drillModalOpen,
+      drillResult,
+      drillLoading,
+      closeDrill,
     } = useReportPreview({ renderService, messageApi, onClose });
 
     const lastPreviewedRef = useRef<RenderConfig | null>(null);
@@ -58,12 +72,20 @@ const ReportPreview = forwardRef<ReportPreviewHandle, ReportPreviewProps>(
       openPreview(config);
     }, [config, openPreview]);
 
-    useEffect(() => { onPreviewingChange?.(previewing); }, [previewing, onPreviewingChange]);
-    useEffect(() => { onExportingChange?.(exporting); }, [exporting, onExportingChange]);
+    useEffect(() => {
+      onPreviewingChange?.(previewing);
+    }, [previewing, onPreviewingChange]);
+    useEffect(() => {
+      onExportingChange?.(exporting);
+    }, [exporting, onExportingChange]);
 
-    useImperativeHandle(ref, () => ({
-      exportXlsx: (cfg: RenderConfig) => openExport(cfg),
-    }), [openExport]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        exportXlsx: (cfg: RenderConfig) => openExport(cfg),
+      }),
+      [openExport],
+    );
 
     return (
       <>
@@ -101,11 +123,7 @@ const ReportPreview = forwardRef<ReportPreviewHandle, ReportPreviewProps>(
             </Space>
           }
         >
-          <WorkbookTable
-            workbook={previewWorkbook}
-            drillable={previewDrillable}
-            onDrill={drill}
-          />
+          <WorkbookTable workbook={previewWorkbook} drillable={previewDrillable} onDrill={drill} />
         </Drawer>
 
         <DrillModal

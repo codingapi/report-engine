@@ -44,7 +44,21 @@ interface SheetPanelProps {
  * Univer 电子表格封装：转发 ref 句柄，简化 props 传递。
  */
 const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
-  ({ cellProps, loopBlocks, highlightCells, contextMenuGroups, onCellSelect, onFieldDrop, onCellValueChange, onSelectionClear, onFontRequest, onReady }, ref) => {
+  (
+    {
+      cellProps,
+      loopBlocks,
+      highlightCells,
+      contextMenuGroups,
+      onCellSelect,
+      onFieldDrop,
+      onCellValueChange,
+      onSelectionClear,
+      onFontRequest,
+      onReady,
+    },
+    ref,
+  ) => {
     const univerRef = useRef<UniverSheetHandle>(null);
 
     useImperativeHandle(ref, () => ({

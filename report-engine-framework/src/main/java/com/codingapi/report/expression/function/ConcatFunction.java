@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 /**
  * 拼接函数 {@code concat(v1, v2, ...)}：将多个值按顺序拼接为字符串，null 跳过。
+ *
  * <p>例：{@code concat(d.first, d.last)} → {@code "张三丰"}；{@code concat("a", "b")} → {@code "ab"}。
  */
 public class ConcatFunction implements ValueFunction {
@@ -17,9 +18,8 @@ public class ConcatFunction implements ValueFunction {
 
     @Override
     public FunctionMeta meta() {
-        return new FunctionMeta("concat", "拼接",
-                List.of("值1", "值2", "..."),
-                "拼接多个值为字符串，例：concat(d.first, d.last)");
+        return new FunctionMeta(
+                "concat", "拼接", List.of("值1", "值2", "..."), "拼接多个值为字符串，例：concat(d.first, d.last)");
     }
 
     @Override

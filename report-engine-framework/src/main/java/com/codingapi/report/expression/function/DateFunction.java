@@ -7,7 +7,9 @@ import java.util.List;
 
 /**
  * 日期格式化函数 {@code date(value, pattern)}：把 ISO 日期/日期时间字符串按给定模式重新格式化。
+ *
  * <p>例：{@code date("2026-06-15", "yyyy/MM/dd")} → {@code "2026/06/15"}。
+ *
  * <p>当前最小实现：接受 ISO_LOCAL_DATE 或 ISO_LOCAL_DATE_TIME 字符串；无法解析则原样返回。
  */
 public class DateFunction implements ValueFunction {
@@ -19,9 +21,8 @@ public class DateFunction implements ValueFunction {
 
     @Override
     public FunctionMeta meta() {
-        return new FunctionMeta("date", "日期格式化",
-                List.of("日期值", "格式模式"),
-                "把日期按模式格式化，例：date(value, \"yyyy/MM/dd\")");
+        return new FunctionMeta(
+                "date", "日期格式化", List.of("日期值", "格式模式"), "把日期按模式格式化，例：date(value, \"yyyy/MM/dd\")");
     }
 
     @Override

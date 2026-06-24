@@ -7,6 +7,11 @@ import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.DoubleNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -20,22 +25,13 @@ import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Excel 导入器，将 .xlsx 文件解析为 {@link Workbook} JSON 模型。
- * <p>
- * 与 {@link ExcelExporter} 互为逆操作：Exporter 将 JSON 模型构建为 .xlsx 字节流，
- * Importer 将 .xlsx 字节流解析回 JSON 模型。两者配合实现 Excel 数据的完整 round-trip。
- * </p>
- * <p>
- * 解析能力覆盖：单元格值（字符串/数字/布尔/空值）、公式、富文本、样式（字体/对齐/边框/
- * 填充/旋转/换行/数字格式）、合并区域、自定义行高列宽、隐藏行列。
- * </p>
+ *
+ * <p>与 {@link ExcelExporter} 互为逆操作：Exporter 将 JSON 模型构建为 .xlsx 字节流， Importer 将 .xlsx 字节流解析回 JSON
+ * 模型。两者配合实现 Excel 数据的完整 round-trip。
+ *
+ * <p>解析能力覆盖：单元格值（字符串/数字/布尔/空值）、公式、富文本、样式（字体/对齐/边框/ 填充/旋转/换行/数字格式）、合并区域、自定义行高列宽、隐藏行列。
  *
  * @see Workbook
  * @see ExcelExporter
@@ -106,8 +102,10 @@ public class ExcelImporter {
         sheet.setRowCount(xssfSheet.getLastRowNum() + 1);
         int dataMaxCol = getMaxColumnCount(xssfSheet);
         sheet.setColumnCount(dataMaxCol);
-        sheet.setDefaultRowHeight(ExcelExporter.pointsToPixels(xssfSheet.getDefaultRowHeightInPoints()));
-        sheet.setDefaultColumnWidth(ExcelExporter.widthUnitsToPixels(xssfSheet.getDefaultColumnWidth()));
+        sheet.setDefaultRowHeight(
+                ExcelExporter.pointsToPixels(xssfSheet.getDefaultRowHeightInPoints()));
+        sheet.setDefaultColumnWidth(
+                ExcelExporter.widthUnitsToPixels(xssfSheet.getDefaultColumnWidth()));
 
         // 解析合并区域
         List<Merge> merges = new ArrayList<>();
@@ -194,7 +192,9 @@ public class ExcelImporter {
         }
 
         // 解析富文本
-        if (cellType == CellType.STRING || (cellType == CellType.FORMULA && poiCell.getCachedFormulaResultType() == CellType.STRING)) {
+        if (cellType == CellType.STRING
+                || (cellType == CellType.FORMULA
+                        && poiCell.getCachedFormulaResultType() == CellType.STRING)) {
             XSSFRichTextString rts = (XSSFRichTextString) poiCell.getRichStringCellValue();
             if (rts != null && rts.numFormattingRuns() > 1) {
                 cell.setRichText(parseRichText(rts));
@@ -398,8 +398,10 @@ public class ExcelImporter {
         BorderStyle bottom = style.getBorderBottom();
         BorderStyle left = style.getBorderLeft();
 
-        if (top == BorderStyle.NONE && right == BorderStyle.NONE
-                && bottom == BorderStyle.NONE && left == BorderStyle.NONE) {
+        if (top == BorderStyle.NONE
+                && right == BorderStyle.NONE
+                && bottom == BorderStyle.NONE
+                && left == BorderStyle.NONE) {
             return null;
         }
 
@@ -457,7 +459,8 @@ public class ExcelImporter {
     }
 
     private static String getCellRef(org.apache.poi.ss.usermodel.Cell cell) {
-        return new org.apache.poi.ss.util.CellReference(cell.getRowIndex(), cell.getColumnIndex()).formatAsString();
+        return new org.apache.poi.ss.util.CellReference(cell.getRowIndex(), cell.getColumnIndex())
+                .formatAsString();
     }
 
     private static int getMaxColumnCount(XSSFSheet sheet) {

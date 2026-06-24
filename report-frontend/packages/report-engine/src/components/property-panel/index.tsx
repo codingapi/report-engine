@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Popconfirm, Badge, Tabs, Empty, Form } from 'antd';
 import { PlusOutlined, DeleteOutlined, MenuFoldOutlined } from '@ant-design/icons';
-import type { CellBinding, SummaryRow, LoopBlock, Dataset, ReportParam, ExpressionCatalog } from '@/types';
+import type {
+  CellBinding,
+  SummaryRow,
+  LoopBlock,
+  Dataset,
+  ReportParam,
+  ExpressionCatalog,
+} from '@/types';
 import type { SheetCellSelectInfo } from '@/components/sheet-panel';
 import ExpressionBuilder from './expression-builder';
 import ExpansionEditor from './expansion-editor';
@@ -63,17 +70,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
       <div className="re-panel">
         <div className="re-panel__title">
           {onCollapse && (
-            <Button
-              type="text"
-              size="small"
-              icon={<MenuFoldOutlined />}
-              onClick={onCollapse}
-            />
+            <Button type="text" size="small" icon={<MenuFoldOutlined />} onClick={onCollapse} />
           )}
           <span>属性面板</span>
         </div>
         <div className="re-panel__content">
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择一个单元格查看属性" style={{ margin: '32px 0' }} />
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="选择一个单元格查看属性"
+            style={{ margin: '32px 0' }}
+          />
         </div>
       </div>
     );
@@ -86,7 +92,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   // （同一主轴位置可并列多个汇总，各占不同交叉段）
   const summaryRow = summaries.find((s) => summaryHit(s, info.row, info.column));
   // 命中汇总时点击格的交叉坐标（纵向=列、横向=行），用于定位/编辑该格
-  const summaryCrossPos = summaryRow ? crossPosOf(summaryAxis(summaryRow), info.row, info.column) : 0;
+  const summaryCrossPos = summaryRow
+    ? crossPosOf(summaryAxis(summaryRow), info.row, info.column)
+    : 0;
 
   const updateBinding = (patch: Partial<CellBinding>) => {
     if (!binding) return;
@@ -130,7 +138,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 <code>{previewText || '（未配置）'}</code>
               </div>
               <Form layout="vertical" size="small">
-                <Form.Item label="本格内容" tooltip="当前单元格显示什么：文本、字段、聚合、或混合表达式。支持 ${...} 模板语法。">
+                <Form.Item
+                  label="本格内容"
+                  tooltip="当前单元格显示什么：文本、字段、聚合、或混合表达式。支持 ${...} 模板语法。"
+                >
                   <ExpressionBuilder
                     key={cellKey}
                     value={binding.value}
@@ -166,9 +177,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         {
           key: 'condition',
           label: (
-            <span>
-              条件{binding.conditions.length > 0 && `(${binding.conditions.length})`}
-            </span>
+            <span>条件{binding.conditions.length > 0 && `(${binding.conditions.length})`}</span>
           ),
           children: (
             <div className="re-prop-tab-content">
@@ -198,7 +207,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     const parts = v.payload.split('.');
                     return parts.length >= 2 ? parts[0] : null;
                   }
-                  if (v.type === 'Aggregate' && v.operand?.type === 'FieldValue' && v.operand.payload) {
+                  if (
+                    v.type === 'Aggregate' &&
+                    v.operand?.type === 'FieldValue' &&
+                    v.operand.payload
+                  ) {
                     const parts = v.operand.payload.split('.');
                     return parts.length >= 2 ? parts[0] : null;
                   }
@@ -217,12 +230,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* ─── Title 栏：收缩 + 位置/标题 + 清空操作 ─── */}
       <div className="re-panel__title">
         {onCollapse && (
-          <Button
-            type="text"
-            size="small"
-            icon={<MenuFoldOutlined />}
-            onClick={onCollapse}
-          />
+          <Button type="text" size="small" icon={<MenuFoldOutlined />} onClick={onCollapse} />
         )}
         <span className="re-panel__title-text">
           {positionText}
@@ -232,17 +240,23 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
             </span>
           )}
           {summaryRow && (
-            <Badge color="gold" text={summaryAxis(summaryRow) === 'HORIZONTAL' ? '汇总列' : '汇总行'} style={{ marginLeft: 8 }} />
+            <Badge
+              color="gold"
+              text={summaryAxis(summaryRow) === 'HORIZONTAL' ? '汇总列' : '汇总行'}
+              style={{ marginLeft: 8 }}
+            />
           )}
         </span>
         {(summaryRow || binding) && (
           <Popconfirm
             title={summaryRow ? '取消该汇总配置？' : '确定清除此绑定？'}
-            description={summaryRow
-              ? summaryAxis(summaryRow) === 'HORIZONTAL'
-                ? '将移除本汇总（行区间）的所有单元格'
-                : '将移除本汇总（列区间）的所有单元格'
-              : undefined}
+            description={
+              summaryRow
+                ? summaryAxis(summaryRow) === 'HORIZONTAL'
+                  ? '将移除本汇总（行区间）的所有单元格'
+                  : '将移除本汇总（列区间）的所有单元格'
+                : undefined
+            }
             onConfirm={() => {
               if (summaryRow) onSummaryRowDelete(summaryRow.id);
               else if (binding) onBindingDelete(cellKey);

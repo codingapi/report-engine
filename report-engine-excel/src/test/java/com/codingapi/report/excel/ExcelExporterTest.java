@@ -1,7 +1,13 @@
 package com.codingapi.report.excel;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.codingapi.report.excel.pojo.Workbook;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
@@ -10,13 +16,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ExcelExporterTest {
 
@@ -116,11 +115,21 @@ class ExcelExporterTest {
     void sheet1_alignment() throws Exception {
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsxBytes))) {
             Sheet sheet = wb.getSheetAt(0);
-            assertEquals(HorizontalAlignment.LEFT, sheet.getRow(4).getCell(0).getCellStyle().getAlignment());
-            assertEquals(VerticalAlignment.TOP, sheet.getRow(4).getCell(0).getCellStyle().getVerticalAlignment());
-            assertEquals(HorizontalAlignment.CENTER, sheet.getRow(4).getCell(1).getCellStyle().getAlignment());
-            assertEquals(HorizontalAlignment.RIGHT, sheet.getRow(4).getCell(2).getCellStyle().getAlignment());
-            assertEquals(VerticalAlignment.BOTTOM, sheet.getRow(4).getCell(2).getCellStyle().getVerticalAlignment());
+            assertEquals(
+                    HorizontalAlignment.LEFT,
+                    sheet.getRow(4).getCell(0).getCellStyle().getAlignment());
+            assertEquals(
+                    VerticalAlignment.TOP,
+                    sheet.getRow(4).getCell(0).getCellStyle().getVerticalAlignment());
+            assertEquals(
+                    HorizontalAlignment.CENTER,
+                    sheet.getRow(4).getCell(1).getCellStyle().getAlignment());
+            assertEquals(
+                    HorizontalAlignment.RIGHT,
+                    sheet.getRow(4).getCell(2).getCellStyle().getAlignment());
+            assertEquals(
+                    VerticalAlignment.BOTTOM,
+                    sheet.getRow(4).getCell(2).getCellStyle().getVerticalAlignment());
         }
     }
 
@@ -209,11 +218,13 @@ class ExcelExporterTest {
         assertEquals(expected, style.getBorderLeft());
     }
 
-    private static void assertColorEquals(String expectedHex, org.apache.poi.xssf.usermodel.XSSFColor actual) {
+    private static void assertColorEquals(
+            String expectedHex, org.apache.poi.xssf.usermodel.XSSFColor actual) {
         assertNotNull(actual);
         byte[] rgb = actual.getRGB();
         assertNotNull(rgb);
-        String actualHex = String.format("#%02X%02X%02X", rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF);
+        String actualHex =
+                String.format("#%02X%02X%02X", rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF);
         assertEquals(expectedHex.toUpperCase(), actualHex);
     }
 }

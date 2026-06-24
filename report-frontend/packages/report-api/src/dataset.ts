@@ -37,10 +37,7 @@ export async function fetchDatasets(): Promise<DatasetInfo[]> {
 }
 
 /** 获取数据集前 N 行预览数据 */
-export async function fetchDatasetPreview(
-  id: string,
-  limit = 20,
-): Promise<DatasetPreview> {
+export async function fetchDatasetPreview(id: string, limit = 20): Promise<DatasetPreview> {
   const res = await http.get(`/datasets/${id}/preview`, { params: { limit } });
   return res.data;
 }

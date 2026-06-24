@@ -1,16 +1,13 @@
 package com.codingapi.report.excel.pojo;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.Data;
-
 import java.util.List;
+import lombok.Data;
 
 /**
  * Excel 单元格模型，对应前端 ExcelCell 快照结构。
- * <p>
- * 单元格通过 (row, col) 定位，支持多种值类型（字符串、数字、布尔、空值），
- * 同时可携带公式、富文本、样式和领域属性绑定。
- * </p>
+ *
+ * <p>单元格通过 (row, col) 定位，支持多种值类型（字符串、数字、布尔、空值）， 同时可携带公式、富文本、样式和领域属性绑定。
  */
 @Data
 public class Cell {
@@ -26,12 +23,14 @@ public class Cell {
 
     /**
      * 单元格值，支持多态类型：
+     *
      * <ul>
-     *   <li>字符串 — JSON text 节点</li>
-     *   <li>数字 — JSON number 节点（int/double）</li>
-     *   <li>布尔 — JSON boolean 节点</li>
-     *   <li>空值 — JSON null 或缺失</li>
+     *   <li>字符串 — JSON text 节点
+     *   <li>数字 — JSON number 节点（int/double）
+     *   <li>布尔 — JSON boolean 节点
+     *   <li>空值 — JSON null 或缺失
      * </ul>
+     *
      * 使用 Jackson JsonNode 以保留原始类型信息。
      */
     private JsonNode value;
@@ -45,9 +44,6 @@ public class Cell {
     /** 单元格样式（字体、对齐、边框、填充等） */
     private Style style;
 
-    /**
-     * 领域属性绑定列表（如字段绑定、数据配置等）。
-     * Excel 构建时忽略，仅用于前端快照的 round-trip 保持。
-     */
+    /** 领域属性绑定列表（如字段绑定、数据配置等）。 Excel 构建时忽略，仅用于前端快照的 round-trip 保持。 */
     private List<JsonNode> props;
 }

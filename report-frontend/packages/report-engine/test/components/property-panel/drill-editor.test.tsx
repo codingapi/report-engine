@@ -9,14 +9,15 @@ const datasets: Dataset[] = [
   { id: 'ds-2', alias: '商品表', fields: [] },
 ];
 
-const ALERT_TEXT =
-  '视图后续将与数据源一样独立管理配置；本期直接用数据集本身作默认视图。';
+const ALERT_TEXT = '视图后续将与数据源一样独立管理配置；本期直接用数据集本身作默认视图。';
 
 /**
  * 受控渲染 DrillEditor：onChange 回调被 spy 的同时驱动内部状态，
  * 这样既能断言回调 payload，又能验证条件渲染随状态切换。
  */
-function renderDrill(initial: { drillEnabled?: boolean; drillView?: string | null; defaultView?: string | null } = {}) {
+function renderDrill(
+  initial: { drillEnabled?: boolean; drillView?: string | null; defaultView?: string | null } = {},
+) {
   const onChange = rs.fn();
   function Harness() {
     const [state, setState] = useState({
@@ -112,4 +113,3 @@ describe('DrillEditor · 结构与可访问性', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 });
-

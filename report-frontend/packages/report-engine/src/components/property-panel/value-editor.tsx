@@ -1,18 +1,8 @@
 import React, { useCallback } from 'react';
 import { Select, Input, Button, Empty, Typography, Form, Space } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import type {
-  ReportValue,
-  ValueType,
-  Aggregation,
-  Dataset,
-  LoopBlock,
-} from '@/types';
-import {
-  VALUE_TYPE_LABELS,
-  AGG_LABELS,
-  findDataset,
-} from '@/types';
+import type { ReportValue, ValueType, Aggregation, Dataset, LoopBlock } from '@/types';
+import { VALUE_TYPE_LABELS, AGG_LABELS, findDataset } from '@/types';
 import { templateToString, parseTemplate } from '@/value-text';
 import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
 
@@ -46,7 +36,11 @@ function emptyValue(type: ValueType): ReportValue {
     case 'Template':
       return { type: 'Template', parts: [] };
     case 'Aggregate':
-      return { type: 'Aggregate', aggregation: 'SUM', operand: { type: 'FieldValue', payload: '' } };
+      return {
+        type: 'Aggregate',
+        aggregation: 'SUM',
+        operand: { type: 'FieldValue', payload: '' },
+      };
     case 'FunctionCall':
       return { type: 'FunctionCall', funcName: '', args: [] };
   }
@@ -229,7 +223,9 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
         return (
           <Form.Item
             label="文本模板"
-            extra={'用 ${name} 引用运行时名称、${数据集.字段} 引用字段、${SUM(数据集.字段)} 插入聚合'}
+            extra={
+              '用 ${name} 引用运行时名称、${数据集.字段} 引用字段、${SUM(数据集.字段)} 插入聚合'
+            }
           >
             {input}
           </Form.Item>
@@ -259,7 +255,9 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                 <Select
                   size={size}
                   value={datasetId || undefined}
-                  onChange={(dsId) => update({ operand: { type: 'FieldValue', payload: `${dsId}.` } })}
+                  onChange={(dsId) =>
+                    update({ operand: { type: 'FieldValue', payload: `${dsId}.` } })
+                  }
                   placeholder="数据集"
                   options={datasetOptions(datasets)}
                   showSearch
@@ -448,7 +446,11 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                   </div>
                 ))}
                 {args.length === 0 && (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无参数" style={{ margin: '8px 0' }} />
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无参数"
+                    style={{ margin: '8px 0' }}
+                  />
                 )}
               </div>
             </Form.Item>
@@ -457,7 +459,11 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
       }
 
       default:
-        return <Typography.Text type="secondary" style={{ fontSize: 12 }}>不支持的类型</Typography.Text>;
+        return (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            不支持的类型
+          </Typography.Text>
+        );
     }
   })();
 

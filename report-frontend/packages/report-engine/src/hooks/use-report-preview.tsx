@@ -1,10 +1,6 @@
 import { useRef, useState } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
-import type {
-  DrillResult,
-  PreviewResult,
-  RenderRequest,
-} from '@coding-report/report-api';
+import type { DrillResult, PreviewResult, RenderRequest } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
 import type { ReportParam, RenderConfig, RenderService } from '@/types';
 import { toBindingDTO } from '@/utils/render-dto';
@@ -68,7 +64,10 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
   const [drillLoading, setDrillLoading] = useState(false);
 
   /** 由 RenderConfig + 参数值构建后端渲染请求 */
-  const buildRequest = (config: RenderConfig, paramValues: Record<string, unknown>): RenderRequest => ({
+  const buildRequest = (
+    config: RenderConfig,
+    paramValues: Record<string, unknown>,
+  ): RenderRequest => ({
     cellBindings: config.bindings.map(toBindingDTO),
     loopBlocks: config.loops as unknown[],
     summaries: config.summaries as unknown[],

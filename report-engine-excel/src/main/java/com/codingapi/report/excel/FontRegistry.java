@@ -1,7 +1,6 @@
 package com.codingapi.report.excel;
 
 import com.codingapi.report.excel.pojo.FontInfo;
-
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
@@ -25,17 +24,18 @@ import java.util.regex.Pattern;
 
 /**
  * 字体注册中心，负责扫描字体目录、解析字体元数据、提供字体清单。
- * <p>
- * 主要职责：
+ *
+ * <p>主要职责：
+ *
  * <ul>
- *   <li>扫描指定目录下的字体文件（.ttf / .otf / .ttc），解析每个文件的族名和样式</li>
- *   <li>支持双目录：内置字体目录 + 用户自定义字体目录</li>
- *   <li>通过文件名数字前缀排序（如 "01_Arial.ttf" → 1），无编号文件按文件名自然排序</li>
- *   <li>提供字体目录清单（{@link #getFontCatalog()}），供前端按需加载</li>
- *   <li>可选地将字体注册到 JVM GraphicsEnvironment，供 POI 文本度量使用</li>
+ *   <li>扫描指定目录下的字体文件（.ttf / .otf / .ttc），解析每个文件的族名和样式
+ *   <li>支持双目录：内置字体目录 + 用户自定义字体目录
+ *   <li>通过文件名数字前缀排序（如 "01_Arial.ttf" → 1），无编号文件按文件名自然排序
+ *   <li>提供字体目录清单（{@link #getFontCatalog()}），供前端按需加载
+ *   <li>可选地将字体注册到 JVM GraphicsEnvironment，供 POI 文本度量使用
  * </ul>
+ *
  * 此类为纯 Java 实现，不依赖任何 Web 框架。
- * </p>
  */
 public class FontRegistry {
 
@@ -79,12 +79,11 @@ public class FontRegistry {
 
     /**
      * 创建字体注册中心实例（双目录模式）。
-     * <p>
-     * 内置字体优先加载，自定义字体随后加载。两个目录各自独立排序。
-     * </p>
+     *
+     * <p>内置字体优先加载，自定义字体随后加载。两个目录各自独立排序。
      *
      * @param builtinFontDir 内置字体目录路径
-     * @param customFontDir  用户自定义字体目录路径（可为 null）
+     * @param customFontDir 用户自定义字体目录路径（可为 null）
      */
     public FontRegistry(Path builtinFontDir, Path customFontDir) {
         this.builtinFontDir = builtinFontDir;
@@ -93,13 +92,13 @@ public class FontRegistry {
 
     /**
      * 从 classpath 的 fonts/ 目录加载内置字体。
-     * <p>
-     * 支持两种运行场景：
+     *
+     * <p>支持两种运行场景：
+     *
      * <ul>
-     *   <li>开发模式（file: 协议）：直接返回 classpath 下的字体目录路径</li>
-     *   <li>JAR 部署（jar: 协议）：提取到临时目录，临时文件标记为 deleteOnExit</li>
+     *   <li>开发模式（file: 协议）：直接返回 classpath 下的字体目录路径
+     *   <li>JAR 部署（jar: 协议）：提取到临时目录，临时文件标记为 deleteOnExit
      * </ul>
-     * </p>
      *
      * @return 内置字体目录路径
      * @throws IOException 加载失败
@@ -170,12 +169,9 @@ public class FontRegistry {
 
     /**
      * 扫描字体目录，解析所有字体文件的元数据。
-     * <p>
-     * 先扫描内置字体目录，再扫描用户自定义目录。
-     * 使用 {@link Font#createFont(int, java.io.File)} 读取字体文件内嵌的族名和样式信息。
-     * .ttc（TrueType Collection）文件仅解析第一个字体。
-     * 扫描过程中遇到无法解析的文件会记录警告日志并跳过。
-     * </p>
+     *
+     * <p>先扫描内置字体目录，再扫描用户自定义目录。 使用 {@link Font#createFont(int, java.io.File)} 读取字体文件内嵌的族名和样式信息。
+     * .ttc（TrueType Collection）文件仅解析第一个字体。 扫描过程中遇到无法解析的文件会记录警告日志并跳过。
      */
     public void scanDirectory() {
         List<FontInfo> builtinFonts = scanDir(builtinFontDir, "内置");
@@ -188,16 +184,20 @@ public class FontRegistry {
         catalog = Collections.unmodifiableList(result);
         builtinCatalog = Collections.unmodifiableList(builtinFonts);
         customCatalog = Collections.unmodifiableList(customFonts);
-        LOG.info("字体扫描完成，共 " + result.size() + " 个字体（内置 "
-                + builtinFonts.size() + "，自定义 " + customFonts.size() + "）");
+        LOG.info(
+                "字体扫描完成，共 "
+                        + result.size()
+                        + " 个字体（内置 "
+                        + builtinFonts.size()
+                        + "，自定义 "
+                        + customFonts.size()
+                        + "）");
     }
 
     /**
      * 将已扫描的字体注册到 JVM 的 GraphicsEnvironment。
-     * <p>
-     * 注册后，Java 2D 文本渲染（包括 POI 的文本度量计算）可以使用这些字体。
-     * 仅在需要精确文本度量时调用，普通的 Excel 导出（仅写字体名称）不需要此操作。
-     * </p>
+     *
+     * <p>注册后，Java 2D 文本渲染（包括 POI 的文本度量计算）可以使用这些字体。 仅在需要精确文本度量时调用，普通的 Excel 导出（仅写字体名称）不需要此操作。
      */
     public void registerToGraphicsEnvironment() {
         if (catalog == null) {
@@ -261,7 +261,8 @@ public class FontRegistry {
 
     /**
      * 根据文件名获取字体文件的完整路径。
-     * <p>先查自定义目录，再查内置目录。</p>
+     *
+     * <p>先查自定义目录，再查内置目录。
      *
      * @param filename 字体文件名
      * @return 字体文件路径，如果文件不存在返回 null
@@ -295,9 +296,7 @@ public class FontRegistry {
 
     // ─── 内部方法 ─────────────────────────────────────────────
 
-    /**
-     * 扫描单个目录下的字体文件。
-     */
+    /** 扫描单个目录下的字体文件。 */
     private List<FontInfo> scanDir(Path dir, String label) {
         if (dir == null || !Files.isDirectory(dir)) {
             if (dir != null) {
@@ -331,17 +330,14 @@ public class FontRegistry {
         }
 
         // 排序：有编号的按编号排，无编号的按文件名自然序排在后面
-        result.sort(Comparator
-                .comparingInt(FontInfo::getOrder)
-                .thenComparing(FontInfo::getFilename));
+        result.sort(
+                Comparator.comparingInt(FontInfo::getOrder).thenComparing(FontInfo::getFilename));
 
         LOG.info(label + "字体目录扫描完成: " + dir + "，发现 " + result.size() + " 个字体");
         return result;
     }
 
-    /**
-     * 在两个目录中查找字体文件。
-     */
+    /** 在两个目录中查找字体文件。 */
     private Path resolveFontFile(String filename) {
         if (customFontDir != null) {
             Path file = customFontDir.resolve(filename);
@@ -354,7 +350,8 @@ public class FontRegistry {
         return null;
     }
 
-    private FontInfo parseFontFile(Path file, String ext) throws IOException, java.awt.FontFormatException {
+    private FontInfo parseFontFile(Path file, String ext)
+            throws IOException, java.awt.FontFormatException {
         Font awtFont = Font.createFont(Font.TRUETYPE_FONT, file.toFile());
 
         FontInfo info = new FontInfo();
@@ -380,11 +377,7 @@ public class FontRegistry {
         return info;
     }
 
-    /**
-     * 从文件名解析数字前缀作为排序值。
-     * 如 "01_Arial.ttf" → 1，"10_宋体.ttf" → 10。
-     * 无编号的文件返回 Integer.MAX_VALUE，排在最后。
-     */
+    /** 从文件名解析数字前缀作为排序值。 如 "01_Arial.ttf" → 1，"10_宋体.ttf" → 10。 无编号的文件返回 Integer.MAX_VALUE，排在最后。 */
     private static int parseOrder(String filename) {
         Matcher m = ORDER_PREFIX.matcher(filename);
         if (m.matches()) {

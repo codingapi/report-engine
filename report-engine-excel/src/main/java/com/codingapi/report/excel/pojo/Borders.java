@@ -4,9 +4,8 @@ import lombok.Data;
 
 /**
  * 四边边框配置，对应前端 ExcelBorders 快照结构。
- * <p>
- * 每条边可独立设置线型和颜色，为 null 表示该侧不设置边框。
- * </p>
+ *
+ * <p>每条边可独立设置线型和颜色，为 null 表示该侧不设置边框。
  */
 @Data
 public class Borders {

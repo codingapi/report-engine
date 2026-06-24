@@ -2,7 +2,14 @@ import React, { useRef, useState, useMemo } from 'react';
 import { Input, Menu, List, Empty } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { InputRef } from 'antd';
-import type { ReportValue, Dataset, LoopBlock, ReportParam, ExpressionCatalog, FunctionMeta } from '@/types';
+import type {
+  ReportValue,
+  Dataset,
+  LoopBlock,
+  ReportParam,
+  ExpressionCatalog,
+  FunctionMeta,
+} from '@/types';
 import { findDataset, dataTypeLabel } from '@/types';
 import { templateToString, parseTemplate } from '@/value-text';
 import { matchWithPinyin } from '@/pinyin';
@@ -20,7 +27,12 @@ type Category = 'field' | 'loop' | 'param' | 'agg' | 'func';
 
 /** 内置聚合（后端未提供时的兜底） */
 const FALLBACK_AGGS: FunctionMeta[] = [
-  { name: 'COUNT', label: '计数', params: ['字段'], description: '统计行数，如 COUNT(employees.id)' },
+  {
+    name: 'COUNT',
+    label: '计数',
+    params: ['字段'],
+    description: '统计行数，如 COUNT(employees.id)',
+  },
   { name: 'COUNT_DISTINCT', label: '去重计数', params: ['字段'], description: '统计不重复的行数' },
   { name: 'SUM', label: '求和', params: ['字段'], description: '计算数值字段的总和' },
   { name: 'AVG', label: '平均值', params: ['字段'], description: '计算数值字段的平均值' },
@@ -117,7 +129,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
           const fLabel = f.alias || f.name;
           const displayLabel = `${dsLabel}.${fLabel}`;
           const desc = `${ds.id}.${f.name} · ${dataTypeLabel(f.dataType)}`;
-          if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
+          if (
+            keyword &&
+            !matchWithPinyin(displayLabel, keyword) &&
+            !matchWithPinyin(desc, keyword)
+          ) {
             continue;
           }
           items.push({ expr: `${ds.id}.${f.name}`, label: displayLabel, desc });
@@ -136,7 +152,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
           const fLabel = f.alias || f.name;
           const displayLabel = `${lbLabel}.${fLabel}`;
           const desc = `${lb.id}.${f.name} · ${dataTypeLabel(f.dataType)}`;
-          if (keyword && !matchWithPinyin(displayLabel, keyword) && !matchWithPinyin(desc, keyword)) {
+          if (
+            keyword &&
+            !matchWithPinyin(displayLabel, keyword) &&
+            !matchWithPinyin(desc, keyword)
+          ) {
             continue;
           }
           items.push({ expr: `${lb.id}.${f.name}`, label: displayLabel, desc });
@@ -163,9 +183,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
       return aggs
         .filter((a) => {
           if (!keyword) return true;
-          return matchWithPinyin(a.name, keyword) ||
+          return (
+            matchWithPinyin(a.name, keyword) ||
             matchWithPinyin(a.label, keyword) ||
-            matchWithPinyin(a.description, keyword);
+            matchWithPinyin(a.description, keyword)
+          );
         })
         .map((a) => ({
           expr: `${a.name}()`,
@@ -179,9 +201,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
       return funcs
         .filter((f) => {
           if (!keyword) return true;
-          return matchWithPinyin(f.name, keyword) ||
+          return (
+            matchWithPinyin(f.name, keyword) ||
             matchWithPinyin(f.label, keyword) ||
-            matchWithPinyin(f.description, keyword);
+            matchWithPinyin(f.description, keyword)
+          );
         })
         .map((f) => ({
           expr: `${f.name}()`,
@@ -234,14 +258,21 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
               <List
                 size="small"
                 dataSource={secondLevelItems}
-                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配项" /> }}
+                locale={{
+                  emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配项" />,
+                }}
                 style={{ flex: 1, overflowY: 'auto' }}
                 split={false}
                 renderItem={(item, idx) => (
                   <List.Item
                     key={`${item.expr}-${idx}`}
                     onClick={() => doInsert(item.expr, (item as any).caretFromEnd || 0)}
-                    style={{ cursor: 'pointer', borderRadius: 'var(--re-radius-base)', padding: '6px 12px', marginBottom: 2 }}
+                    style={{
+                      cursor: 'pointer',
+                      borderRadius: 'var(--re-radius-base)',
+                      padding: '6px 12px',
+                      marginBottom: 2,
+                    }}
                   >
                     <List.Item.Meta
                       title={<span style={{ fontWeight: 500 }}>{item.label}</span>}
@@ -252,13 +283,13 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
               />
             </>
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                  <span style={{ color: 'var(--re-color-text-secondary)' }}>
-                    请先选择左侧分类
-                  </span>
+                  <span style={{ color: 'var(--re-color-text-secondary)' }}>请先选择左侧分类</span>
                 }
               />
             </div>

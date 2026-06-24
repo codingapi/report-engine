@@ -36,7 +36,7 @@ function resolveParamName(payload: string | undefined, params: ReportParam[]): s
 function resolveLoopFieldValue(
   payload: string | undefined,
   loopBlocks: LoopBlock[],
-  datasets: Dataset[]
+  datasets: Dataset[],
 ): string {
   if (!payload) return '(未选)';
   const dotIndex = payload.indexOf('.');
@@ -65,7 +65,7 @@ function describeValue(
   cond: Condition,
   datasets: Dataset[],
   loopBlocks: LoopBlock[],
-  params: ReportParam[]
+  params: ReportParam[],
 ): { left: string; op: string; right: string } {
   const describeOne = (v: Condition['left'] | null | undefined): string => {
     if (!v) return '';
@@ -141,10 +141,24 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
                   fontSize: 12,
                 }}
               >
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <Tag color="blue" style={{ marginRight: 4 }}>{left}</Tag>
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Tag color="blue" style={{ marginRight: 4 }}>
+                    {left}
+                  </Tag>
                   <span style={{ color: '#666' }}>{op}</span>
-                  {right && <Tag color="green" style={{ marginLeft: 4 }}>{right}</Tag>}
+                  {right && (
+                    <Tag color="green" style={{ marginLeft: 4 }}>
+                      {right}
+                    </Tag>
+                  )}
                 </span>
                 <Button
                   type="text"
@@ -164,7 +178,11 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
           })}
         </div>
       ) : (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无过滤条件" style={{ margin: '16px 0' }} />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="暂无过滤条件"
+          style={{ margin: '16px 0' }}
+        />
       )}
 
       <Button

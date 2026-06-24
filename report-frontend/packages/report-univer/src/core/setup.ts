@@ -50,84 +50,87 @@ import '@univerjs/preset-sheets-core/lib/index.css';
 
 /** Univer 字体列表（仅保留通用字体，中文字体待后端字体服务就绪后动态注入） */
 const FONT_LIST = [
-    { value: 'Arial', label: 'Arial', category: 'sans-serif' as const },
-    { value: 'Times New Roman', label: 'Times New Roman', category: 'serif' as const },
-    { value: 'Tahoma', label: 'Tahoma', category: 'sans-serif' as const },
-    { value: 'Verdana', label: 'Verdana', category: 'sans-serif' as const },
+  { value: 'Arial', label: 'Arial', category: 'sans-serif' as const },
+  { value: 'Times New Roman', label: 'Times New Roman', category: 'serif' as const },
+  { value: 'Tahoma', label: 'Tahoma', category: 'sans-serif' as const },
+  { value: 'Verdana', label: 'Verdana', category: 'sans-serif' as const },
 ];
 
 /** 需要隐藏的菜单项 */
 const HIDDEN_MENUS: Record<string, { hidden: boolean }> = {
-    // 隐藏常用函数菜单
-    'formula-ui.operation.insert-function.common': { hidden: true },
-    'formula-ui.operation.insert-function.financial': { hidden: true },
-    'formula-ui.operation.insert-function.logical': { hidden: true },
-    'formula-ui.operation.insert-function.text': { hidden: true },
-    'formula-ui.operation.insert-function.date': { hidden: true },
-    'formula-ui.operation.insert-function.lookup': { hidden: true },
-    'formula-ui.operation.insert-function.math': { hidden: true },
-    'formula-ui.operation.insert-function.statistical': { hidden: true },
-    'formula-ui.operation.insert-function.engineering': { hidden: true },
-    'formula-ui.operation.insert-function.information': { hidden: true },
-    'formula-ui.operation.insert-function.database': { hidden: true },
-    'formula-ui.operation.more-functions': { hidden: true },
-    // 隐藏文本转数字
-    'sheet.toolbar.text-to-number': { hidden: true },
-    'sheet.contextMenu.text-to-number': { hidden: true },
+  // 隐藏常用函数菜单
+  'formula-ui.operation.insert-function.common': { hidden: true },
+  'formula-ui.operation.insert-function.financial': { hidden: true },
+  'formula-ui.operation.insert-function.logical': { hidden: true },
+  'formula-ui.operation.insert-function.text': { hidden: true },
+  'formula-ui.operation.insert-function.date': { hidden: true },
+  'formula-ui.operation.insert-function.lookup': { hidden: true },
+  'formula-ui.operation.insert-function.math': { hidden: true },
+  'formula-ui.operation.insert-function.statistical': { hidden: true },
+  'formula-ui.operation.insert-function.engineering': { hidden: true },
+  'formula-ui.operation.insert-function.information': { hidden: true },
+  'formula-ui.operation.insert-function.database': { hidden: true },
+  'formula-ui.operation.more-functions': { hidden: true },
+  // 隐藏文本转数字
+  'sheet.toolbar.text-to-number': { hidden: true },
+  'sheet.contextMenu.text-to-number': { hidden: true },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type UniverAPI = any;
 
 export interface SetupResult {
-    univerAPI: UniverAPI;
-    dispose: () => void;
+  univerAPI: UniverAPI;
+  dispose: () => void;
 }
 
 /**
  * 初始化 Univer 实例（手动插件模式）
  */
 export function setupUniver(container: HTMLDivElement): SetupResult {
-    const { univerAPI } = createUniver({
-        locale: LocaleType.ZH_CN,
-        locales: {
-            [LocaleType.ZH_CN]: mergeLocales(
-                UniverUIZhCN,
-                UniverDocsUIZhCN,
-                UniverSheetsZhCN,
-                UniverSheetsUIZhCN,
-                UniverSheetsNumfmtUIZhCN,
-                UniverSheetsFormulaZhCN,
-                UniverSheetsFormulaUIZhCN,
-            ),
+  const { univerAPI } = createUniver({
+    locale: LocaleType.ZH_CN,
+    locales: {
+      [LocaleType.ZH_CN]: mergeLocales(
+        UniverUIZhCN,
+        UniverDocsUIZhCN,
+        UniverSheetsZhCN,
+        UniverSheetsUIZhCN,
+        UniverSheetsNumfmtUIZhCN,
+        UniverSheetsFormulaZhCN,
+        UniverSheetsFormulaUIZhCN,
+      ),
+    },
+    presets: [],
+    plugins: [
+      UniverNetworkPlugin,
+      UniverDocsPlugin,
+      UniverRenderEnginePlugin,
+      [
+        UniverUIPlugin,
+        {
+          container,
+          ribbonType: 'simple' as const,
+          formulaBar: false,
+          menu: HIDDEN_MENUS,
+          customFontFamily: { override: true, list: FONT_LIST },
         },
-        presets: [],
-        plugins: [
-            UniverNetworkPlugin,
-            UniverDocsPlugin,
-            UniverRenderEnginePlugin,
-            [UniverUIPlugin, {
-                container,
-                ribbonType: 'simple' as const,
-                formulaBar: false,
-                menu: HIDDEN_MENUS,
-                customFontFamily: { override: true, list: FONT_LIST },
-            }],
-            UniverDocsUIPlugin,
-            UniverFormulaEnginePlugin,
-            UniverSheetsPlugin,
-            [UniverSheetsUIPlugin, { formulaBar: false }],
-            UniverSheetsNumfmtPlugin,
-            UniverSheetsNumfmtUIPlugin,
-            UniverSheetsFormulaPlugin,
-            [UniverSheetsFormulaUIPlugin, { functionScreenTips: false }],
-        ],
-    });
+      ],
+      UniverDocsUIPlugin,
+      UniverFormulaEnginePlugin,
+      UniverSheetsPlugin,
+      [UniverSheetsUIPlugin, { formulaBar: false }],
+      UniverSheetsNumfmtPlugin,
+      UniverSheetsNumfmtUIPlugin,
+      UniverSheetsFormulaPlugin,
+      [UniverSheetsFormulaUIPlugin, { functionScreenTips: false }],
+    ],
+  });
 
-    univerAPI.createWorkbook({});
+  univerAPI.createWorkbook({});
 
-    return {
-        univerAPI,
-        dispose: () => univerAPI.dispose(),
-    };
+  return {
+    univerAPI,
+    dispose: () => univerAPI.dispose(),
+  };
 }

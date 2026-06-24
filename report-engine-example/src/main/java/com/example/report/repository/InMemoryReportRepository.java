@@ -4,7 +4,6 @@ import com.codingapi.report.config.ReportConfig;
 import com.codingapi.report.repository.PageQuery;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.repository.ReportRepository;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,9 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link ReportRepository} 的内存实现（example 演示用）。
- * <p>
- * 报表配置以强类型 {@link ReportConfig} 实体保存；进程内存储，重启丢失。
- * 生产环境应由使用方提供持久化实现。
+ *
+ * <p>报表配置以强类型 {@link ReportConfig} 实体保存；进程内存储，重启丢失。 生产环境应由使用方提供持久化实现。
  */
 public class InMemoryReportRepository implements ReportRepository {
 

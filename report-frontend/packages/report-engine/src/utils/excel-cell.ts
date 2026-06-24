@@ -46,6 +46,11 @@ export function cellA1(row: number, col: number): string {
 }
 
 /** 区域描述 A1:C4 */
-export function describeRange(startRow: number, startCol: number, endRow: number, endCol: number): string {
+export function describeRange(
+  startRow: number,
+  startCol: number,
+  endRow: number,
+  endCol: number,
+): string {
   return `${cellA1(startRow, startCol)}:${cellA1(endRow, endCol)}`;
 }

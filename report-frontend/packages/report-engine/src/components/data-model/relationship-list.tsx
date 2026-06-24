@@ -22,7 +22,10 @@ const SOURCE_COLORS: Record<DataSourceType, string> = {
 function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
   if (!sourceType) return null;
   return (
-    <Tag color={SOURCE_COLORS[sourceType] || 'default'} style={{ marginRight: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+    <Tag
+      color={SOURCE_COLORS[sourceType] || 'default'}
+      style={{ marginRight: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
+    >
       {sourceType}
     </Tag>
   );
@@ -38,10 +41,7 @@ interface DatasetGroup {
  * 按 relationships 将 datasets 分为连通分量。
  * 仅返回有关系的数据集（standalone 被过滤掉）。
  */
-function groupDatasets(
-  datasets: Dataset[],
-  relationships: Relationship[],
-): DatasetGroup[] {
+function groupDatasets(datasets: Dataset[], relationships: Relationship[]): DatasetGroup[] {
   if (relationships.length === 0) return [];
 
   const parent = new Map<string, string>();
@@ -126,10 +126,7 @@ function buildFieldRelationMap(
 
 // ─── 分组树节点构建 ──────────────────────────────────────
 
-function buildGroupedTreeData(
-  datasets: Dataset[],
-  relationships: Relationship[],
-): any[] {
+function buildGroupedTreeData(datasets: Dataset[], relationships: Relationship[]): any[] {
   const groups = groupDatasets(datasets, relationships);
   if (groups.length === 0) return [];
 
@@ -180,7 +177,10 @@ function buildGroupedTreeData(
     }));
 
     return {
-      key: `group-${g.datasets.map((d) => d.id).sort().join('-')}`,
+      key: `group-${g.datasets
+        .map((d) => d.id)
+        .sort()
+        .join('-')}`,
       title: <span className="re-ds-group-title">📦 {groupLabel}</span>,
       selectable: false,
       children,
@@ -213,17 +213,24 @@ function RelationshipItems({
         <List.Item
           key={i}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 10px', marginBottom: 6,
-            background: 'var(--re-color-bg-subtle)', border: '1px solid var(--re-color-border-light)',
-            borderRadius: 'var(--re-radius-base)', fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 10px',
+            marginBottom: 6,
+            background: 'var(--re-color-bg-subtle)',
+            border: '1px solid var(--re-color-border-light)',
+            borderRadius: 'var(--re-radius-base)',
+            fontSize: 12,
             borderBottom: '1px solid var(--re-color-border-light)',
           }}
         >
           <span style={{ wordBreak: 'break-all' }}>{endpoint(r.left)}</span>
           <SwapOutlined style={{ color: 'var(--re-color-primary)', flexShrink: 0 }} />
           <span style={{ wordBreak: 'break-all' }}>{endpoint(r.right)}</span>
-          <Tag color="blue" style={{ marginLeft: 'auto' }}>{r.joinType}</Tag>
+          <Tag color="blue" style={{ marginLeft: 'auto' }}>
+            {r.joinType}
+          </Tag>
         </List.Item>
       )}
     />

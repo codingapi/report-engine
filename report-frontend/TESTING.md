@@ -20,14 +20,14 @@
 
 ## 2. 技术选型
 
-| 用途 | 工具 |
-|---|---|
-| 测试运行器 | **rstest**（rsbuild 生态，Jest 兼容 API，复用现有 rsbuild/rspack 配置） |
-| 组件渲染 + 查询 | **@testing-library/react**（按 role/label/text 查询，反对 test-id） |
-| 用户交互模拟 | **@testing-library/user-event** |
-| 接口模拟 | **MSW**（Node 端 `setupServer`；浏览器端 `setupWorker`） |
-| DOM 环境 | **happy-dom**（逻辑/结构层，仓库已装、快、零环境依赖） |
-| 真浏览器（仅样式层用） | rstest Browser Mode / Playwright，**headless**，只读结构化渲染数据 |
+| 用途                   | 工具                                                                    |
+| ---------------------- | ----------------------------------------------------------------------- |
+| 测试运行器             | **rstest**（rsbuild 生态，Jest 兼容 API，复用现有 rsbuild/rspack 配置） |
+| 组件渲染 + 查询        | **@testing-library/react**（按 role/label/text 查询，反对 test-id）     |
+| 用户交互模拟           | **@testing-library/user-event**                                         |
+| 接口模拟               | **MSW**（Node 端 `setupServer`；浏览器端 `setupWorker`）                |
+| DOM 环境               | **happy-dom**（逻辑/结构层，仓库已装、快、零环境依赖）                  |
+| 真浏览器（仅样式层用） | rstest Browser Mode / Playwright，**headless**，只读结构化渲染数据      |
 
 > 注：rstest Browser Mode 目前为 experimental，落地时确认当前版本对所需 API 的支持情况。
 
@@ -39,12 +39,12 @@
 
 按成本从低到高分四层，绝大多数验证落在前两层：
 
-| 层 | 跑在哪 | 验证什么 | 失败输出 |
-|---|---|---|---|
-| 交互逻辑层（主力） | jsdom | 输入/点击后状态与渲染是否正确 | RTL 断言文本 |
-| 结构层 | jsdom | DOM 结构、ARIA 可访问性树（语义/层级） | 文本 diff |
-| 样式层 | 真浏览器 headless | 关键元素的 computed style + 几何（尺寸/坐标/遮挡） | 文本/数字 diff |
-| 像素层（默认禁用） | 真浏览器 headless | 像素级视觉回归 | PNG diff |
+| 层                 | 跑在哪            | 验证什么                                           | 失败输出       |
+| ------------------ | ----------------- | -------------------------------------------------- | -------------- |
+| 交互逻辑层（主力） | jsdom             | 输入/点击后状态与渲染是否正确                      | RTL 断言文本   |
+| 结构层             | jsdom             | DOM 结构、ARIA 可访问性树（语义/层级）             | 文本 diff      |
+| 样式层             | 真浏览器 headless | 关键元素的 computed style + 几何（尺寸/坐标/遮挡） | 文本/数字 diff |
+| 像素层（默认禁用） | 真浏览器 headless | 像素级视觉回归                                     | PNG diff       |
 
 **视觉验证用结构化对比，不用截图。** 原则是：不问「整体看起来对不对」，而是**显式声明在乎哪些属性**（背景色、文字颜色、高度、是否被遮挡、相对位置等），把它们读成 JSON 做断言或文本快照（「视觉指纹」）。
 
@@ -137,7 +137,7 @@ import { defineConfig } from '@rstest/core';
 import { withRslibConfig } from '@rstest/adapter-rslib';
 
 export default defineConfig({
-  extends: withRslibConfig(),   // 继承 rslib.config.ts 的 alias(@/) / define / source
+  extends: withRslibConfig(), // 继承 rslib.config.ts 的 alias(@/) / define / source
   testEnvironment: 'happy-dom', // 顶层！非 test.environment
   setupFiles: ['./test/setup.ts'], // 顶层！非 test.setupFiles
   globals: true,
@@ -201,11 +201,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from './setup';
 
 test('成功后展示结果', async () => {
-  server.use(
-    http.post('/api/login', () =>
-      HttpResponse.json({ token: 'abc', name: 'Alice' }),
-    ),
-  );
+  server.use(http.post('/api/login', () => HttpResponse.json({ token: 'abc', name: 'Alice' })));
   const user = userEvent.setup();
   // render(<LoginPage />);
   await user.type(screen.getByLabelText('用户名'), 'alice');

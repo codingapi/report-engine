@@ -16,7 +16,11 @@ export function datasetOptions(datasets: Dataset[]): SelectOption[] {
  * @param qualified true → value 为全限定 "datasetId.field"（用于 FieldValue payload）；
  *                  false → value 为裸字段名（用于 groupBy/orderBy 等）。
  */
-export function fieldOptions(datasets: Dataset[], datasetId: string, qualified = false): SelectOption[] {
+export function fieldOptions(
+  datasets: Dataset[],
+  datasetId: string,
+  qualified = false,
+): SelectOption[] {
   const ds = findDataset(datasets, datasetId);
   if (!ds) return [];
   return ds.fields.map((f) => ({

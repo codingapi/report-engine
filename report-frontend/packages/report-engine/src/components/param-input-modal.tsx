@@ -10,12 +10,7 @@ interface ParamInputModalProps {
 }
 
 /** 导出/预览前的参数输入弹窗 */
-const ParamInputModal: React.FC<ParamInputModalProps> = ({
-  params,
-  open,
-  onConfirm,
-  onCancel,
-}) => {
+const ParamInputModal: React.FC<ParamInputModalProps> = ({ params, open, onConfirm, onCancel }) => {
   const [values, setValues] = useState<Record<string, unknown>>({});
 
   // 打开或参数变化时预填默认值
@@ -25,16 +20,17 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({
     for (const p of params) {
       if (p.defaultValue != null && p.defaultValue !== '') {
         init[p.name] =
-          p.dataType === 'NUMBER' ? Number(p.defaultValue) :
-          p.dataType === 'BOOLEAN' ? p.defaultValue === 'true' :
-          p.defaultValue;
+          p.dataType === 'NUMBER'
+            ? Number(p.defaultValue)
+            : p.dataType === 'BOOLEAN'
+              ? p.defaultValue === 'true'
+              : p.defaultValue;
       }
     }
     setValues(init);
   }, [open, params]);
 
-  const update = (name: string, val: unknown) =>
-    setValues((prev) => ({ ...prev, [name]: val }));
+  const update = (name: string, val: unknown) => setValues((prev) => ({ ...prev, [name]: val }));
 
   const handleOk = () => {
     for (const p of params) {
@@ -69,10 +65,7 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({
       case 'BOOLEAN':
         return (
           <Form.Item key={param.name} label={label}>
-            <Switch
-              checked={!!values[param.name]}
-              onChange={(v) => update(param.name, v)}
-            />
+            <Switch checked={!!values[param.name]} onChange={(v) => update(param.name, v)} />
           </Form.Item>
         );
 

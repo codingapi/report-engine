@@ -1,7 +1,15 @@
 import React, { useCallback, useState } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { SheetPanelHandle } from '@/components/sheet-panel';
-import type { CellBinding, LoopBlock, SummaryRow, ReportParam, Dataset, ReportConfig, ReportEngineProps } from '@/types';
+import type {
+  CellBinding,
+  LoopBlock,
+  SummaryRow,
+  ReportParam,
+  Dataset,
+  ReportConfig,
+  ReportEngineProps,
+} from '@/types';
 import { valueDisplayText, templateToString } from '@/value-text';
 import { summaryAxis, summaryHit, crossPosOf } from '@/utils/summary-axis';
 
@@ -28,10 +36,19 @@ export interface UseReportIOOptions {
  */
 export function useReportIO(opts: UseReportIOOptions) {
   const {
-    sheetRef, datasets, dataModelId,
-    cellBindings, loopBlocks, summaries, params,
-    reportId, reportName, onReportIdChange,
-    onSaveReport, onImport, messageApi,
+    sheetRef,
+    datasets,
+    dataModelId,
+    cellBindings,
+    loopBlocks,
+    summaries,
+    params,
+    reportId,
+    reportName,
+    onReportIdChange,
+    onSaveReport,
+    onImport,
+    messageApi,
   } = opts;
 
   const [savingReport, setSavingReport] = useState(false);
@@ -51,7 +68,10 @@ export function useReportIO(opts: UseReportIOOptions) {
     }));
     const summariesOut = summaries.map((s) => ({
       ...s,
-      cells: s.cells.map((c) => ({ ...c, preview: valueDisplayText(c.value, datasets, loopBlocks, params) })),
+      cells: s.cells.map((c) => ({
+        ...c,
+        preview: valueDisplayText(c.value, datasets, loopBlocks, params),
+      })),
     }));
 
     const templateOut = {
@@ -144,7 +164,19 @@ export function useReportIO(opts: UseReportIOOptions) {
     } finally {
       setSavingReport(false);
     }
-  }, [onSaveReport, reportId, reportName, dataModelId, cellBindings, loopBlocks, summaries, params, onReportIdChange, sheetRef, messageApi]);
+  }, [
+    onSaveReport,
+    reportId,
+    reportName,
+    dataModelId,
+    cellBindings,
+    loopBlocks,
+    summaries,
+    params,
+    onReportIdChange,
+    sheetRef,
+    messageApi,
+  ]);
 
   // ─── 导入 ───
   const handleImport = useCallback(

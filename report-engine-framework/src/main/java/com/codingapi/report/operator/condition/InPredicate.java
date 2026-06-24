@@ -1,7 +1,6 @@
 package com.codingapi.report.operator.condition;
 
 import com.codingapi.report.operator.Values;
-
 import java.util.Arrays;
 
 /**

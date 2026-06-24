@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * 报表配置存储：example 演示用内存实现。
- * <p>
- * 生产环境应由使用方提供持久化实现覆盖此 Bean。
+ *
+ * <p>生产环境应由使用方提供持久化实现覆盖此 Bean。
  */
 @Configuration
 public class RepositoryConfig {

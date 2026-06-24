@@ -1,16 +1,13 @@
 package com.codingapi.report.excel.pojo;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.Data;
-
 import java.util.List;
+import lombok.Data;
 
 /**
  * Excel 工作表模型，对应前端 ExcelSheet 快照结构。
- * <p>
- * 一个工作表包含单元格数据、合并区域、自定义行高列宽以及循环块定义。
- * 行列索引均为 0-based。
- * </p>
+ *
+ * <p>一个工作表包含单元格数据、合并区域、自定义行高列宽以及循环块定义。 行列索引均为 0-based。
  */
 @Data
 public class Sheet {
@@ -45,9 +42,6 @@ public class Sheet {
     /** 自定义列宽和隐藏状态的列配置列表 */
     private List<Column> columns;
 
-    /**
-     * 循环块列表（报表模板概念）。
-     * 导出时接受但构建 Excel 时忽略，仅用于前端快照的 round-trip 保持。
-     */
+    /** 循环块列表（报表模板概念）。 导出时接受但构建 Excel 时忽略，仅用于前端快照的 round-trip 保持。 */
     private List<JsonNode> loopBlocks;
 }

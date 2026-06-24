@@ -1,13 +1,10 @@
 package com.codingapi.report.expression;
 
-import com.codingapi.report.data.dataset.FieldRef;
+import static org.junit.jupiter.api.Assertions.*;
 
+import com.codingapi.report.data.dataset.FieldRef;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Templates.parse：文本插值解析器")
 class TemplatesTest {
@@ -242,8 +239,7 @@ class TemplatesTest {
         Value.Template tpl = (Value.Template) v;
         assertEquals(3, tpl.parts().size());
         assertEquals("合计 ", ((Value.Template.Text) tpl.parts().get(0)).text());
-        assertInstanceOf(Value.Aggregate.class,
-                ((Value.Template.Hole) tpl.parts().get(1)).value());
+        assertInstanceOf(Value.Aggregate.class, ((Value.Template.Hole) tpl.parts().get(1)).value());
         assertEquals(" 元", ((Value.Template.Text) tpl.parts().get(2)).text());
     }
 
@@ -254,11 +250,11 @@ class TemplatesTest {
         assertInstanceOf(Value.Template.class, v);
         Value.Template tpl = (Value.Template) v;
         assertEquals(4, tpl.parts().size());
-        assertInstanceOf(Value.FieldValue.class,
-                ((Value.Template.Hole) tpl.parts().get(0)).value());
+        assertInstanceOf(
+                Value.FieldValue.class, ((Value.Template.Hole) tpl.parts().get(0)).value());
         assertEquals("(", ((Value.Template.Text) tpl.parts().get(1)).text());
-        assertInstanceOf(Value.FieldValue.class,
-                ((Value.Template.Hole) tpl.parts().get(2)).value());
+        assertInstanceOf(
+                Value.FieldValue.class, ((Value.Template.Hole) tpl.parts().get(2)).value());
         assertEquals(")", ((Value.Template.Text) tpl.parts().get(3)).text());
     }
 
@@ -269,8 +265,10 @@ class TemplatesTest {
         assertInstanceOf(Value.Template.class, v);
         Value.Template tpl = (Value.Template) v;
         assertEquals(2, tpl.parts().size());
-        assertEquals("a", ((Value.NameRef) ((Value.Template.Hole) tpl.parts().get(0)).value()).name());
-        assertEquals("b", ((Value.NameRef) ((Value.Template.Hole) tpl.parts().get(1)).value()).name());
+        assertEquals(
+                "a", ((Value.NameRef) ((Value.Template.Hole) tpl.parts().get(0)).value()).name());
+        assertEquals(
+                "b", ((Value.NameRef) ((Value.Template.Hole) tpl.parts().get(1)).value()).name());
     }
 
     // ============================================================

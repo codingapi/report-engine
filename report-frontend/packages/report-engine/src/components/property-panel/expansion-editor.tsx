@@ -12,7 +12,11 @@ interface ExpansionEditorProps {
   independent: boolean;
   cellBindings: CellBinding[];
   currentCellKey: string;
-  onChange: (patch: Partial<Pick<CellBinding, 'expansion' | 'expandMode' | 'mergeRepeated' | 'parentCell' | 'independent'>>) => void;
+  onChange: (
+    patch: Partial<
+      Pick<CellBinding, 'expansion' | 'expandMode' | 'mergeRepeated' | 'parentCell' | 'independent'>
+    >,
+  ) => void;
 }
 
 /** 将 cellKey "sheetId:row:col" 转为简短显示 */
@@ -56,7 +60,9 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
           buttonStyle="solid"
         >
           {Object.entries(EXPANSION_LABELS).map(([v, l]) => (
-            <Radio.Button key={v} value={v}>{l}</Radio.Button>
+            <Radio.Button key={v} value={v}>
+              {l}
+            </Radio.Button>
           ))}
         </Radio.Group>
       </Form.Item>
@@ -83,7 +89,10 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
       )}
 
       {expansion !== 'NONE' && expandMode === 'GROUP' && (
-        <Form.Item label="合并重复值" tooltip="相邻相同值合并为一个跨行/跨列单元格（多级分组表头常用）">
+        <Form.Item
+          label="合并重复值"
+          tooltip="相邻相同值合并为一个跨行/跨列单元格（多级分组表头常用）"
+        >
           <Switch
             size="small"
             checked={mergeRepeated}
@@ -93,7 +102,10 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
       )}
 
       {expansion === 'VERTICAL' && (
-        <Form.Item label="独立纵向带" tooltip="开启后本列不与同源列对齐，从本格起独立向下展开（交错排版）。注意：独立列无法再与其它列做跨列聚合/跨列汇总/主从合并。">
+        <Form.Item
+          label="独立纵向带"
+          tooltip="开启后本列不与同源列对齐，从本格起独立向下展开（交错排版）。注意：独立列无法再与其它列做跨列聚合/跨列汇总/主从合并。"
+        >
           <Switch
             size="small"
             checked={independent}
@@ -103,7 +115,10 @@ const ExpansionEditor: React.FC<ExpansionEditorProps> = ({
       )}
 
       {expansion !== 'NONE' && (
-        <Form.Item label="父格" tooltip="多级分组时指定对齐参照格（父格变化时本行重置）。留空表示顶层，无父格依赖。">
+        <Form.Item
+          label="父格"
+          tooltip="多级分组时指定对齐参照格（父格变化时本行重置）。留空表示顶层，无父格依赖。"
+        >
           <Select
             value={parentCell ?? undefined}
             onChange={(val) => onChange({ parentCell: val ?? null })}

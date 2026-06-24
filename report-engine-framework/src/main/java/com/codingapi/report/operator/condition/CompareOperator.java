@@ -3,11 +3,12 @@ package com.codingapi.report.operator.condition;
 /**
  * 条件比较算子：用于 {@link Condition} 中定义过滤条件。
  *
- * <p>所有比较都在 Java 内存完成（不下推 SQL），因此算子语义均为 Java 原生字符串/数值/集合判定，
- * 不依赖任何 SQL 方言（无 LIKE 通配符、无 BETWEEN 语法）。
+ * <p>所有比较都在 Java 内存完成（不下推 SQL），因此算子语义均为 Java 原生字符串/数值/集合判定， 不依赖任何 SQL 方言（无 LIKE 通配符、无 BETWEEN 语法）。
  *
  * <h3>按数据类型的可用性</h3>
+ *
  * <p>前端属性面板根据字段的 {@link com.codingapi.report.data.dataset.DataType} 智能过滤可用算子：
+ *
  * <pre>
  *                    STRING  NUMBER  DATE  DATETIME  BOOLEAN
  *   EQ (=)            ✓       ✓      ✓      ✓        ✓
@@ -24,9 +25,9 @@ package com.codingapi.report.operator.condition;
  *   IS_NOT_NULL       ✓       ✓      ✓      ✓        ✓
  *   BETWEEN           ✗       ✓      ✓      ✓        ✗
  * </pre>
- * <p>STRING 不支持大小比较（GT/GE/LT/LE/BETWEEN），因为没有自然的排序关系。
- * CONTAINS 为子串包含（Java {@code String.contains}），仅用于 STRING 类型。
- * BETWEEN 为闭区间（{@code low ≤ field ≤ high}），右值为逗号分隔的 "low,high"。
+ *
+ * <p>STRING 不支持大小比较（GT/GE/LT/LE/BETWEEN），因为没有自然的排序关系。 CONTAINS 为子串包含（Java {@code
+ * String.contains}），仅用于 STRING 类型。 BETWEEN 为闭区间（{@code low ≤ field ≤ high}），右值为逗号分隔的 "low,high"。
  */
 public enum CompareOperator {
     /** 等于：field = value */

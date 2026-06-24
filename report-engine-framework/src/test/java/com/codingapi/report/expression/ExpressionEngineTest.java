@@ -1,18 +1,16 @@
 package com.codingapi.report.expression;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.codingapi.report.data.dataset.FieldRef;
-
 import com.codingapi.report.param.ParamContext;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("表达式引擎：节点策略求值")
 class ExpressionEngineTest {
@@ -30,7 +28,11 @@ class ExpressionEngineTest {
     @Test
     @DisplayName("字面量直接返回")
     void literal() {
-        assertEquals(42, engine.eval(new Value.Literal(42), EvalContext.scalar(null, new ParamContext(Map.of()))));
+        assertEquals(
+                42,
+                engine.eval(
+                        new Value.Literal(42),
+                        EvalContext.scalar(null, new ParamContext(Map.of()))));
     }
 
     @Test
@@ -53,21 +55,32 @@ class ExpressionEngineTest {
     @Test
     @DisplayName("文本插值：文本 + 字段洞，整数去小数点")
     void template() {
-        Value tpl = new Value.Template(List.of(
-                new Value.Template.Hole(new Value.FieldValue(new FieldRef("emp", "name"))),
-                new Value.Template.Text("：薪资 "),
-                new Value.Template.Hole(new Value.FieldValue(new FieldRef("emp", "salary")))));
-        EvalContext ctx = EvalContext.scalar(row("emp.name", "张三", "emp.salary", 8000.0), new ParamContext(Map.of()));
+        Value tpl =
+                new Value.Template(
+                        List.of(
+                                new Value.Template.Hole(
+                                        new Value.FieldValue(new FieldRef("emp", "name"))),
+                                new Value.Template.Text("：薪资 "),
+                                new Value.Template.Hole(
+                                        new Value.FieldValue(new FieldRef("emp", "salary")))));
+        EvalContext ctx =
+                EvalContext.scalar(
+                        row("emp.name", "张三", "emp.salary", 8000.0), new ParamContext(Map.of()));
         assertEquals("张三：薪资 8000", engine.eval(tpl, ctx));
     }
 
     @Test
     @DisplayName("聚合：字段快路径")
     void aggregateField() {
-        List<Map<String, Object>> rows = new ArrayList<>(List.of(
-                row("emp.salary", 8000.0), row("emp.salary", 9000.0), row("emp.salary", 7500.0)));
+        List<Map<String, Object>> rows =
+                new ArrayList<>(
+                        List.of(
+                                row("emp.salary", 8000.0),
+                                row("emp.salary", 9000.0),
+                                row("emp.salary", 7500.0)));
         Value sum = new Value.Aggregate("SUM", new Value.FieldValue(new FieldRef("emp", "salary")));
-        assertEquals(24500.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
+        assertEquals(
+                24500.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
     }
 
     @Test
@@ -75,17 +88,24 @@ class ExpressionEngineTest {
     void aggregateExpression() {
         List<Map<String, Object>> rows = new ArrayList<>(List.of(row(), row(), row()));
         Value sum = new Value.Aggregate("SUM", new Value.Literal(5));
-        assertEquals(15.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
+        assertEquals(
+                15.0, engine.eval(sum, EvalContext.aggregate(rows, new ParamContext(Map.of()))));
     }
 
     @Test
     @DisplayName("函数：format / date")
     void functions() {
         ParamContext params = new ParamContext(Map.of());
-        Value fmt = new Value.FunctionCall("format", List.of(new Value.Literal(1234.5), new Value.Literal("#,##0.00")));
+        Value fmt =
+                new Value.FunctionCall(
+                        "format",
+                        List.of(new Value.Literal(1234.5), new Value.Literal("#,##0.00")));
         assertEquals("1,234.50", engine.eval(fmt, EvalContext.scalar(null, params)));
 
-        Value date = new Value.FunctionCall("date", List.of(new Value.Literal("2026-06-15"), new Value.Literal("yyyy/MM/dd")));
+        Value date =
+                new Value.FunctionCall(
+                        "date",
+                        List.of(new Value.Literal("2026-06-15"), new Value.Literal("yyyy/MM/dd")));
         assertEquals("2026/06/15", engine.eval(date, EvalContext.scalar(null, params)));
     }
 
@@ -96,19 +116,39 @@ class ExpressionEngineTest {
         EvalContext ctx = EvalContext.scalar(null, params);
 
         // round(3.14159, 2) → 3.14；round(3.5) → 4.0
-        Value r2 = new Value.FunctionCall("round", List.of(new Value.Literal(3.14159), new Value.Literal(2)));
+        Value r2 =
+                new Value.FunctionCall(
+                        "round", List.of(new Value.Literal(3.14159), new Value.Literal(2)));
         assertEquals(3.14, engine.eval(r2, ctx));
         Value r0 = new Value.FunctionCall("round", List.of(new Value.Literal(3.5)));
         assertEquals(4.0, engine.eval(r0, ctx));
 
         // concat("a", "b") → "ab"；null 跳过
-        Value cat = new Value.FunctionCall("concat", List.of(new Value.Literal("a"), new Value.Literal(null), new Value.Literal("b")));
+        Value cat =
+                new Value.FunctionCall(
+                        "concat",
+                        List.of(
+                                new Value.Literal("a"),
+                                new Value.Literal(null),
+                                new Value.Literal("b")));
         assertEquals("ab", engine.eval(cat, ctx));
 
         // if(true, "是", "否") → "是"；if(0, ...) → "否"
-        Value ifTrue = new Value.FunctionCall("if", List.of(new Value.Literal(true), new Value.Literal("是"), new Value.Literal("否")));
+        Value ifTrue =
+                new Value.FunctionCall(
+                        "if",
+                        List.of(
+                                new Value.Literal(true),
+                                new Value.Literal("是"),
+                                new Value.Literal("否")));
         assertEquals("是", engine.eval(ifTrue, ctx));
-        Value ifZero = new Value.FunctionCall("if", List.of(new Value.Literal(0), new Value.Literal("是"), new Value.Literal("否")));
+        Value ifZero =
+                new Value.FunctionCall(
+                        "if",
+                        List.of(
+                                new Value.Literal(0),
+                                new Value.Literal("是"),
+                                new Value.Literal("否")));
         assertEquals("否", engine.eval(ifZero, ctx));
     }
 
@@ -116,7 +156,8 @@ class ExpressionEngineTest {
     @DisplayName("未注册函数显式抛异常")
     void unknownFunction() {
         Value call = new Value.FunctionCall("nope", List.of());
-        assertThrows(IllegalStateException.class,
+        assertThrows(
+                IllegalStateException.class,
                 () -> engine.eval(call, EvalContext.scalar(null, new ParamContext(Map.of()))));
     }
 }

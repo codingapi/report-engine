@@ -2,7 +2,6 @@ package com.codingapi.report.operator.aggregation;
 
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.expression.function.FunctionMeta;
-
 import java.util.List;
 import java.util.Map;
 
@@ -10,24 +9,24 @@ import java.util.Map;
  * 聚合算子注册表：内置全部 {@link Aggregator} 实现，按聚合名选中并求值。
  *
  * <h3>扩展方式</h3>
- * <p>新增一种聚合（如 BOOLEAN 类型的 COUNT_TRUE/COUNT_FALSE）：实现 {@link Aggregator}，
- * 在 {@link #REGISTRY} 列表里登记一行即可，无需改动调用方。未注册的聚合名会显式抛异常。
+ *
+ * <p>新增一种聚合（如 BOOLEAN 类型的 COUNT_TRUE/COUNT_FALSE）：实现 {@link Aggregator}， 在 {@link #REGISTRY}
+ * 列表里登记一行即可，无需改动调用方。未注册的聚合名会显式抛异常。
  */
 public final class Aggregators {
 
     /** 内置聚合实现。新增聚合在此登记。 */
-    private static final List<Aggregator> REGISTRY = List.of(
-            new NoneAggregator(),
-            new CountAggregator(),
-            new CountDistinctAggregator(),
-            new SumAggregator(),
-            new AvgAggregator(),
-            new MaxAggregator(),
-            new MinAggregator()
-    );
+    private static final List<Aggregator> REGISTRY =
+            List.of(
+                    new NoneAggregator(),
+                    new CountAggregator(),
+                    new CountDistinctAggregator(),
+                    new SumAggregator(),
+                    new AvgAggregator(),
+                    new MaxAggregator(),
+                    new MinAggregator());
 
-    private Aggregators() {
-    }
+    private Aggregators() {}
 
     /** 列出所有已注册聚合的元信息（供前端表达式构建器枚举）。 */
     public static List<FunctionMeta> list() {
@@ -49,7 +48,8 @@ public final class Aggregators {
      *
      * @throws IllegalStateException 当没有策略支持该聚合名
      */
-    public static Object aggregate(String aggregation, List<Map<String, Object>> rows, FieldRef field) {
+    public static Object aggregate(
+            String aggregation, List<Map<String, Object>> rows, FieldRef field) {
         for (Aggregator a : REGISTRY) {
             if (a.supports(aggregation)) {
                 return a.aggregate(rows, field);

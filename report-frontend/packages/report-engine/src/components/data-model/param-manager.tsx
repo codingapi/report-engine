@@ -1,11 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Button, List, Tag, Empty, Popconfirm, Typography } from 'antd';
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  HolderOutlined,
-} from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, HolderOutlined } from '@ant-design/icons';
 import type { ReportParam } from '@/types';
 import { genId, dataTypeLabel } from '@/types';
 import ParamModal from './param-modal';
@@ -98,9 +93,7 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
               ]}
             >
               <List.Item.Meta
-                avatar={
-                  <HolderOutlined className="re-param-drag-handle" />
-                }
+                avatar={<HolderOutlined className="re-param-drag-handle" />}
                 title={
                   <span>
                     <span className="re-param-alias">{p.alias || p.name}</span>

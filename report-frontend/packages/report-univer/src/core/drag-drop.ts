@@ -15,49 +15,49 @@ import { createCellHandle } from './cell-handle';
  * @returns 清理函数
  */
 export function registerDragDrop(
-    container: HTMLDivElement,
-    univerAPI: UniverAPI,
-    getCallback: () => ((info: FieldDropInfo, handle: CellHandle) => void) | undefined,
+  container: HTMLDivElement,
+  univerAPI: UniverAPI,
+  getCallback: () => ((info: FieldDropInfo, handle: CellHandle) => void) | undefined,
 ): () => void {
-    const handleDragOver = (e: DragEvent) => {
-        e.preventDefault();
-        if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = 'copy';
-        }
-    };
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
 
-    const handleDrop = (e: DragEvent) => {
-        e.preventDefault();
-        const callback = getCallback();
-        if (!callback) return;
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    const callback = getCallback();
+    if (!callback) return;
 
-        const data = e.dataTransfer?.getData('text/plain');
-        if (!data) return;
+    const data = e.dataTransfer?.getData('text/plain');
+    if (!data) return;
 
-        // 通过活动工作表获取目标单元格
-        const workbook = univerAPI.getActiveWorkbook();
-        if (!workbook) return;
+    // 通过活动工作表获取目标单元格
+    const workbook = univerAPI.getActiveWorkbook();
+    if (!workbook) return;
 
-        const sheet = workbook.getActiveSheet();
-        if (!sheet) return;
+    const sheet = workbook.getActiveSheet();
+    if (!sheet) return;
 
-        const activeRange = sheet.getActiveRange();
-        if (!activeRange) return;
+    const activeRange = sheet.getActiveRange();
+    if (!activeRange) return;
 
-        const sheetId = sheet.getSheetId?.() as string;
-        const row = activeRange.getRow() as number;
-        const column = activeRange.getColumn() as number;
-        const a1Notation = activeRange.getA1Notation?.() ?? '';
+    const sheetId = sheet.getSheetId?.() as string;
+    const row = activeRange.getRow() as number;
+    const column = activeRange.getColumn() as number;
+    const a1Notation = activeRange.getA1Notation?.() ?? '';
 
-        const handle = createCellHandle(univerAPI, sheetId, row, column, a1Notation);
-        callback({ sheetId, row, column, data }, handle);
-    };
+    const handle = createCellHandle(univerAPI, sheetId, row, column, a1Notation);
+    callback({ sheetId, row, column, data }, handle);
+  };
 
-    container.addEventListener('dragover', handleDragOver);
-    container.addEventListener('drop', handleDrop);
+  container.addEventListener('dragover', handleDragOver);
+  container.addEventListener('drop', handleDrop);
 
-    return () => {
-        container.removeEventListener('dragover', handleDragOver);
-        container.removeEventListener('drop', handleDrop);
-    };
+  return () => {
+    container.removeEventListener('dragover', handleDragOver);
+    container.removeEventListener('drop', handleDrop);
+  };
 }

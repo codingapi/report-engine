@@ -23,22 +23,25 @@ const ReportsPage = () => {
   const [creating, setCreating] = useState(false);
   const [form] = Form.useForm<{ name: string; dataModelId: string }>();
 
-  const refresh = useCallback(async (targetPage = page) => {
-    setLoading(true);
-    try {
-      const [res, dms] = await Promise.all([
-        listReportConfigs(targetPage, PAGE_SIZE),
-        listDataModels(),
-      ]);
-      setReports(res.list);
-      setTotal(res.total);
-      setDataModels(dms);
-    } catch (e) {
-      message.error(`加载报表列表失败: ${e}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+  const refresh = useCallback(
+    async (targetPage = page) => {
+      setLoading(true);
+      try {
+        const [res, dms] = await Promise.all([
+          listReportConfigs(targetPage, PAGE_SIZE),
+          listDataModels(),
+        ]);
+        setReports(res.list);
+        setTotal(res.total);
+        setDataModels(dms);
+      } catch (e) {
+        message.error(`加载报表列表失败: ${e}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page],
+  );
 
   const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
 
@@ -105,7 +108,14 @@ const ReportsPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
         <h2 style={{ margin: 0 }}>报表管理</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           新建报表

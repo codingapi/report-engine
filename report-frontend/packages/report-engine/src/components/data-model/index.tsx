@@ -24,7 +24,9 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
 }) => {
   return (
     <div className="re-panel">
-      <div className="re-panel__title" style={{ paddingLeft: 12 }}>数据模型</div>
+      <div className="re-panel__title" style={{ paddingLeft: 12 }}>
+        数据模型
+      </div>
       <div className="re-panel__content">
         <Tabs
           size="small"

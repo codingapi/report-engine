@@ -5,11 +5,7 @@ export default defineConfig([
   ts.configs.recommended,
   {
     // 排除构建产物和生成文件
-    ignores: [
-      '**/dist/**',
-      '**/node_modules/**',
-      '**/*.d.ts',
-    ],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.d.ts'],
     rules: {
       // 允许 console（开发阶段）
       'no-console': 'off',
@@ -20,10 +16,13 @@ export default defineConfig([
       // Function 类型用于 Univer Facade API 的类型 workaround
       '@typescript-eslint/no-unsafe-function-type': 'off',
       // 允许未使用变量/参数以 _ 开头
-      '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
       // 允许 require imports（CommonJS 兼容场景）
       '@typescript-eslint/no-require-imports': 'off',
     },

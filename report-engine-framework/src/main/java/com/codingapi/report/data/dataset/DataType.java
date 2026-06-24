@@ -4,16 +4,18 @@ package com.codingapi.report.data.dataset;
  * 字段数据类型：业务层简化的类型系统，与数据库物理类型解耦。
  *
  * <h3>为什么不用 JDBC 的 {@code java.sql.Types}？</h3>
+ *
  * <p>JDBC 类型有几十种（VARCHAR/CHAR/LONGVARCHAR/NVARCHAR...），但对于报表设计来说，
- * 用户只关心"这个字段是文本还是数字？能不能求和？能不能比较大小？"。
- * 简化为 6 种业务类型后：
+ * 用户只关心"这个字段是文本还是数字？能不能求和？能不能比较大小？"。 简化为 6 种业务类型后：
+ *
  * <ul>
- *   <li>前端属性面板可以按类型智能过滤可用算子（NUMBER 才能 SUM，STRING 只能 COUNT）</li>
- *   <li>条件面板可以按类型过滤可用比较符（STRING 才有 CONTAINS，NUMBER/DATE 才有大小比较）</li>
- *   <li>数据提取时统一转换为对应的 Java 类型（NUMBER→Double, BOOLEAN→Boolean, 其余→String）</li>
+ *   <li>前端属性面板可以按类型智能过滤可用算子（NUMBER 才能 SUM，STRING 只能 COUNT）
+ *   <li>条件面板可以按类型过滤可用比较符（STRING 才有 CONTAINS，NUMBER/DATE 才有大小比较）
+ *   <li>数据提取时统一转换为对应的 Java 类型（NUMBER→Double, BOOLEAN→Boolean, 其余→String）
  * </ul>
  *
  * <h3>类型映射示例</h3>
+ *
  * <pre>
  *   PostgreSQL VARCHAR  → STRING
  *   PostgreSQL INTEGER  → NUMBER

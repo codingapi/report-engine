@@ -31,10 +31,7 @@ const DrillEditor: React.FC<DrillEditorProps> = ({
         label="反查"
         tooltip="开启后，预览态下该格渲染为可点击（蓝色链接样式），用户点击可查看聚合/汇总计算的明细数据。仅对聚合格有意义。"
       >
-        <Switch
-          checked={enabled}
-          onChange={(checked) => onChange({ drillEnabled: checked })}
-        />
+        <Switch checked={enabled} onChange={(checked) => onChange({ drillEnabled: checked })} />
       </Form.Item>
 
       {enabled && (
@@ -45,7 +42,7 @@ const DrillEditor: React.FC<DrillEditorProps> = ({
           <Select
             value={drillView ?? undefined}
             onChange={(val) => onChange({ drillView: val ?? null })}
-            placeholder={`默认（${defaultView ? datasets.find(d => d.id === defaultView)?.alias || defaultView : '数据集本身'}）`}
+            placeholder={`默认（${defaultView ? datasets.find((d) => d.id === defaultView)?.alias || defaultView : '数据集本身'}）`}
             options={datasetOptions(datasets)}
             showSearch
             allowClear

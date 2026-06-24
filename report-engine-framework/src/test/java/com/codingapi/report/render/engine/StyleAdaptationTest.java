@@ -1,8 +1,18 @@
 package com.codingapi.report.render.engine;
 
-import com.codingapi.report.param.ParamContext;
-import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.dataset.DataType;
+import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.dataset.FieldRef;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.DataSourceType;
+import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
 import com.codingapi.report.excel.ExcelExporter;
 import com.codingapi.report.excel.ExcelImporter;
 import com.codingapi.report.excel.pojo.Border;
@@ -14,40 +24,26 @@ import com.codingapi.report.excel.pojo.RichTextSegment;
 import com.codingapi.report.excel.pojo.Sheet;
 import com.codingapi.report.excel.pojo.Style;
 import com.codingapi.report.excel.pojo.Workbook;
-import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.expression.Value;
+import com.codingapi.report.param.ParamContext;
 import com.codingapi.report.render.Report;
 import com.codingapi.report.render.grid.CellBinding;
-import com.codingapi.report.expression.Value;
-import com.codingapi.report.expression.Templates;
 import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.DataSourceType;
-import com.codingapi.report.data.dataset.DataType;
-import com.codingapi.report.data.dataset.Dataset;
-import com.codingapi.report.data.dataset.TableDataset;
-import com.codingapi.report.data.dataset.Field;
-import com.codingapi.report.data.dataset.FieldRef;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 /**
- * 样式适配全链路：模板（Univer 画布）携带<b>合并标题 + 富文本 + 加粗表头 + 边框</b>，
- * 渲染器以模板为底填入列表数据并<b>保留样式</b>，导出本地 xlsx 后回读校验样式存活。
+ * 样式适配全链路：模板（Univer 画布）携带<b>合并标题 + 富文本 + 加粗表头 + 边框</b>， 渲染器以模板为底填入列表数据并<b>保留样式</b>，导出本地 xlsx
+ * 后回读校验样式存活。
  *
- * <p>验证三件事：① 合并的标题单元格；② 富文本分段样式；③ 表头/数据的边框，
- * 以及"扩展行继承声明格样式"（数据多行都带边框）。
+ * <p>验证三件事：① 合并的标题单元格；② 富文本分段样式；③ 表头/数据的边框， 以及"扩展行继承声明格样式"（数据多行都带边框）。
  */
 class StyleAdaptationTest {
 
@@ -73,8 +69,14 @@ class StyleAdaptationTest {
         Sheet sheet = new ExcelImporter().importFrom(Files.readAllBytes(file)).getSheets().get(0);
 
         // ① 合并标题：跨 3 列合并
-        assertTrue(sheet.getMerges() != null && sheet.getMerges().stream().anyMatch(m ->
-                        m.getStartRow() == 0 && m.getStartCol() == 0 && m.getColSpan() == 3),
+        assertTrue(
+                sheet.getMerges() != null
+                        && sheet.getMerges().stream()
+                                .anyMatch(
+                                        m ->
+                                                m.getStartRow() == 0
+                                                        && m.getStartCol() == 0
+                                                        && m.getColSpan() == 3),
                 "标题应跨 3 列合并");
 
         // ② 富文本：标题是分段富文本，"员工"加粗
@@ -83,7 +85,9 @@ class StyleAdaptationTest {
         assertNotNull(rt, "标题应为富文本");
         assertEquals("员工名单", rt.getText());
         assertTrue(rt.getSegments().size() >= 2, "富文本应有多个分段");
-        assertTrue(rt.getSegments().stream().anyMatch(s -> Boolean.TRUE.equals(s.getStyle().getBold())),
+        assertTrue(
+                rt.getSegments().stream()
+                        .anyMatch(s -> Boolean.TRUE.equals(s.getStyle().getBold())),
                 "富文本应有加粗分段");
 
         // ③ 表头：加粗 + 四边边框
@@ -104,16 +108,40 @@ class StyleAdaptationTest {
     // ---- 数据模型 / 报表 ----
 
     private static DataModel staffModel() {
-        DataSource src = DataSource.builder().id("ds").name("员工CSV").type(DataSourceType.CSV)
-                .config(Map.of("path", "/data/styled_staff.csv")).build();
-        Dataset staff = TableDataset.builder().id("d_staff").datasourceId("ds").sourceTable("styled_staff.csv")
-                .fields(List.of(
-                        Field.builder().name("id").dataType(DataType.NUMBER).build(),
-                        Field.builder().name("name").dataType(DataType.STRING).build(),
-                        Field.builder().name("dept").dataType(DataType.STRING).build()))
+        DataSource src =
+                DataSource.builder()
+                        .id("ds")
+                        .name("员工CSV")
+                        .type(DataSourceType.CSV)
+                        .config(Map.of("path", "/data/styled_staff.csv"))
+                        .build();
+        Dataset staff =
+                TableDataset.builder()
+                        .id("d_staff")
+                        .datasourceId("ds")
+                        .sourceTable("styled_staff.csv")
+                        .fields(
+                                List.of(
+                                        Field.builder()
+                                                .name("id")
+                                                .dataType(DataType.NUMBER)
+                                                .build(),
+                                        Field.builder()
+                                                .name("name")
+                                                .dataType(DataType.STRING)
+                                                .build(),
+                                        Field.builder()
+                                                .name("dept")
+                                                .dataType(DataType.STRING)
+                                                .build()))
+                        .build();
+        return DataModel.builder()
+                .id("dm")
+                .name("员工模型")
+                .datasources(List.of(src))
+                .datasets(List.of(staff))
+                .relationships(List.of())
                 .build();
-        return DataModel.builder().id("dm").name("员工模型")
-                .datasources(List.of(src)).datasets(List.of(staff)).relationships(List.of()).build();
     }
 
     /** 列表报表：数据从第 2 行起，列 工号/姓名/部门（只绑数据，样式由模板提供） */
@@ -121,7 +149,11 @@ class StyleAdaptationTest {
         CellBinding idCol = listCol(2, 0, "id");
         CellBinding nameCol = listCol(2, 1, "name");
         CellBinding deptCol = listCol(2, 2, "dept");
-        return Report.builder().id("r").name("员工名单").dataModelId("dm").templateId("tpl")
+        return Report.builder()
+                .id("r")
+                .name("员工名单")
+                .dataModelId("dm")
+                .templateId("tpl")
                 .parameters(List.of())
                 .cellBindings(List.<CellBinding>of(idCol, nameCol, deptCol))
                 .loopBlocks(List.of())
@@ -129,8 +161,12 @@ class StyleAdaptationTest {
     }
 
     private static CellBinding listCol(int row, int col, String field) {
-        return CellBinding.builder().cell(new CellRef("sheet1", row, col)).value(new Value.FieldValue(new FieldRef("d_staff", field)))
-                .expansion(Expansion.VERTICAL).expandMode(ExpandMode.LIST).build();
+        return CellBinding.builder()
+                .cell(new CellRef("sheet1", row, col))
+                .value(new Value.FieldValue(new FieldRef("d_staff", field)))
+                .expansion(Expansion.VERTICAL)
+                .expandMode(ExpandMode.LIST)
+                .build();
     }
 
     // ---- 模板画布（携带样式/边框/合并/富文本）----
@@ -143,9 +179,10 @@ class StyleAdaptationTest {
         // 标题(0,0)：富文本"员工名单"（员工=加粗红，名单=蓝），跨 3 列合并
         RichText rt = new RichText();
         rt.setText("员工名单");
-        rt.setSegments(List.of(
-                segment("员工", font(true, "FF0000", 14.0)),
-                segment("名单", font(false, "0000FF", 14.0))));
+        rt.setSegments(
+                List.of(
+                        segment("员工", font(true, "FF0000", 14.0)),
+                        segment("名单", font(false, "0000FF", 14.0))));
         Cell title = new Cell();
         title.setRow(0);
         title.setCol(0);
@@ -231,8 +268,11 @@ class StyleAdaptationTest {
     }
 
     private static Cell cell(Sheet sheet, int row, int col) {
-        Cell c = sheet.getCells().stream()
-                .filter(x -> x.getRow() == row && x.getCol() == col).findFirst().orElse(null);
+        Cell c =
+                sheet.getCells().stream()
+                        .filter(x -> x.getRow() == row && x.getCol() == col)
+                        .findFirst()
+                        .orElse(null);
         assertNotNull(c, "缺少单元格 (" + row + "," + col + ")");
         return c;
     }
