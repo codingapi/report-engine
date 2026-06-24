@@ -1,6 +1,6 @@
 package com.example.report.config;
 
-import com.codingapi.report.starter.repository.ReportRepository;
+import com.codingapi.report.repository.ReportRepository;
 import com.example.report.repository.InMemoryReportRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

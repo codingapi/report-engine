@@ -7,7 +7,7 @@ import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
 import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
 import com.codingapi.report.config.dto.ConfigDtos.SourceDTO;
 import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
-import com.codingapi.report.starter.repository.ReportRepository;
+import com.codingapi.report.repository.ReportRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;

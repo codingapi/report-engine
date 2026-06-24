@@ -94,6 +94,10 @@ com.codingapi.report
 │   ├── eval/          各节点求值策略
 │   └── function/      ValueFunction SPI + 注册表
 ├── param/             参数域：运行时值解析
+├── repository/        存储抽象域：报表配置存取（零 Spring 依赖）
+│   ├── ReportRepository  存储扩展点（使用方提供实现）
+│   ├── PageQuery         分页入参（归一逻辑下沉到访问器）
+│   └── PageResult<T>     分页结果
 └── render/            渲染域：数据如何映射到单元格
     ├── Report         报表定义
     ├── grid/          CellBinding（值层 + 控制层）
@@ -194,15 +198,15 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 **报表引擎 API**（`controller/`）：
 - `POST /api/report/render`（`ReportRenderController`）— 配置 + 模板快照 → `ReportRenderer.render()` → 填充数据的 `.xlsx`
-- `/api/report/configs[...]`（`ReportConfigController`）— 报表配置保存（`@RequestBody ReportConfig`）/加载（附带 `dataModel` 富化）/分页列表（`page(SearchRequest): Page<ReportConfig>`）/删除
+- `/api/report/configs[...]`（`ReportConfigController`）— 报表配置保存（`@RequestBody ReportConfig`）/加载（附带 `dataModel` 富化）/分页列表（GET，入参 `SearchRequest`，内部转 `PageQuery` 调 `repository.page(PageQuery): PageResult<ReportConfig>`）/删除
 - `GET /api/datamodels`（`DataModelController`）— 数据模型列表（注入 `List<DataModel>`，供创建报表时选择）
 - `GET /api/datasets[...]`（`DatasetController`）— 数据集列表（含字段）/预览前 N 行
 - `GET /api/expression/functions`（`ExpressionController`）— 公式目录（聚合 + 函数元信息）
 
-**存储抽象**（接口在 starter，实现由使用方提供）：
-- `ReportRepository` 接口（`com.codingapi.report.starter.repository`）：`save(ReportConfig):String` / `find(id):ReportConfig` / `page(SearchRequest):Page<ReportConfig>` / `delete(id)`。starter **不提供默认实现**（存储交使用方），用 `@ConditionalOnMissingBean` 装配 Controller 允许覆盖。
+**存储抽象**（接口在 framework，实现由使用方提供）：
+- `ReportRepository` 接口在 **framework**（`com.codingapi.report.repository`）：`save(ReportConfig):String` / `find(id):ReportConfig` / `page(PageQuery):PageResult<ReportConfig>` / `delete(id)`。分页用 framework 纯类型 `PageQuery`（current/pageSize，归一逻辑下沉到访问器）/`PageResult<T>`（content/total），**不依赖 Spring**，保持 framework 可独立发布。starter **不提供默认实现**（存储交使用方），用 `@ConditionalOnMissingBean` 装配 Controller 允许覆盖。
 - `ReportConfig` 实体在 **framework**（`com.codingapi.report.config`）：强类型 POJO，`id/name/dataModelId/createTime/updateTime`（long 时间戳）+ `cellBindings/loopBlocks/summaries/params/template`（引用 DTO record）+ `dataModel`（响应富化字段，`@JsonInclude NON_NULL`，仅 GET 返回不持久化）。example 的 `InMemoryReportRepository` 在 save 时设时间戳、null 列表归一空。
-- 接口放 starter 而非 framework：因 `page(SearchRequest)` 需 `SearchRequest`/`Page` 这类 Spring 类型，放 framework 会引入 Spring 依赖、破坏"framework 可独立发布"原则。
+- Spring 类型仅存在于 starter 的 `ReportConfigController` 边界：入参 `SearchRequest` → `PageQuery`，返回 `PageResult` → `MultiResponse`，转换在 Controller 内完成。
 
 **DTO 契约层**（DTO record 在 **framework** `com.codingapi.report.config.dto.ConfigDtos`，转换在 starter `RenderDtoConverter`）：
 - DTO record（`BindingDTO`/`ValueDTO`/`LoopBlockDTO`/`SummaryRowDTO`/`SummaryCellDTO`/`ConditionDTO`/`PartDTO`/`SourceDTO`/`FieldRefDTO`）同时是 `ReportConfig` 实体的持久化字段类型 + 前端 JSON 契约。
@@ -212,7 +216,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 ### Example Module (`report-engine-example`)
 
-演示应用，只承载**应用级实现**：数据集配置（具体数据）、示例报表预存。通用 API / 存储 / DTO 均在 starter。
+演示应用，只承载**应用级实现**：数据集配置（具体数据）、示例报表预存。通用 API / DTO 转换适配均在 starter，存储抽象接口（`ReportRepository`）在 framework。
 
 **数据集配置** (`DatasetConfig.java`)：
 - 扫描 `classpath:data/*.json` 描述文件，每个 JSON 对应一个 CSV 数据集（字段名/别名/类型/主键）
@@ -221,9 +225,9 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 构建唯一 `DataModel` Bean（id=`"default"`）+ `CsvDataExtractor` Bean，注入 starter 的 Controller
 
 **示例报表预存** (`ReportTemplateSeeder.java`)：
-- `@Component`，启动时（`@EventListener(ApplicationReadyEvent)`）向 `ReportRepository`（example 内存实现）写入 8 个完整报表配置
+- `@Component`，启动时（`@EventListener(ApplicationReadyEvent)`）向 `ReportRepository`（example 内存实现）写入 10 个完整报表配置
 - 示例报表使用**写死的稳定 id**（`example-simple-list` 等），保证重启后 id 不变、前端引用不失效（内存存储重启即丢，但 seeder 用同一批 id 重写）
-- 涵盖：简单列表、分组列表、多级分组统计、主从合并、小计+总计、薪资条循环、独立数据带并列、并列双汇总
+- 涵盖：简单列表、分组列表、多级分组统计、主从合并、小计+总计、薪资条循环、独立数据带并列、并列双汇总、交叉表（区域季度销售）、横向汇总（商品横向汇总表）
 - 配置用 `ReportConfigBuilder`（链式构造器）生成，产物为强类型 `ReportConfig`（引用 framework DTO record + `Workbook` POJO）。示例列表不再有专用端点，统一走 starter 的 `GET /api/report/configs`（示例与用户报表同表）。
 
 **CSV 数据集**（`src/main/resources/data/`）：10 个 CSV + 对应 JSON 描述 + `relationships.json`。
@@ -298,7 +302,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 前端 `UniverSheet` 裁剪了大量菜单项，仅保留报表设计所需的最小功能集
 - **跨模块修改**：修改 framework/excel/starter 后必须 `./mvnw install -DskipTests` 再启动 example，否则 example 使用的是本地仓库中的旧 JAR
 - **Univer 默认 sheet ID**：UniverSheet 创建的默认 sheet ID 不一定是 `'sheet1'`（可能是 UUID），需要通过 `getActiveSheetId()` 从快照获取实际 ID
-- **Value sealed interface 无 Jackson 注解**：前后端传输/持久化使用 DTO record（在 framework `ConfigDtos`，同时是 `ReportConfig` 实体字段类型）+ starter `RenderDtoConverter` 中间转换，而非直接在 Value 上加 `@JsonTypeInfo`。`ReportRepository` 接口放 starter（需 `SearchRequest`/`Page`），`ReportConfig` 实体放 framework（纯 POJO，仅依赖 excel 的 `Workbook`），保持 framework 可独立发布。
+- **Value sealed interface 无 Jackson 注解**：前后端传输/持久化使用 DTO record（在 framework `ConfigDtos`，同时是 `ReportConfig` 实体字段类型）+ starter `RenderDtoConverter` 中间转换，而非直接在 Value 上加 `@JsonTypeInfo`。`ReportRepository` 接口与 `ReportConfig` 实体均放 framework（纯 POJO + 纯分页类型 `PageQuery`/`PageResult`，零 Spring 依赖），保持 framework 可独立发布。
 - **模板层样式继承**：`renderLoop` 中后续迭代的合并区域需要显式复制（`seedTemplate` 只载入原始位置的 merge），样式通过 `place()` 从模板源格继承
 - **loadReportConfig sheet ID 重映射**：后端存储的 cellKey 中 sheet ID 可能是 `"sheet1"`，但 Univer 运行时活动工作表 ID 可能是 UUID。`loadReportConfig` 必须先 `getActiveSheetId()` 获取实际 ID，再重映射所有 cellKey/parentCell，最后回写绑定显示文本
 - **数据模型随配置加载**：`GET /configs/{id}` 返回的 `dataModel` 字段由后端从注入的 `DataModel` Bean 实时解析（当前始终返回唯一的全局模型），配置中仅存 `dataModelId` 引用
