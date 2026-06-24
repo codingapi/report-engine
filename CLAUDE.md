@@ -286,6 +286,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 后端 framework 和 excel 模块的测试均**不需要外部依赖**（纯内存/POI 测试），可直接运行
 - framework 测试使用 CSV 文件（`src/test/resources/data/`）作为数据源，`ReportScenarioTest` 覆盖 7 种报表结构场景 + 独立数据带场景
 - 前端库包使用 `bundle: false`（非打包模式），保留 tree-shaking 能力
+- **前端测试纪律**见 [`report-frontend/TESTING.md`](report-frontend/TESTING.md)：MSW 模拟接口（源码零侵入）、Testing Library 语义查询（禁用 data-testid）、视觉验证用结构化对比而非截图、Claude Code 仅做编排与读文本 diff、不自更新基准。前端测试一律参照该文件。
 
 ## Key Design Decisions
 

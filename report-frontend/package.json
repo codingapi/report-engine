@@ -19,6 +19,8 @@
     "dev": "pnpm run dev:app-pc",
     "lint": "rslint",
     "lint:fix": "rslint --fix",
+    "test:report-engine": "pnpm -F @coding-report/report-engine test",
+    "test": "pnpm run test:report-engine",
     "clean": "pnpm cleaninstall-node"
   },
   "keywords": [],
