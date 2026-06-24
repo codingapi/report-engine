@@ -25,6 +25,7 @@
 		<maven.compile.target>17</maven.compile.target>
 		<maven.source.plugin>3.0.1</maven.source.plugin>
 		<maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+		<spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
 
 		<java.version>17</java.version>
 		<fastjson.version>2.0.53</fastjson.version>
@@ -221,6 +222,25 @@
 							<Implementation-Title>${project.name}</Implementation-Title>
 						</manifestEntries>
 					</archive>
+				</configuration>
+			</plugin>
+
+			<!-- Spotless：Java 代码格式化。AOSP 风格（4 空格）匹配本仓库现有缩进。
+			     ./mvnw spotless:apply 格式化，spotless:check 仅校验（CI 用）。 -->
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>${spotless-maven-plugin.version}</version>
+				<configuration>
+					<java>
+						<googleJavaFormat>
+							<version>1.22.0</version>
+							<style>AOSP</style>
+						</googleJavaFormat>
+						<removeUnusedImports/>
+						<trimTrailingWhitespace/>
+						<endWithNewline/>
+					</java>
 				</configuration>
 			</plugin>
 		</plugins>

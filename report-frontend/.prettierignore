@@ -1,0 +1,9 @@
+# 构建产物
+**/dist/**
+# 依赖
+**/node_modules/**
+# 类型声明（rslint 也忽略）
+**/*.d.ts
+# 生成文件
+pnpm-lock.yaml
+**/*.snap
