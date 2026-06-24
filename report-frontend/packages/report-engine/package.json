@@ -30,6 +30,9 @@
   "scripts": {
     "build": "rslib build",
     "dev": "rslib build --watch",
+    "test": "rstest",
+    "test:node": "rstest --project node",
+    "test:browser": "rstest --project browser",
     "push": "pnpm run build && pnpm publish --access public"
   },
   "dependencies": {
@@ -43,5 +46,11 @@
     "antd": ">=5",
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@rstest/browser": "0.9.10",
+    "@testing-library/user-event": "^14.6.1",
+    "msw": "^2.14.6"
   }
 }
