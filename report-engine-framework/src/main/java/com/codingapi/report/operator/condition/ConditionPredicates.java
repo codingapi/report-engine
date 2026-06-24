@@ -28,7 +28,8 @@ public final class ConditionPredicates {
             new InPredicate(),
             new NotInPredicate(),
             new IsNullPredicate(),
-            new IsNotNullPredicate()
+            new IsNotNullPredicate(),
+            new BetweenPredicate()
     );
 
     private ConditionPredicates() {

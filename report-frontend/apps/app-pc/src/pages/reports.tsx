@@ -98,7 +98,7 @@ const ReportsPage = () => {
     setCreateOpen(true);
   };
 
-  const onPageChange = (next: number, nextSize: number) => {
+  const onPageChange = (next: number, _pageSize: number) => {
     setPage(next);
     refresh(next);
   };

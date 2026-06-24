@@ -10,6 +10,7 @@ import SummaryRowEditor from './summary-row-editor';
 import DrillEditor from './drill-editor';
 import { valueDisplayText } from '../../value-text';
 import { cellA1 } from '../../utils/excel-cell';
+import { summaryAxis, summaryCellRC, summaryHit, crossPosOf } from '../../utils/summary-axis';
 
 interface PropertyPanelProps {
   selectedCell: SheetCellSelectInfo | null;
@@ -81,11 +82,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const { info } = selectedCell;
   const cellKey = `${info.sheetId}:${info.row}:${info.column}`;
   const binding = cellBindings.find((b) => b.cellKey === cellKey);
-  // 汇总按列区间归属：点击的列落在某汇总的 [fromColumn, toColumn] 内即命中
-  // （同一设计行可并列多个汇总，各占不同列段）
-  const summaryRow = summaries.find(
-    (s) => s.row === info.row && info.column >= s.fromColumn && info.column <= s.toColumn,
-  );
+  // 汇总按轴 + 交叉区间归属：点击格的主轴位置相符、交叉坐标落在 [crossFrom, crossTo] 内即命中
+  // （同一主轴位置可并列多个汇总，各占不同交叉段）
+  const summaryRow = summaries.find((s) => summaryHit(s, info.row, info.column));
+  // 命中汇总时点击格的交叉坐标（纵向=列、横向=行），用于定位/编辑该格
+  const summaryCrossPos = summaryRow ? crossPosOf(summaryAxis(summaryRow), info.row, info.column) : 0;
 
   const updateBinding = (patch: Partial<CellBinding>) => {
     if (!binding) return;
@@ -95,7 +96,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   // 预览文本
   const previewText = summaryRow
     ? (() => {
-        const c = summaryRow.cells.find((sc) => sc.column === info.column);
+        const c = summaryRow.cells.find((sc) => sc.crossPos === summaryCrossPos);
         return c ? valueDisplayText(c.value, datasets, loopBlocks, params) : '';
       })()
     : binding
@@ -104,11 +105,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
   // 位置显示（A1 记法）
   const positionText = info.a1Notation || `${info.row + 1},${info.column + 1}`;
-  // 汇总行：显示其作用列区间（A1 风格），如 A3:B3；单列时只显示一格
+  // 汇总：显示其作用区间（A1 风格），如 A3:B3（纵向）或 C1:C2（横向）；单格时只显示一格
   const summaryRangeText = summaryRow
-    ? summaryRow.fromColumn === summaryRow.toColumn
-      ? cellA1(summaryRow.row, summaryRow.fromColumn)
-      : `${cellA1(summaryRow.row, summaryRow.fromColumn)}:${cellA1(summaryRow.row, summaryRow.toColumn)}`
+    ? (() => {
+        const from = summaryCellRC(summaryRow, summaryRow.crossFrom);
+        const to = summaryCellRC(summaryRow, summaryRow.crossTo);
+        const a1From = cellA1(from.row, from.col);
+        return summaryRow.crossFrom === summaryRow.crossTo
+          ? a1From
+          : `${a1From}:${cellA1(to.row, to.col)}`;
+      })()
     : '';
 
   // ─── 已绑定：Tab 内容 ───
@@ -225,12 +231,18 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
               范围:{summaryRangeText}
             </span>
           )}
-          {summaryRow && <Badge color="gold" text="汇总行" style={{ marginLeft: 8 }} />}
+          {summaryRow && (
+            <Badge color="gold" text={summaryAxis(summaryRow) === 'HORIZONTAL' ? '汇总列' : '汇总行'} style={{ marginLeft: 8 }} />
+          )}
         </span>
         {(summaryRow || binding) && (
           <Popconfirm
             title={summaryRow ? '取消该汇总配置？' : '确定清除此绑定？'}
-            description={summaryRow ? '将移除本汇总（列区间）的所有单元格' : undefined}
+            description={summaryRow
+              ? summaryAxis(summaryRow) === 'HORIZONTAL'
+                ? '将移除本汇总（行区间）的所有单元格'
+                : '将移除本汇总（列区间）的所有单元格'
+              : undefined}
             onConfirm={() => {
               if (summaryRow) onSummaryRowDelete(summaryRow.id);
               else if (binding) onBindingDelete(cellKey);
@@ -246,10 +258,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
       <div className="re-panel__content">
         {summaryRow ? (
-          /* ── 汇总行：单页展示 ── */
+          /* ── 汇总：单页展示 ── */
           <SummaryRowEditor
             summaryRow={summaryRow}
-            column={info.column}
+            crossPos={summaryCrossPos}
             datasets={datasets}
             loopBlocks={loopBlocks}
             params={params}
@@ -269,7 +281,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           /* ── 空白单元格 ── */
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总行」。"
+            description="未配置绑定。点击下方按钮绑定数据，或框选单元格后右键「设为汇总」。"
             style={{ margin: '24px 0' }}
           >
             <Button

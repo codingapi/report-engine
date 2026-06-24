@@ -73,6 +73,13 @@ public final class Templates {
      * <p>按优先级识别：函数调用（含 {@code (}）→ 字段引用（含 {@code .}）→ 名字引用。
      */
     static Value parseHole(String content) {
+        // 字符串字面量："..." 或 '...'（含逗号、括号等字符不参与解析）
+        if (content.length() >= 2) {
+            char q = content.charAt(0);
+            if ((q == '"' || q == '\'') && content.charAt(content.length() - 1) == q) {
+                return new Value.Literal(content.substring(1, content.length() - 1));
+            }
+        }
         int parenIdx = content.indexOf('(');
         if (parenIdx > 0 && content.endsWith(")")) {
             return parseCall(content, parenIdx);
@@ -111,11 +118,43 @@ public final class Templates {
         return Aggregators.isRegistered(name);
     }
 
-    /** 按逗号分割参数并逐个解析（不支持嵌套括号和字符串字面量中的逗号） */
+    /**
+     * 按顶层逗号分割参数并逐个解析。支持嵌套括号（{@code if(f(a), b, c)}）与
+     * 字符串字面量中的逗号（{@code concat("a,b", x)}）——括号深度与引号内的逗号不参与分割。
+     */
     private static List<Value> splitArgs(String argsStr) {
         List<Value> args = new ArrayList<>();
-        for (String arg : argsStr.split(",")) {
-            args.add(parseHole(arg.trim()));
+        StringBuilder cur = new StringBuilder();
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < argsStr.length(); i++) {
+            char c = argsStr.charAt(i);
+            if (quote != 0) {
+                cur.append(c);
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+                cur.append(c);
+            } else if (c == '(') {
+                depth++;
+                cur.append(c);
+            } else if (c == ')') {
+                depth--;
+                cur.append(c);
+            } else if (c == ',' && depth == 0) {
+                args.add(parseHole(cur.toString().trim()));
+                cur.setLength(0);
+            } else {
+                cur.append(c);
+            }
+        }
+        String tail = cur.toString().trim();
+        if (!tail.isEmpty() || !args.isEmpty()) {
+            args.add(parseHole(tail));
         }
         return args;
     }

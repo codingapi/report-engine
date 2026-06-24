@@ -14,7 +14,10 @@ public final class Functions {
     /** 内置函数。新增函数在此登记。 */
     private static final List<ValueFunction> REGISTRY = List.of(
             new FormatFunction(),
-            new DateFunction()
+            new DateFunction(),
+            new RoundFunction(),
+            new ConcatFunction(),
+            new IfFunction()
     );
 
     private Functions() {

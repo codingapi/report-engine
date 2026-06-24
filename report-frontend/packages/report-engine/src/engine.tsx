@@ -17,6 +17,7 @@ import type { ReportEngineProps, CellBinding, LoopBlock, SummaryRow, SummaryCell
 import type { TemplatePreset } from './types';
 import { genId } from './types';
 import { parseCellKey, makeCellKey } from './utils/excel-cell';
+import { summaryAxis, summaryCellRC, summaryHit, crossPosOf } from './utils/summary-axis';
 import { useReportIO } from './hooks/use-report-io';
 import ReportPreview from './components/preview/preview';
 import type { ReportPreviewHandle } from './components/preview/preview';
@@ -24,7 +25,7 @@ import { valueDisplayText, parseTemplate } from './value-text';
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
 interface LegacySummaryCell {
-  column: number;
+  crossPos: number;
   value?: unknown;
   kind?: 'label' | 'agg';
   payload?: string;
@@ -34,9 +35,10 @@ interface LegacySummaryCell {
 /** 兼容旧持久化数据的 SummaryRow（cells 可能是旧格式） */
 interface LegacySummaryRow {
   id: string;
-  row: number;
-  fromColumn: number;
-  toColumn: number;
+  axis?: SummaryRow['axis'];
+  mainPos: number;
+  crossFrom: number;
+  crossTo: number;
   groupBy: { datasetId: string; field: string } | null;
   cells: LegacySummaryCell[];
 }
@@ -44,11 +46,11 @@ interface LegacySummaryRow {
 function migrateSummaryCell(cell: LegacySummaryCell): SummaryCell {
   if (cell.value) return cell as unknown as SummaryCell; // 已是新格式
   if (cell.kind === 'label') {
-    return { column: cell.column, value: parseTemplate(cell.payload || '') };
+    return { crossPos: cell.crossPos, value: parseTemplate(cell.payload || '') };
   }
   // kind === 'agg'
   return {
-    column: cell.column,
+    crossPos: cell.crossPos,
     value: {
       type: 'Aggregate',
       aggregation: (cell.aggregation || 'SUM') as ReportValue['aggregation'],
@@ -160,11 +162,12 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     if (!prev) return;
     // 清空旧模板设置过的单元格（标题 + 表头 + 数据区域 + 汇总行）
     const prevSummaries = prev.summaries || [];
+    const summaryRC = prevSummaries.flatMap((s) => s.cells.map((c) => summaryCellRC(s, c.crossPos)));
     const maxRow = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).row),
-      ...prev.cellValues.map((cv) => cv.row), ...prevSummaries.map((s) => s.row));
+      ...prev.cellValues.map((cv) => cv.row), ...summaryRC.map((rc) => rc.row));
     const maxCol = Math.max(...prev.bindings.map((b) => parseCellKey(b.cellKey).col),
       ...prev.cellValues.map((cv) => cv.col),
-      ...prevSummaries.flatMap((s) => s.cells.map((c) => c.column)));
+      ...summaryRC.map((rc) => rc.col));
     // 清空 0..maxRow × 0..maxCol 区域
     for (let r = 0; r <= maxRow; r++) {
       for (let c = 0; c <= maxCol; c++) {
@@ -228,7 +231,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }
     for (const s of remappedSummaries) {
       for (const cell of s.cells) {
-        sheetRef.current?.setCellValue(sheetId, s.row, cell.column, cell.displayText ?? '');
+        const { row, col } = summaryCellRC(s, cell.crossPos);
+        sheetRef.current?.setCellValue(sheetId, row, col, cell.displayText ?? '');
       }
     }
 
@@ -295,7 +299,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     }
     for (const s of migratedSummaries) {
       for (const c of s.cells) {
-        sheetRef.current?.setCellValue(actualSheetId, s.row, c.column, c.displayText ?? '');
+        const { row, col } = summaryCellRC(s, c.crossPos);
+        sheetRef.current?.setCellValue(actualSheetId, row, col, c.displayText ?? '');
       }
     }
 
@@ -374,7 +379,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
         // 聚合格、Template（含 ${} 占位）都属于配置项，纯 Literal 文本不高亮
         const isExpr = cell.value.type !== 'Literal';
         if (!isExpr) continue;
-        ranges.push({ sheetId: sumSheet, startRow: s.row, startColumn: cell.column, endRow: s.row, endColumn: cell.column });
+        const { row, col } = summaryCellRC(s, cell.crossPos);
+        ranges.push({ sheetId: sumSheet, startRow: row, startColumn: col, endRow: row, endColumn: col });
       }
     }
     return ranges;
@@ -430,11 +436,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
       setSummaries((prev) => {
         const oldRow = prev.find((s) => s.id === id);
-        // 清空被移除的列
+        // 清空被移除的格
         if (oldRow) {
-          const keep = new Set(newRow.cells.map((c) => c.column));
+          const keep = new Set(newRow.cells.map((c) => c.crossPos));
           for (const c of oldRow.cells) {
-            if (!keep.has(c.column)) sheetRef.current?.setCellValue(sheetId, oldRow.row, c.column, '');
+            if (!keep.has(c.crossPos)) {
+              const { row, col } = summaryCellRC(oldRow, c.crossPos);
+              sheetRef.current?.setCellValue(sheetId, row, col, '');
+            }
           }
         }
         // 每个汇总格附带 displayText（回声基准）+ 回写单元格
@@ -443,7 +452,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           displayText: valueDisplayText(c.value, datasets, loopBlocks, params),
         }));
         for (const c of cellsWithText) {
-          sheetRef.current?.setCellValue(sheetId, newRow.row, c.column, c.displayText);
+          const { row, col } = summaryCellRC(newRow, c.crossPos);
+          sheetRef.current?.setCellValue(sheetId, row, col, c.displayText);
         }
         const rowWithText = { ...newRow, cells: cellsWithText };
         return prev.map((s) => (s.id === id ? rowWithText : s));
@@ -456,8 +466,11 @@ export const ReportEngine: React.FC<ReportEngineProps & {
   const handleSummaryRowDelete = useCallback((id: string) => {
     const sheetId = sheetRef.current?.getActiveSheetId() || 'sheet1';
     setSummaries((prev) => {
-      const row = prev.find((s) => s.id === id);
-      if (row) for (const c of row.cells) sheetRef.current?.setCellValue(sheetId, row.row, c.column, '');
+      const summary = prev.find((s) => s.id === id);
+      if (summary) for (const c of summary.cells) {
+        const { row, col } = summaryCellRC(summary, c.crossPos);
+        sheetRef.current?.setCellValue(sheetId, row, col, '');
+      }
       return prev.filter((s) => s.id !== id);
     });
     setActiveTemplate(null);
@@ -486,26 +499,43 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     [datasets, messageApi],
   );
 
-  // ─── 右键：将选中区域（同一行）设为汇总行 ───
+  // ─── 右键：将选中区域设为汇总（按选区形状自动判轴） ───
+  //   横向选区（同一行）→ 纵向汇总（带下方追加合计行）；纵向选区（同一列）→ 横向汇总（带右侧追加合计列）。
   const handleCreateSummaryFromRange = useCallback(
     (range: CellRange) => {
-      if (range.startRow !== range.endRow) {
-        messageApi.warning('汇总行需选择同一行内的连续单元格');
+      const sameRow = range.startRow === range.endRow;
+      const sameCol = range.startColumn === range.endColumn;
+      if (sameRow === sameCol) {
+        // 单格(都true)或斜向块(都false)：无法判定方向
+        messageApi.warning('汇总需选择同一行（→纵向合计行）或同一列（→横向合计列）内的连续单元格');
         return;
       }
-      setSummaries((prev) => [
-        ...prev,
-        {
-          id: genId(),
-          row: range.startRow,
-          fromColumn: range.startColumn,
-          toColumn: range.endColumn,
-          groupBy: null,
-          cells: [],
-        },
-      ]);
+      const newSummary: SummaryRow = sameRow
+        ? {
+            id: genId(),
+            axis: 'VERTICAL',
+            mainPos: range.startRow,
+            crossFrom: range.startColumn,
+            crossTo: range.endColumn,
+            groupBy: null,
+            cells: [],
+          }
+        : {
+            id: genId(),
+            axis: 'HORIZONTAL',
+            mainPos: range.startColumn,
+            crossFrom: range.startRow,
+            crossTo: range.endRow,
+            groupBy: null,
+            cells: [],
+          };
+      setSummaries((prev) => [...prev, newSummary]);
       setActiveTemplate(null);
-      messageApi.success('已创建汇总行，请在右侧属性面板逐列配置标签/聚合');
+      messageApi.success(
+        sameRow
+          ? '已创建纵向汇总（下方合计行），请在右侧属性面板逐列配置标签/聚合'
+          : '已创建横向汇总（右侧合计列），请在右侧属性面板逐行配置标签/聚合',
+      );
     },
     [messageApi],
   );
@@ -524,8 +554,8 @@ export const ReportEngine: React.FC<ReportEngineProps & {
           },
           {
             id: 'set-summary-row',
-            title: '设为汇总行',
-            tooltip: '将选中的同行单元格设为汇总行（小计/总计），框选列段即作用区间',
+            title: '设为汇总',
+            tooltip: '框选行段（同一行）→ 纵向汇总（下方合计行）；框选列段（同一列）→ 横向汇总（右侧合计列）',
             onClick: handleCreateSummaryFromRange,
           },
         ],
@@ -642,12 +672,14 @@ export const ReportEngine: React.FC<ReportEngineProps & {
       setSummaries((prev) => {
         let changed = false;
         const next = prev.map((s) => {
-          const matching = changes.filter((c) => c.row === s.row && c.col >= s.fromColumn && c.col <= s.toColumn);
+          const axis = summaryAxis(s);
+          const matching = changes.filter((c) => summaryHit(s, c.row, c.col));
           if (matching.length === 0) return s;
           let cellsChanged = false;
           const cells = [...s.cells];
           for (const c of matching) {
-            const idx = cells.findIndex((sc) => sc.column === c.col);
+            const cross = crossPosOf(axis, c.row, c.col);
+            const idx = cells.findIndex((sc) => sc.crossPos === cross);
             const existing = idx >= 0 ? cells[idx] : null;
             if (existing && c.value === (existing.displayText ?? '')) continue; // 回声
             if (c.value === '') {
@@ -661,7 +693,7 @@ export const ReportEngine: React.FC<ReportEngineProps & {
                 cellsChanged = true;
               } // 聚合等引用格保护
             } else {
-              cells.push({ column: c.col, value: { type: 'Literal', payload: c.value }, displayText: c.value });
+              cells.push({ crossPos: cross, value: { type: 'Literal', payload: c.value }, displayText: c.value });
               cellsChanged = true;
             }
           }
@@ -688,7 +720,10 @@ export const ReportEngine: React.FC<ReportEngineProps & {
     setSummaries((prev) =>
       prev.map((s) => ({
         ...s,
-        cells: s.cells.filter((c) => !rowColKeys.has(`${s.row}:${c.column}`)),
+        cells: s.cells.filter((c) => {
+          const { row, col } = summaryCellRC(s, c.crossPos);
+          return !rowColKeys.has(`${row}:${col}`);
+        }),
       })),
     );
   }, []);

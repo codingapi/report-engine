@@ -59,6 +59,8 @@ public class ReportTemplateSeeder {
         seedPayslipLoop();
         seedIndependentBands();
         seedIndependentBandsWithSummary();
+        seedCrossTab();
+        seedHorizontalSummary();
         log.info("已预存 {} 个示例报表", count);
     }
 
@@ -297,6 +299,64 @@ public class ReportTemplateSeeder {
                         cell(0, 3, "价格"),
                         cell(2, 0, "员工合计"),
                         cell(2, 2, "商品合计"))
+                .build());
+    }
+
+    // ============================================================
+    // 9. 交叉表（横向拓展 + 交叉格 + 行/列/总合计）：区域 × 季度 → SUM(销售额)
+    // ============================================================
+
+    private void seedCrossTab() {
+        // 几何约定（紧邻交叉格，后端 detectMatrices 自动识别，无需新增字段）：
+        //   行维 region 纵向GROUP@(2,0) × 列维 quarter 横向GROUP@(1,1) → 交叉格 SUM@(2,1)
+        //   行合计@(2,2)[cross右]  列合计@(3,1)[cross下]  总计@(3,2)[右下]
+        //   右合计列头@(1,2)[列维行]  底合计行头@(3,0)[行维列]
+        // 渲染后：季度沿列向右铺开（Q1..Q4），区域沿行向下（华东/华北/华南），交叉格填满网格，
+        //   右缘/底缘/右下角自动补出行合计/列合计/总计。
+        String ds = "matrix_sales";
+        save("example-cross-tab", new ReportConfigBuilder("区域季度销售交叉表")
+                .binding(0, 0, literal("区域季度销售交叉表"), "NONE", "LIST")
+                .binding(1, 0, literal("区域＼季度"), "NONE", "LIST")
+                // 列维（横向）+ 行维（纵向）
+                .binding(1, 1, fieldValue(ds, "quarter"), "HORIZONTAL", "GROUP")
+                .binding(2, 0, fieldValue(ds, "region"), "VERTICAL", "GROUP")
+                // 交叉格 + 行/列/总合计（均为聚合）
+                .binding(2, 1, aggregate("SUM", ds, "amount"), "NONE", "LIST")
+                .binding(2, 2, aggregate("SUM", ds, "amount"), "NONE", "LIST")
+                .binding(3, 1, aggregate("SUM", ds, "amount"), "NONE", "LIST")
+                .binding(3, 2, aggregate("SUM", ds, "amount"), "NONE", "LIST")
+                // 合计表头标签
+                .binding(1, 2, literal("合计"), "NONE", "LIST")
+                .binding(3, 0, literal("合计"), "NONE", "LIST")
+                .template(8, 8,
+                        cell(0, 0, "区域季度销售交叉表"),
+                        cell(1, 0, "区域＼季度"),
+                        cell(1, 2, "合计"),
+                        cell(3, 0, "合计"))
+                .build());
+    }
+
+    // ============================================================
+    // 10. 横向带 + 横向汇总：商品横向铺开，右侧追加合计列（纵向汇总的转置）
+    // ============================================================
+
+    private void seedHorizontalSummary() {
+        // 商品名/单价各占一行（row0/row1），沿列向右逐个商品铺开（HORIZONTAL）。
+        // 横向汇总（summaryColumn）在带右侧追加一列合计：行区间 [0,1]，row0 标签、row1=SUM(单价)。
+        String ds = "products";
+        save("example-horizontal-summary", new ReportConfigBuilder("商品横向汇总表")
+                .binding(0, 0, literal("商品名"), "NONE", "LIST")
+                .binding(1, 0, literal("单价"), "NONE", "LIST")
+                .binding(0, 1, fieldValue(ds, "name"), "HORIZONTAL", "LIST")
+                .binding(1, 1, fieldValue(ds, "price"), "HORIZONTAL", "LIST")
+                // 横向汇总：声明列 col 2（样式源），作用行区间 [0,1]；标签@row0、SUM(单价)@row1
+                .summaryColumn(2, 0, 1, null, List.of(
+                        labelCell(0, "合计"),
+                        aggCell(1, "products.price", "SUM")))
+                .template(8, 8,
+                        cell(0, 0, "商品名"),
+                        cell(1, 0, "单价"),
+                        cell(0, 2, "合计"))
                 .build());
     }
 

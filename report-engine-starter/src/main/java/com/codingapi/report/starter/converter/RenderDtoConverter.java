@@ -17,6 +17,7 @@ import com.codingapi.report.render.grid.CellRef;
 import com.codingapi.report.render.grid.ExpandMode;
 import com.codingapi.report.render.grid.Expansion;
 import com.codingapi.report.render.grid.LoopBlock;
+import com.codingapi.report.render.grid.Axis;
 import com.codingapi.report.render.grid.SummaryCell;
 import com.codingapi.report.render.grid.SummaryRow;
 
@@ -137,22 +138,23 @@ public final class RenderDtoConverter {
                 for (SummaryCellDTO c : dto.cells()) {
                     if (c.value() != null) {
                         // 新格式：直接使用 ValueDTO + 反查配置
-                        cells.add(new SummaryCell(c.column(), convertValue(c.value()), c.drillEnabled(), c.drillView()));
+                        cells.add(new SummaryCell(c.crossPos(), convertValue(c.value()), c.drillEnabled(), c.drillView()));
                     } else if ("label".equals(c.kind())) {
                         // 旧格式兼容
-                        cells.add(SummaryCell.label(c.column(), c.payload()));
+                        cells.add(SummaryCell.label(c.crossPos(), c.payload()));
                     } else {
                         // 旧格式 agg 兼容
                         String[] parts = c.payload().split("\\.", 2);
-                        cells.add(SummaryCell.agg(c.column(),
+                        cells.add(SummaryCell.agg(c.crossPos(),
                                 new FieldRef(parts[0], parts[1]),
                                 c.aggregation()));
                     }
                 }
             }
-            result.add(SummaryRow.builder().groupBy(groupBy)
-                    .fromColumn(dto.fromColumn()).toColumn(dto.toColumn())
-                    .cells(cells).row(dto.row()).build());
+            Axis axis = "HORIZONTAL".equals(dto.axis()) ? Axis.HORIZONTAL : Axis.VERTICAL;
+            result.add(SummaryRow.builder().axis(axis).groupBy(groupBy)
+                    .crossFrom(dto.crossFrom()).crossTo(dto.crossTo())
+                    .cells(cells).mainPos(dto.mainPos()).build());
         }
         return result;
     }

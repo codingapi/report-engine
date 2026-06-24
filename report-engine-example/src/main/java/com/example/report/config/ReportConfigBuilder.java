@@ -72,12 +72,21 @@ public class ReportConfigBuilder {
                 false, null, false, null);
     }
 
-    // ─── 链式：汇总行 ───
+    // ─── 链式：汇总 ───
 
+    /** 纵向汇总：在数据带下方追加合计行。row=声明行，[fromColumn,toColumn]=作用列区间，cell 坐标=列号。 */
     public ReportConfigBuilder summary(int row, int fromColumn, int toColumn,
                                        FieldRefDTO groupBy, List<SummaryCellDTO> cells) {
-        summaries.add(new SummaryRowDTO("sum-" + System.nanoTime(), groupBy, fromColumn, toColumn,
+        summaries.add(new SummaryRowDTO("sum-" + System.nanoTime(), "VERTICAL", groupBy, fromColumn, toColumn,
                 List.copyOf(cells), row));
+        return this;
+    }
+
+    /** 横向汇总：在数据带右侧追加合计列。col=声明列，[fromRow,toRow]=作用行区间，cell 坐标=行号。 */
+    public ReportConfigBuilder summaryColumn(int col, int fromRow, int toRow,
+                                             FieldRefDTO groupBy, List<SummaryCellDTO> cells) {
+        summaries.add(new SummaryRowDTO("sum-" + System.nanoTime(), "HORIZONTAL", groupBy, fromRow, toRow,
+                List.copyOf(cells), col));
         return this;
     }
 
@@ -131,16 +140,16 @@ public class ReportConfigBuilder {
         return new ValueDTO("Aggregate", null, agg, fieldValue(datasetId, field), null, null, null);
     }
 
-    public static SummaryCellDTO labelCell(int column, String label) {
+    public static SummaryCellDTO labelCell(int crossPos, String label) {
         ValueDTO value = label.contains("${") ? buildTemplateValue(label) : literal(label);
-        return new SummaryCellDTO(column, value, null, null, null, null, false, null);
+        return new SummaryCellDTO(crossPos, value, null, null, null, null, false, null);
     }
 
-    public static SummaryCellDTO aggCell(int column, String payload, String aggregation) {
+    public static SummaryCellDTO aggCell(int crossPos, String payload, String aggregation) {
         ValueDTO value = new ValueDTO("Aggregate", null, aggregation,
                 new ValueDTO("FieldValue", payload, null, null, null, null, null),
                 null, null, null);
-        return new SummaryCellDTO(column, value, null, null, aggregation, null, false, null);
+        return new SummaryCellDTO(crossPos, value, null, null, aggregation, null, false, null);
     }
 
     /** 构造 Template ValueDTO：支持 ${name} 占位符（编译为 NameRef） */

@@ -3,6 +3,7 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import type { SheetPanelHandle } from '../components/sheet-panel';
 import type { CellBinding, LoopBlock, SummaryRow, ReportParam, Dataset, ReportConfig, ReportEngineProps } from '../types';
 import { valueDisplayText, templateToString } from '../value-text';
+import { summaryAxis, summaryHit, crossPosOf } from '../utils/summary-axis';
 
 export interface UseReportIOOptions {
   sheetRef: React.RefObject<SheetPanelHandle>;
@@ -65,9 +66,10 @@ export function useReportIO(opts: UseReportIOOptions) {
           if (binding) {
             return { ...cell, value: templateToString(binding.value) };
           }
-          const summary = summaries.find((s) => s.row === cell.row);
+          const summary = summaries.find((s) => summaryHit(s, cell.row, cell.col));
           if (summary) {
-            const summaryCell = summary.cells.find((c) => c.column === cell.col);
+            const cross = crossPosOf(summaryAxis(summary), cell.row, cell.col);
+            const summaryCell = summary.cells.find((c) => c.crossPos === cross);
             if (summaryCell) {
               return { ...cell, value: templateToString(summaryCell.value) };
             }
@@ -105,10 +107,11 @@ export function useReportIO(opts: UseReportIOOptions) {
             if (binding) {
               return { ...cell, value: templateToString(binding.value) };
             }
-            // 查找对应的 summaryCell
-            const summary = summaries.find((s) => s.row === cell.row);
+            // 查找对应的 summaryCell（按轴 + 交叉区间归属）
+            const summary = summaries.find((s) => summaryHit(s, cell.row, cell.col));
             if (summary) {
-              const summaryCell = summary.cells.find((c) => c.column === cell.col);
+              const cross = crossPosOf(summaryAxis(summary), cell.row, cell.col);
+              const summaryCell = summary.cells.find((c) => c.crossPos === cross);
               if (summaryCell) {
                 return { ...cell, value: templateToString(summaryCell.value) };
               }

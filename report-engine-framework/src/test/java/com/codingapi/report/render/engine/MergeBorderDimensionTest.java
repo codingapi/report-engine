@@ -64,7 +64,7 @@ class MergeBorderDimensionTest {
         DataModel dm = DataModel.builder().id("default").name("m")
                 .datasources(List.of(src)).datasets(List.of(a)).relationships(List.of()).build();
 
-        SummaryRow sum = SummaryRow.builder().row(3).groupBy(null).fromColumn(0).toColumn(2).cells(List.of(
+        SummaryRow sum = SummaryRow.builder().mainPos(3).groupBy(null).crossFrom(0).crossTo(2).cells(List.of(
                 new SummaryCell(0, new Value.Literal("总人数")),
                 new SummaryCell(1, new Value.Literal("")),
                 new SummaryCell(2, new Value.Aggregate("COUNT", new Value.FieldValue(new FieldRef("dept_a", "name")))))).build();

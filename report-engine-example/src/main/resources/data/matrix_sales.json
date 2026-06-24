@@ -1,0 +1,8 @@
+{
+  "alias": "区域季度销售",
+  "fields": [
+    { "name": "region", "alias": "区域", "dataType": "STRING" },
+    { "name": "quarter", "alias": "季度", "dataType": "STRING" },
+    { "name": "amount", "alias": "销售额", "dataType": "NUMBER" }
+  ]
+}

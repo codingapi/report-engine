@@ -9,7 +9,8 @@ import DrillEditor from './drill-editor';
 
 interface SummaryRowEditorProps {
   summaryRow: SummaryRow;
-  column: number;
+  /** 当前选中格在交叉轴上的坐标（纵向=列号、横向=行号） */
+  crossPos: number;
   datasets: Dataset[];
   loopBlocks: LoopBlock[];
   params: ReportParam[];
@@ -19,7 +20,7 @@ interface SummaryRowEditorProps {
 
 const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   summaryRow,
-  column,
+  crossPos,
   datasets,
   loopBlocks,
   params,
@@ -27,32 +28,33 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   onChange,
 }) => {
   const isGroup = summaryRow.groupBy != null;
-  const cell = summaryRow.cells.find((c) => c.column === column);
+  const isHorizontal = (summaryRow.axis ?? 'VERTICAL') === 'HORIZONTAL';
+  const cell = summaryRow.cells.find((c) => c.crossPos === crossPos);
   const initializedRef = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('content');
 
-  // 切换选中列或汇总行时重置 Tab 到"内容"
+  // 切换选中格或汇总时重置 Tab 到"内容"
   const prevKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const key = `${summaryRow.id}-${column}`;
+    const key = `${summaryRow.id}-${crossPos}`;
     if (key !== prevKeyRef.current) {
       prevKeyRef.current = key;
       setActiveTab('content');
     }
-  }, [summaryRow.id, column]);
+  }, [summaryRow.id, crossPos]);
 
   /** 创建空值（由用户自行填写） */
   const createEmptyValue = (): ReportValue => {
     return { type: 'Literal', payload: '' };
   };
 
-  /** 写入/更新本列单元格 */
+  /** 写入/更新本格单元格 */
   const setCellValue = (value: ReportValue) => {
     let cells: SummaryCell[];
     if (cell) {
-      cells = summaryRow.cells.map((c) => (c.column === column ? { ...c, value } : c));
+      cells = summaryRow.cells.map((c) => (c.crossPos === crossPos ? { ...c, value } : c));
     } else {
-      cells = [...summaryRow.cells, { column, value }];
+      cells = [...summaryRow.cells, { crossPos, value }];
     }
     onChange({ ...summaryRow, cells });
   };
@@ -61,19 +63,19 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
   const setDrillConfig = (patch: { drillEnabled?: boolean; drillView?: string | null }) => {
     if (!cell) return;
     const cells = summaryRow.cells.map((c) =>
-      c.column === column ? { ...c, ...patch } : c
+      c.crossPos === crossPos ? { ...c, ...patch } : c
     );
     onChange({ ...summaryRow, cells });
   };
 
-  // 自动初始化：当切换到未配置的列时，自动创建空值
+  // 自动初始化：当切换到未配置的格时，自动创建空值
   useEffect(() => {
-    const cellKey = `${summaryRow.id}-${column}`;
+    const cellKey = `${summaryRow.id}-${crossPos}`;
     if (!cell && initializedRef.current !== cellKey) {
       initializedRef.current = cellKey;
       setCellValue(createEmptyValue());
     }
-  }, [summaryRow.id, column, cell]);
+  }, [summaryRow.id, crossPos, cell]);
 
   // 当前分组字段别名（用于 ${group} 说明）
   const groupFieldLabel = isGroup
@@ -111,7 +113,9 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
           )}
 
           <Form layout="vertical" size="small">
-            <Form.Item label="汇总范围" tooltip="总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。">
+            <Form.Item label="汇总范围" tooltip={isHorizontal
+              ? '总计：在数据带右侧追加一列；分组小计：按指定字段每组追加一列小计。作用范围为右键框选的行区间。'
+              : '总计：在数据带末尾追加一行；分组小计：按指定字段每组追加一行小计。作用范围为右键框选的列区间。'}>
               <Radio.Group
                 value={isGroup ? 'group' : 'total'}
                 onChange={(e) =>
@@ -153,11 +157,11 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
               )}
             </Form.Item>
 
-            <Form.Item label="本格内容" tooltip="当前选中列在汇总行显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
+            <Form.Item label="本格内容" tooltip="当前选中格在汇总显示什么：文本、聚合、或混合表达式。支持 ${...} 模板语法。">
               {cell && (
                 <>
                   <ExpressionBuilder
-                    key={`${summaryRow.id}-${column}`}
+                    key={`${summaryRow.id}-${crossPos}`}
                     value={cell.value}
                     datasets={datasets}
                     loopBlocks={loopBlocks}
