@@ -62,6 +62,9 @@ importers:
       '@coding-report/report-api':
         specifier: workspace:*
         version: link:../../packages/report-api
+      '@coding-report/report-datasource':
+        specifier: workspace:*
+        version: link:../../packages/report-datasource
       '@coding-report/report-engine':
         specifier: workspace:*
         version: link:../../packages/report-engine
