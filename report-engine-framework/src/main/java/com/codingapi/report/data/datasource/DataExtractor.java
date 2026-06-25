@@ -1,6 +1,7 @@
 package com.codingapi.report.data.datasource;
 
 import com.codingapi.report.data.dataset.Dataset;
+import java.util.List;
 
 /**
  * 数据提取器接口（SPI）：每种 {@link DataSourceType} 对应一个实现， <b>唯一职责是把数据取成规整的 {@link RawTable}</b>。
@@ -62,4 +63,33 @@ public interface DataExtractor {
      * @return 内存表，列名为限定名 {@code datasetId.field}，值已按 DataType 归一化
      */
     RawTable extract(DataSource source, Dataset dataset);
+
+    // ============================================================
+    // 管理能力（连接测试 + 元数据探查）
+    // ============================================================
+    //
+    // 这些方法服务于"数据源管理"而非渲染：测试连接可达性、探查表/列元数据， 供建模界面选表、推断字段。提取器按能力实现——
+    // 文件类（CSV/EXCEL）通常无需探查（表即文件、列即表头），可不实现走默认抛异常； DB/API 类应实现。
+    // 用 default 方法而非另立 SPI，避免多接口装配；未实现的能力显式抛 UnsupportedOperationException，
+    // 不会静默放行（与本项目算子/聚合/函数的注册表范式一致）。
+
+    /**
+     * 测试连接是否可达且凭证有效。
+     *
+     * <p>不落库、不影响现有数据，仅建连 + 最小探测（如 {@code SELECT 1}）后立即关闭。 默认抛 {@link
+     * UnsupportedOperationException}，表示该提取器不支持连接测试（文件类无此概念）。
+     */
+    default TestResult test(DataSource source) {
+        throw new UnsupportedOperationException("提取器不支持连接测试");
+    }
+
+    /** 探查连接下可用的表/集合列表（DB/API 类实现）。 默认抛 {@link UnsupportedOperationException}。 */
+    default List<String> listTables(DataSource source) {
+        throw new UnsupportedOperationException("提取器不支持表探查");
+    }
+
+    /** 探查指定表的列元数据（DB/API 类实现）。 默认抛 {@link UnsupportedOperationException}。 */
+    default List<ColumnMeta> listColumns(DataSource source, String table) {
+        throw new UnsupportedOperationException("提取器不支持列探查");
+    }
 }
