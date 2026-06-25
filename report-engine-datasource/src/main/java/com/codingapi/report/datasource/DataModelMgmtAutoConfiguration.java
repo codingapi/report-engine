@@ -7,6 +7,7 @@ import com.codingapi.report.datasource.converter.DataModelConfigConverter;
 import com.codingapi.report.datasource.credential.CredentialService;
 import com.codingapi.report.datasource.db.DbDataExtractor;
 import com.codingapi.report.datasource.excel.ExcelDataExtractor;
+import com.codingapi.report.datasource.json.JsonDataExtractor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -59,5 +60,12 @@ public class DataModelMgmtAutoConfiguration {
     @ConditionalOnMissingBean
     public ExcelDataExtractor excelDataExtractor() {
         return new ExcelDataExtractor();
+    }
+
+    /** JSON 提取器：读 JSON 文件或字面量字符串，按 dataPath 取数组。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public JsonDataExtractor jsonDataExtractor() {
+        return new JsonDataExtractor();
     }
 }
