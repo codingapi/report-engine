@@ -32,6 +32,8 @@ export type {
   DataModelInfo,
   DataModelDataset,
   DataModelField,
+  DataModelSource,
+  UnionMember,
   RelationshipInfo,
   FieldRefInfo,
 } from './datamodel';

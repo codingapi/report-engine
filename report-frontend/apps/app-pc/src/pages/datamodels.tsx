@@ -8,6 +8,8 @@ import {
 import type {
   DataModelBrief,
   DataModelInfo,
+  DataModelDataset,
+  DataModelSource,
 } from '@coding-report/report-api';
 import {
   DatasetManager,
@@ -21,6 +23,45 @@ import type {
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
+
+/**
+ * 后端 DatasetDTO（kind=TABLE/UNION）→ report-datasource 的 DatasetDef（kind=PHYSICAL/UNION）。
+ * 两个端点的 dataset 字段集不同（configs/{id} 精简视图无 kind，datamodels/{id} 完整 DTO 有），
+ * 此处统一适配：kind 缺失或 TABLE 都按物理表处理。
+ */
+const toDatasetDef = (d: DataModelDataset): DatasetDef => {
+  const fields = (d.fields ?? []).map((f) => ({
+    name: f.name,
+    alias: f.alias,
+    dataType: f.dataType,
+    primaryKey: f.primaryKey,
+  }));
+  if (d.kind === 'UNION') {
+    return {
+      kind: 'UNION',
+      id: d.id,
+      alias: d.alias,
+      baseDatasetIds: (d.members ?? []).map((m) => m.datasetId),
+      fields,
+    };
+  }
+  return {
+    kind: 'PHYSICAL',
+    id: d.id,
+    alias: d.alias,
+    sourceId: d.datasourceId ?? '',
+    table: d.sourceTable ?? '',
+    fields,
+  };
+};
+
+/** 后端 DataSourceDTO → report-datasource 的 DataSourceConfig（来源列只需 id/name/type） */
+const toDataSourceConfig = (s: DataModelSource): DataSourceConfig => ({
+  id: s.id,
+  name: s.name,
+  type: s.type,
+  options: s.config,
+});
 
 const DataModelsPage = () => {
   const [briefs, setBriefs] = useState<DataModelBrief[]>([]);
@@ -72,9 +113,11 @@ const DataModelsPage = () => {
     };
   }, [selectedId]);
 
-  const datasets = (model?.datasets ?? []) as unknown as DatasetDef[];
+  const datasets: DatasetDef[] = (model?.datasets ?? []).map(toDatasetDef);
   const relationships = (model?.relationships ?? []) as unknown as Relationship[];
-  const dataSources: DataSourceConfig[] = [];
+  const dataSources: DataSourceConfig[] = (model?.datasources ?? []).map(
+    toDataSourceConfig,
+  );
 
   return (
     <Layout style={{ height: '100%', minHeight: 600 }}>
