@@ -4,25 +4,36 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据模型配置的 DTO 契约容器（前端 JSON ↔ 这些 record ↔ framework 领域对象）。
+ * 数据模型的 DTO 契约容器（前端 JSON ↔ 这些 record ↔ framework 领域对象 {@code DataModel}）。
  *
- * <p>与 {@link ConfigDtos} 同范式：{@code Dataset} 是 sealed interface（{@code TableDataset}/ {@code
- * UnionDataset}），未加 Jackson 多态注解，无法直接反序列化，故用这些 record 承接持久化与前端 JSON， 再由 datasource 模块的 {@code
- * DataModelConfigConverter} 转为 framework 领域对象。
+ * <p>{@code Dataset} 是 sealed interface（{@code TableDataset}/{@code UnionDataset}），未加 Jackson 多态注解，
+ * 无法直接反序列化，故用这些 record 承接前端 JSON，再由 {@code DataModel.fromDTO} / {@code DataModel.toDTO} 与领域对象互转。
  *
- * <p>这些 record 同时是 {@code com.codingapi.report.config.DataModelConfig} 实体的字段类型（持久化契约）， 全字段强类型且
- * Jackson 可序列化。枚举值统一用 {@code String} 存 {@code name()}（{@link
- * com.codingapi.report.data.datasource.DataSourceType}/{@link
+ * <p>枚举值统一用 {@code String} 存 {@code name()}（{@link
+ * com.codingapi.report.data.datasource.type.DataSourceType}/{@link
  * com.codingapi.report.data.dataset.DataType}/ {@link
  * com.codingapi.report.data.relation.JoinType}/{@link
  * com.codingapi.report.data.relation.RelationOrigin}）。
  *
- * <p>{@link DataSourceDTO#config()} 中敏感字段（password/secret/token/apiKey 等）存<b>加密值</b>， 由 datasource
- * 模块的 {@code CredentialService} 加解密、Controller 出口脱敏。
+ * <p>{@link DataSourceDTO#config()} 中敏感字段（password/secret/token 等）出口由 {@code CredentialService} 脱敏。
  */
 public final class DataModelDtos {
 
     private DataModelDtos() {}
+
+    /**
+     * 数据模型出入站契约（GET 返回 / POST 保存）。{@code status} 存枚举名；{@code datasources} 为前端展示用的连接视图
+     * （由各 TableDataset 自带的连接去重收集，出口脱敏）。
+     */
+    public record DataModelDTO(
+            String id,
+            String name,
+            String status,
+            long createTime,
+            long updateTime,
+            List<DataSourceDTO> datasources,
+            List<DatasetDTO> datasets,
+            List<RelationshipDTO> relationships) {}
 
     /** 数据源（连接）持久化契约。{@code config} 含加密后的敏感字段。 */
     public record DataSourceDTO(String id, String name, String type, Map<String, Object> config) {}

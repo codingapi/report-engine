@@ -1,5 +1,6 @@
 package com.codingapi.report.data.dataset;
 
+import com.codingapi.report.data.datasource.DataSource;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
@@ -13,8 +14,9 @@ import lombok.Data;
  *   DataSource（连接）→ TableDataset（表/查询）→ Report（报表）
  * </pre>
  *
- * 库里 50 张表，报表只用 3 张 → 只建 3 个 TableDataset。{@link #datasourceId} 指向连接， {@link #sourceTable} 是表名（或一段
- * SQL 查询）。跨表关联交给 {@link com.codingapi.report.data.relation.Relationship}，数据集本身永远是单表单查询。
+ * 库里 50 张表，报表只用 3 张 → 只建 3 个 TableDataset。{@link #datasource} 是它所属的连接（取数时直接用，
+ * 无需再到 DataModel 里按 id 查找），{@link #sourceTable} 是表名（或一段 SQL 查询）。跨表关联交给 {@link
+ * com.codingapi.report.data.relation.Relationship}，数据集本身永远是单表单查询。
  */
 @Data
 @Builder
@@ -23,7 +25,14 @@ public final class TableDataset implements Dataset {
     /** 数据集唯一标识。 */
     private String id;
 
-    /** 来自哪个连接，指向 {@code DataSource.id}。 */
+    /**
+     * 所属连接（聚合）：TableDataset 自带取数所需的 {@link DataSource}，由它自己负责"从哪取数"。
+     *
+     * <p>这样 {@code DataModel} 不再持有 datasources 列表——要拿连接直接 {@code dataset.getDatasource()}。
+     */
+    private DataSource datasource;
+
+    /** 来自哪个连接，冗余存连接 id（= {@code datasource.getId()}），便于 DTO/展示。 */
     private String datasourceId;
 
     /** 对应库里的表名（或一段 SQL 查询）。 */

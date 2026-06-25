@@ -1,54 +1,42 @@
 package com.codingapi.report.data.datamodel;
 
+import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
+import com.codingapi.report.config.dto.DataModelDtos.DataModelDTO;
+import com.codingapi.report.config.dto.DataModelDtos.DataSourceDTO;
+import com.codingapi.report.config.dto.DataModelDtos.DatasetDTO;
+import com.codingapi.report.config.dto.DataModelDtos.FieldDTO;
+import com.codingapi.report.config.dto.DataModelDtos.RelationshipDTO;
+import com.codingapi.report.config.dto.DataModelDtos.UnionMemberDTO;
+import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.dataset.FieldRef;
+import com.codingapi.report.data.dataset.TableDataset;
+import com.codingapi.report.data.dataset.UnionDataset;
+import com.codingapi.report.data.dataset.UnionMember;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.type.DataSourceType;
+import com.codingapi.report.data.relation.JoinType;
+import com.codingapi.report.data.relation.RelationOrigin;
 import com.codingapi.report.data.relation.Relationship;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
 
 /**
  * 数据模型（可复用的语义层）：描述"数据长什么样、表之间怎么关联"，<b>与具体报表无关</b>。
  *
- * <h3>为什么要把数据模型从报表里独立出来？</h3>
+ * <p>这是<b>领域对象</b>，也是 {@code DataModelRepository} 的持久化实体（不再有单独的 {@code DataModelConfig}）。 面向前端时通过
+ * {@link #toDTO()} 转成 {@link DataModelDTO}（出口脱敏由上层做），前端 JSON 通过 {@link #fromDTO(DataModelDTO)} 还原。
  *
- * <p>如果不分离，每张报表都要各自维护一份"连哪些库、用哪些表、表间怎么关联"——当 10 张报表 都用同一批表和关系时，改一张表名或加一条外键就要改 10 处。把连接/数据集/关系上提到
- * DataModel 后，<b>建一次，多个 {@link Report} 引用</b>，维护点收敛到一处。
+ * <h3>分层</h3>
  *
- * <p>这个分层是业界共识：
- *
- * <ul>
- *   <li>Power BI 的 <i>Tabular Model</i>——连接 + 表 + 关系，多个报表共用
- *   <li>Tableau 的 <i>Data Source</i>——独立于 Worksheet 发布和引用
- *   <li>帆软的 <i>服务器数据集</i>——全局定义、报表引用
- * </ul>
- *
- * <h3>三层结构一览</h3>
- *
- * <pre>
- *   DataModel（建一次，复用）            Report A ─┐
- *   ├── datasources (连接)              Report B ─┼─ 都引用同一个 DataModel
- *   ├── datasets    (表/查询)           Report C ─┘
- *   └── relationships (跨表关联)
- * </pre>
- *
- * <h3>计算在哪发生？</h3>
- *
- * <p>数据计算全部在 Java 内存完成，连接（{@link DataSource}）只负责"提取规整表" （{@code RawTable}）。因此这里的 {@link
- * Relationship} 是喂给 Java 内存 join 算子 的 JoinSpec，而非下推到 SQL 的 JOIN——这样才能支持跨源（如 MySQL 表 JOIN CSV 文件）
- * 的关联。
- *
- * <h3>为什么不直接嵌在 Report 里？</h3>
- *
- * <p>技术上可以把 datasources/datasets/relationships 全部放进 Report，但代价是：
- *
- * <ul>
- *   <li>数据定义随报表扩散，同一张表在 N 个报表里有 N 份副本
- *   <li>改字段类型/加关系需要逐报表修改，容易漏改导致不一致
- *   <li>无法做"数据模型级别"的权限管理和版本控制
- * </ul>
- *
- * 独立出来后，DataModel 可以有自己的生命周期（创建、审核、发布），报表只引用 id。
+ * <p>建一次、多个 {@code Report} 引用（对齐 Power BI Tabular Model / Tableau Data Source / 帆软服务器数据集）。 数据计算全在 Java
+ * 内存完成，连接（{@link DataSource}）只负责取规整表，故 {@link Relationship} 是内存 join 的 JoinSpec， 支持跨源关联（MySQL 表 JOIN
+ * CSV 文件）。
  */
 @Data
 @Builder
@@ -56,28 +44,277 @@ public class DataModel {
     private String id;
     private String name;
 
-    /**
-     * 连接列表（库/API/Excel/CSV/JSON）。
-     *
-     * <p>每个 DataSource 封装一个物理连接的配置（host、端口、凭证等）， 报表模板不直接引用连接，而是通过 {@link Dataset} 间接使用。
-     */
-    private List<DataSource> datasources;
+    /** 状态（草稿/已发布）。 */
+    private DataModelStatus status;
+
+    /** 创建时间（epoch 毫秒）。 */
+    private long createTime;
+
+    /** 修改时间（epoch 毫秒）。 */
+    private long updateTime;
 
     /**
-     * 数据集列表：从连接中选出的单表/单查询，是报表绑定的最小粒度。
+     * 数据集列表：本模型选用的数据集，是报表绑定的最小粒度。
      *
-     * <p>一个 DataSource 下可以有多个 Dataset（比如一个库里选了 5 张表就建 5 个 Dataset）， 也可以是 UNION 派生数据集（多个 Dataset
-     * 纵向合并为一个统一视图）。
+     * <ul>
+     *   <li>{@link TableDataset} —— 物理表，自带所属 {@link DataSource}（{@code dataset.getDatasource()}），
+     *       故本模型不再单独持有 datasources 列表
+     *   <li>{@link UnionDataset} —— UNION 派生（可跨源合并），定义在本模型内，无单一连接
+     * </ul>
      */
     private List<Dataset> datasets;
 
-    /**
-     * 跨数据集关联关系，所有引用本模型的报表共享。
-     *
-     * <p>可以来自数据库外键自动扫描（{@code RelationOrigin.AUTO}）， 也可以来自用户在界面上手动连线（{@code
-     * RelationOrigin.MANUAL}，支持跨源）。
-     *
-     * <p>如果某条关系只被一张报表需要，可以放在 {@link Report#getExtraRelationships()} 里， 不污染共享模型。
-     */
+    /** 跨数据集关联关系，所有引用本模型的报表共享（{@code RelationOrigin.AUTO} 自动扫描 / {@code MANUAL} 手动连线）。 */
     private List<Relationship> relationships;
+
+    // ============================================================
+    // 派生视图
+    // ============================================================
+
+    /** 去重收集本模型用到的连接（由各 TableDataset 自带的 datasource 聚合）。 */
+    public List<DataSource> datasources() {
+        Map<String, DataSource> byId = new LinkedHashMap<>();
+        if (datasets != null) {
+            for (Dataset ds : datasets) {
+                if (ds instanceof TableDataset t && t.getDatasource() != null) {
+                    byId.putIfAbsent(t.getDatasource().getId(), t.getDatasource());
+                }
+            }
+        }
+        return new ArrayList<>(byId.values());
+    }
+
+    // ============================================================
+    // 领域 → DTO（出口；敏感字段脱敏由上层处理）
+    // ============================================================
+
+    public DataModelDTO toDTO() {
+        return new DataModelDTO(
+                id,
+                name,
+                status != null ? status.name() : null,
+                createTime,
+                updateTime,
+                toDatasourceDtos(),
+                toDatasetDtos(),
+                toRelationshipDtos());
+    }
+
+    private List<DataSourceDTO> toDatasourceDtos() {
+        List<DataSourceDTO> out = new ArrayList<>();
+        for (DataSource s : datasources()) {
+            out.add(
+                    new DataSourceDTO(
+                            s.getId(),
+                            s.getName(),
+                            s.getType() != null ? s.getType().type() : null,
+                            s.getConfig()));
+        }
+        return out;
+    }
+
+    private List<DatasetDTO> toDatasetDtos() {
+        List<DatasetDTO> out = new ArrayList<>();
+        if (datasets == null) return out;
+        for (Dataset ds : datasets) {
+            if (ds instanceof TableDataset t) {
+                out.add(
+                        new DatasetDTO(
+                                t.getId(),
+                                t.getAlias(),
+                                "TABLE",
+                                t.getDatasourceId(),
+                                t.getSourceTable(),
+                                toFieldDtos(t.getFields()),
+                                null));
+            } else if (ds instanceof UnionDataset u) {
+                out.add(
+                        new DatasetDTO(
+                                u.getId(),
+                                u.getAlias(),
+                                "UNION",
+                                null,
+                                null,
+                                toFieldDtos(u.getFields()),
+                                toUnionMemberDtos(u.getMembers())));
+            }
+        }
+        return out;
+    }
+
+    private static List<FieldDTO> toFieldDtos(List<Field> fields) {
+        List<FieldDTO> out = new ArrayList<>();
+        if (fields == null) return out;
+        for (Field f : fields) {
+            out.add(
+                    new FieldDTO(
+                            f.getName(),
+                            f.getAlias(),
+                            f.getDataType() != null ? f.getDataType().name() : null,
+                            f.isPrimaryKey()));
+        }
+        return out;
+    }
+
+    private static List<UnionMemberDTO> toUnionMemberDtos(List<UnionMember> members) {
+        List<UnionMemberDTO> out = new ArrayList<>();
+        if (members == null) return out;
+        for (UnionMember m : members) {
+            out.add(new UnionMemberDTO(m.datasetId(), m.mapping()));
+        }
+        return out;
+    }
+
+    private List<RelationshipDTO> toRelationshipDtos() {
+        List<RelationshipDTO> out = new ArrayList<>();
+        if (relationships == null) return out;
+        for (Relationship r : relationships) {
+            out.add(
+                    new RelationshipDTO(
+                            r.getId(),
+                            toFieldRefDto(r.getLeft()),
+                            toFieldRefDto(r.getRight()),
+                            r.getJoinType() != null ? r.getJoinType().name() : null,
+                            r.getOrigin() != null ? r.getOrigin().name() : null));
+        }
+        return out;
+    }
+
+    private static FieldRefDTO toFieldRefDto(FieldRef ref) {
+        return ref == null ? null : new FieldRefDTO(ref.datasetId(), ref.field());
+    }
+
+    // ============================================================
+    // DTO → 领域（入口）
+    // ============================================================
+
+    public static DataModel fromDTO(DataModelDTO dto) {
+        if (dto == null) return null;
+        Map<String, DataSource> sources = buildSources(dto.datasources());
+        List<Dataset> datasets = buildDatasets(dto.datasets(), sources);
+        attachDatasetsToSources(datasets, sources);
+        return DataModel.builder()
+                .id(dto.id())
+                .name(dto.name())
+                .status(dto.status() != null ? DataModelStatus.valueOf(dto.status()) : null)
+                .createTime(dto.createTime())
+                .updateTime(dto.updateTime())
+                .datasets(datasets)
+                .relationships(buildRelationships(dto.relationships()))
+                .build();
+    }
+
+    private static Map<String, DataSource> buildSources(List<DataSourceDTO> sources) {
+        Map<String, DataSource> out = new LinkedHashMap<>();
+        if (sources == null) return out;
+        for (DataSourceDTO s : sources) {
+            DataSourceType type =
+                    s.type() != null ? DataSourceType.of(s.type(), s.config()) : null;
+            out.put(
+                    s.id(),
+                    DataSource.builder()
+                            .id(s.id())
+                            .name(s.name())
+                            .type(type)
+                            .config(s.config())
+                            .build());
+        }
+        return out;
+    }
+
+    private static List<Dataset> buildDatasets(
+            List<DatasetDTO> datasets, Map<String, DataSource> sources) {
+        List<Dataset> out = new ArrayList<>();
+        if (datasets == null) return out;
+        for (DatasetDTO d : datasets) {
+            if ("UNION".equals(d.kind())) {
+                out.add(
+                        UnionDataset.builder()
+                                .id(d.id())
+                                .alias(d.alias())
+                                .fields(buildFields(d.fields()))
+                                .members(buildUnionMembers(d.members()))
+                                .build());
+            } else {
+                out.add(
+                        TableDataset.builder()
+                                .id(d.id())
+                                .alias(d.alias())
+                                .datasource(sources.get(d.datasourceId()))
+                                .datasourceId(d.datasourceId())
+                                .sourceTable(d.sourceTable())
+                                .fields(buildFields(d.fields()))
+                                .build());
+            }
+        }
+        return out;
+    }
+
+    private static void attachDatasetsToSources(
+            List<Dataset> datasets, Map<String, DataSource> sources) {
+        Map<String, List<Dataset>> grouped = new LinkedHashMap<>();
+        for (Dataset ds : datasets) {
+            if (ds instanceof TableDataset t && t.getDatasource() != null) {
+                grouped.computeIfAbsent(t.getDatasource().getId(), k -> new ArrayList<>()).add(t);
+            }
+        }
+        grouped.forEach(
+                (id, list) -> {
+                    DataSource s = sources.get(id);
+                    if (s != null) s.setDatasets(list);
+                });
+    }
+
+    private static List<Field> buildFields(List<FieldDTO> fields) {
+        List<Field> out = new ArrayList<>();
+        if (fields == null) return out;
+        for (FieldDTO f : fields) {
+            out.add(
+                    Field.builder()
+                            .name(f.name())
+                            .alias(f.alias())
+                            .dataType(
+                                    f.dataType() != null
+                                            ? DataType.valueOf(f.dataType())
+                                            : DataType.STRING)
+                            .primaryKey(f.primaryKey())
+                            .build());
+        }
+        return out;
+    }
+
+    private static List<UnionMember> buildUnionMembers(List<UnionMemberDTO> members) {
+        List<UnionMember> out = new ArrayList<>();
+        if (members == null) return out;
+        for (UnionMemberDTO m : members) {
+            out.add(new UnionMember(m.datasetId(), m.mapping() != null ? m.mapping() : Map.of()));
+        }
+        return out;
+    }
+
+    public static List<Relationship> buildRelationships(List<RelationshipDTO> rels) {
+        List<Relationship> out = new ArrayList<>();
+        if (rels == null) return out;
+        for (RelationshipDTO r : rels) {
+            out.add(
+                    Relationship.builder()
+                            .id(r.id())
+                            .left(toFieldRef(r.left()))
+                            .right(toFieldRef(r.right()))
+                            .joinType(
+                                    r.joinType() != null
+                                            ? JoinType.valueOf(r.joinType())
+                                            : JoinType.INNER)
+                            .origin(
+                                    r.origin() != null
+                                            ? RelationOrigin.valueOf(r.origin())
+                                            : RelationOrigin.MANUAL)
+                            .build());
+        }
+        return out;
+    }
+
+    private static FieldRef toFieldRef(FieldRefDTO ref) {
+        return ref == null ? null : new FieldRef(ref.datasetId(), ref.field());
+    }
 }

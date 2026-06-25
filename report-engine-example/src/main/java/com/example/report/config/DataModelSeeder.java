@@ -1,18 +1,17 @@
 package com.example.report.config;
 
-import com.codingapi.report.config.DataModelConfig;
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.datamodel.DataModelStatus;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.DataSourceType;
+import com.codingapi.report.data.datasource.type.CsvDataSourceType;
 import com.codingapi.report.data.relation.JoinType;
 import com.codingapi.report.data.relation.RelationOrigin;
 import com.codingapi.report.data.relation.Relationship;
-import com.codingapi.report.datasource.converter.DataModelConfigConverter;
 import com.codingapi.report.repository.DataModelRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,11 +49,9 @@ public class DataModelSeeder {
     private String datasetsDir;
 
     private final DataModelRepository repository;
-    private final DataModelConfigConverter converter;
 
-    public DataModelSeeder(DataModelRepository repository, DataModelConfigConverter converter) {
+    public DataModelSeeder(DataModelRepository repository) {
         this.repository = repository;
-        this.converter = converter;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -65,9 +62,9 @@ public class DataModelSeeder {
         }
         try {
             DataModel dm = buildDefaultModel();
-            DataModelConfig cfg = converter.toConfig(dm);
-            cfg.setId("default");
-            repository.save(cfg);
+            dm.setId("default");
+            dm.setStatus(DataModelStatus.PUBLISHED);
+            repository.save(dm);
             log.info(
                     "已预存默认数据模型: {} 个数据集, {} 条关系",
                     dm.getDatasets().size(),
@@ -83,7 +80,6 @@ public class DataModelSeeder {
         Resource[] resources = resolver.getResources(pattern);
 
         ObjectMapper mapper = new ObjectMapper();
-        List<DataSource> datasources = new ArrayList<>();
         List<Dataset> datasets = new ArrayList<>();
 
         for (Resource resource : resources) {
@@ -115,19 +111,19 @@ public class DataModelSeeder {
                         DataSource.builder()
                                 .id("csv_" + id)
                                 .name(alias)
-                                .type(DataSourceType.CSV)
+                                .type(new CsvDataSourceType(null))
                                 .config(Map.of("path", csvPath))
                                 .build();
-                datasources.add(source);
-
                 TableDataset ds =
                         TableDataset.builder()
                                 .id(id)
+                                .datasource(source)
                                 .datasourceId(source.getId())
                                 .sourceTable(id + ".csv")
                                 .alias(alias)
                                 .fields(fields)
                                 .build();
+                source.setDatasets(List.of(ds));
                 datasets.add(ds);
                 log.info("加载数据集: {} ({}) - {} 个字段, path={}", id, alias, fields.size(), csvPath);
             }
@@ -138,7 +134,6 @@ public class DataModelSeeder {
         return DataModel.builder()
                 .id("default")
                 .name("默认数据模型")
-                .datasources(datasources)
                 .datasets(new ArrayList<>(datasets))
                 .relationships(relationships)
                 .build();

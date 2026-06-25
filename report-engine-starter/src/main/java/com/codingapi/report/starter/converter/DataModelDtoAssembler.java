@@ -1,8 +1,8 @@
 package com.codingapi.report.starter.converter;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;
-import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.relation.Relationship;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,11 +18,11 @@ public final class DataModelDtoAssembler {
     private DataModelDtoAssembler() {}
 
     public static Map<String, Object> assemble(DataModel dataModel) {
-        // 构建 datasourceId → type 映射
+        // 构建 datasourceId → type 映射（连接由各 TableDataset 自带，DataModel 不再持有 datasources）
         Map<String, String> sourceTypeMap = new LinkedHashMap<>();
-        if (dataModel.getDatasources() != null) {
-            for (DataSource ds : dataModel.getDatasources()) {
-                sourceTypeMap.put(ds.getId(), ds.getType().name());
+        for (Dataset ds : dataModel.getDatasets()) {
+            if (ds instanceof TableDataset t && t.getDatasource() != null) {
+                sourceTypeMap.put(t.getDatasource().getId(), t.getDatasource().getType().type());
             }
         }
 

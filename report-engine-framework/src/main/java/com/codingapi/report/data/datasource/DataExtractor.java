@@ -19,7 +19,7 @@ import java.util.List;
  * 这是"提取 / 加工"的分界线：
  *
  * <ul>
- *   <li><b>提取</b>（本接口的职责）：从物理数据源读取数据，转为统一的内存表格式。 每种连接类型（DB/CSV/API/Excel/JSON）各一个实现类
+ *   <li><b>提取</b>（本接口的职责）：从物理数据源读取数据，转为统一的内存表格式。 每种连接类型（DB/EXCEL/CSV）各一个实现类
  *   <li><b>加工</b>（{@link Operators} 的范畴）：filter/join/aggregate 全在 Java 完成， 与数据源类型无关。这使得跨源计算（如 MySQL
  *       表 JOIN CSV 文件）成为可能
  * </ul>
@@ -39,8 +39,8 @@ import java.util.List;
  * <p>新增一个数据源类型只需三步：
  *
  * <ol>
- *   <li>在 {@link DataSourceType} 枚举中新增值（如 {@code MONGO}）
- *   <li>实现本接口：{@code supports()} 返回 true 当 type == MONGO，{@code extract()} 实现具体读取逻辑
+ *   <li>在 {@link DataSourceKind} 中新增判别码（如 {@code MONGO}），并实现 {@link DataSourceType} 承载类型级配置
+ *   <li>实现本接口：{@code supports()} 返回 true 当 kind == MONGO，{@code extract()} 实现具体读取逻辑
  *   <li>注册到 {@link ReportRenderer} 的 extractors 列表中
  * </ol>
  *
@@ -49,11 +49,11 @@ import java.util.List;
 public interface DataExtractor {
 
     /**
-     * 是否支持指定的数据源类型。
+     * 是否支持指定的数据源类型（按 {@code DataSourceType.type()} 判别串匹配，如 {@code "DB"}）。
      *
      * <p>ReportRenderer 遍历 extractors 列表，调用此方法找到匹配的提取器。
      */
-    boolean supports(DataSourceType type);
+    boolean supports(String type);
 
     /**
      * 从数据源提取一个数据集的全部数据，返回规整的内存表。

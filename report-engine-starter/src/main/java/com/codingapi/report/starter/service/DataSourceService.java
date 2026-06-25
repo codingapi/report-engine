@@ -7,7 +7,7 @@ import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.DataSourceType;
+import com.codingapi.report.data.datasource.type.DataSourceType;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
 import com.codingapi.report.starter.dto.DatasetDtos.PreviewDTO;
@@ -33,7 +33,7 @@ public class DataSourceService {
 
     /** 测试连接（不落库，凭证明文）。 */
     public TestResult testConnection(DataSourceDTO dto) {
-        DataSourceType type = DataSourceType.valueOf(dto.type());
+        DataSourceType type = DataSourceType.of(dto.type(), dto.config());
         DataSource ds =
                 DataSource.builder()
                         .id(dto.id())
@@ -65,14 +65,10 @@ public class DataSourceService {
         if (!(ds instanceof TableDataset tds)) {
             throw new IllegalArgumentException("非表格数据集: " + datasetId);
         }
-        DataSource source =
-                dm.getDatasources().stream()
-                        .filter(s -> s.getId().equals(tds.getDatasourceId()))
-                        .findFirst()
-                        .orElseThrow(
-                                () ->
-                                        new IllegalArgumentException(
-                                                "数据源不存在: " + tds.getDatasourceId()));
+        DataSource source = tds.getDatasource();
+        if (source == null) {
+            throw new IllegalArgumentException("数据集未绑定数据源: " + tds.getDatasourceId());
+        }
         RawTable raw = findExtractor(source.getType()).extract(source, tds);
 
         String prefix = tds.getId() + ".";
@@ -102,15 +98,20 @@ public class DataSourceService {
 
     private DataExtractor findExtractor(DataSourceType type) {
         return extractors.stream()
-                .filter(e -> e.supports(type))
+                .filter(e -> e.supports(type.type()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("无提取器支持类型: " + type));
+                .orElseThrow(() -> new IllegalArgumentException("无提取器支持类型: " + type.type()));
     }
 
     private DataSource loadDataSource(String dataModelId, String datasourceId) {
         DataModel dm = dataModelService.loadDataModel(dataModelId);
-        return dm.getDatasources().stream()
-                .filter(s -> s.getId().equals(datasourceId))
+        return dm.getDatasets().stream()
+                .filter(
+                        d ->
+                                d instanceof TableDataset t
+                                        && t.getDatasource() != null
+                                        && datasourceId.equals(t.getDatasource().getId()))
+                .map(d -> ((TableDataset) d).getDatasource())
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("连接不存在: " + datasourceId));
     }

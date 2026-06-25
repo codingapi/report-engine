@@ -1,6 +1,6 @@
 package com.codingapi.report.param;
 
-import com.codingapi.report.render.grid.CellRef;
+import com.codingapi.report.core.grid.CellRef;
 
 /**
  * 参数来源（密封接口）：决定一个 {@link Parameter} 的"值从哪来、什么时候绑定"。

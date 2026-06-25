@@ -1,7 +1,8 @@
 package com.codingapi.report.starter.controller;
 
-import com.codingapi.report.config.DataModelConfig;
+import com.codingapi.report.config.dto.DataModelDtos.DataModelDTO;
 import com.codingapi.report.config.dto.DataModelDtos.RelationshipDTO;
+import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
@@ -38,7 +39,7 @@ public class DataModelMgmtController {
     public MultiResponse<DataModelBrief> list(
             @RequestParam(defaultValue = "1") int current,
             @RequestParam(defaultValue = "10") int pageSize) {
-        PageResult<DataModelConfig> result = dataModelService.page(current, pageSize);
+        PageResult<DataModel> result = dataModelService.page(current, pageSize);
         List<DataModelBrief> briefs =
                 result.content().stream()
                         .map(
@@ -46,7 +47,7 @@ public class DataModelMgmtController {
                                         new DataModelBrief(
                                                 c.getId(),
                                                 c.getName() != null ? c.getName() : "未命名模型",
-                                                c.getStatus(),
+                                                c.getStatus() != null ? c.getStatus().name() : null,
                                                 c.getCreateTime(),
                                                 c.getUpdateTime()))
                         .toList();
@@ -54,13 +55,13 @@ public class DataModelMgmtController {
     }
 
     @GetMapping("/{id}")
-    public SingleResponse<DataModelConfig> get(@PathVariable String id) {
+    public SingleResponse<DataModelDTO> get(@PathVariable String id) {
         return SingleResponse.of(dataModelService.getMasked(id));
     }
 
     @PostMapping
-    public SingleResponse<String> save(@RequestBody DataModelConfig cfg) {
-        return SingleResponse.of(dataModelService.save(cfg));
+    public SingleResponse<String> save(@RequestBody DataModelDTO dto) {
+        return SingleResponse.of(dataModelService.save(dto));
     }
 
     @DeleteMapping("/{id}")

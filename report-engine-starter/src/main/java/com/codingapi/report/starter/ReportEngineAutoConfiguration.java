@@ -1,8 +1,7 @@
 package com.codingapi.report.starter;
 
 import com.codingapi.report.data.datasource.DataExtractor;
-import com.codingapi.report.datasource.converter.DataModelConfigConverter;
-import com.codingapi.report.datasource.credential.CredentialService;
+import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.excel.FontRegistry;
 import com.codingapi.report.repository.DataModelRepository;
 import com.codingapi.report.repository.ReportRepository;
@@ -69,10 +68,8 @@ public class ReportEngineAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public DataModelService dataModelService(
-                DataModelRepository dataModelRepository,
-                CredentialService credentials,
-                DataModelConfigConverter converter) {
-            return new DataModelService(dataModelRepository, credentials, converter);
+                DataModelRepository dataModelRepository, CredentialService credentials) {
+            return new DataModelService(dataModelRepository, credentials);
         }
 
         @Bean
