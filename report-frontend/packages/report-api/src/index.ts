@@ -35,3 +35,14 @@ export type {
   RelationshipInfo,
   FieldRefInfo,
 } from './datamodel';
+export {
+  listDataModelBriefs,
+  getDataModel,
+  createDataModel,
+  updateDataModel,
+  deleteDataModel,
+  testDataSource,
+  exploreTables,
+  exploreColumns,
+} from './datasource';
+export type { TestResult, ColumnMeta, DataSourceTestRequest } from './datasource';
