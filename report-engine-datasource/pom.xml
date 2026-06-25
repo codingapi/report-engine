@@ -8,9 +8,9 @@
 		<version>0.0.1</version>
 	</parent>
 
-	<name>report-engine-starter</name>
-	<artifactId>report-engine-starter</artifactId>
-	<description>Spring Boot 自动配置模块，提供 FontRegistry 等 Bean 的自动装配</description>
+	<name>report-engine-datasource</name>
+	<artifactId>report-engine-datasource</artifactId>
+	<description>数据源管理模块：连接管理 + 凭证加密/脱敏 + 连接测试/元数据探查 + DB 提取器实现</description>
 
 	<properties>
 		<maven.compiler.source>17</maven.compiler.source>
@@ -24,21 +24,13 @@
 			<artifactId>report-engine-framework</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.codingapi.report</groupId>
-			<artifactId>report-engine-excel</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>com.codingapi.report</groupId>
-			<artifactId>report-engine-datasource</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-web</artifactId>
-			<optional>true</optional>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>

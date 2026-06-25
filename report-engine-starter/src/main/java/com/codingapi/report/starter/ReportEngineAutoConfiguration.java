@@ -1,10 +1,13 @@
 package com.codingapi.report.starter;
 
-import com.codingapi.report.data.datamodel.DataModel;
-import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
+import com.codingapi.report.data.datasource.DataExtractor;
+import com.codingapi.report.datasource.converter.DataModelConfigConverter;
+import com.codingapi.report.datasource.credential.CredentialService;
 import com.codingapi.report.excel.FontRegistry;
+import com.codingapi.report.repository.DataModelRepository;
 import com.codingapi.report.repository.ReportRepository;
-import com.codingapi.report.starter.controller.DataModelController;
+import com.codingapi.report.starter.controller.DataModelMgmtController;
+import com.codingapi.report.starter.controller.DataSourceController;
 import com.codingapi.report.starter.controller.DatasetController;
 import com.codingapi.report.starter.controller.ExcelController;
 import com.codingapi.report.starter.controller.ExpressionController;
@@ -12,6 +15,10 @@ import com.codingapi.report.starter.controller.FontController;
 import com.codingapi.report.starter.controller.ReportConfigController;
 import com.codingapi.report.starter.controller.ReportRenderController;
 import com.codingapi.report.starter.properties.ReportFontProperties;
+import com.codingapi.report.starter.service.DataModelService;
+import com.codingapi.report.starter.service.DataSourceService;
+import com.codingapi.report.starter.service.ReportConfigService;
+import com.codingapi.report.starter.service.ReportRenderService;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -26,6 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Report Engine 自动配置。
  *
  * <p>自动装配 {@link FontRegistry} Bean： 提取内置字体 → 合并用户自定义字体 → 扫描 → 注册到 JVM
+ *
+ * <p>Web 环境下注册全部通用 REST API Controller（数据源管理 / 报表配置 / 渲染 / 数据集 / 字体 / 公式 / Excel）， 业务下沉 service
+ * 层（{@code com.codingapi.report.starter.service}），Controller 只做 HTTP 编排。
  */
 @Configuration
 @EnableConfigurationProperties(ReportFontProperties.class)
@@ -50,11 +60,43 @@ public class ReportEngineAutoConfiguration {
         return registry;
     }
 
-    /** Web 环境下的自动配置：注册 REST API Controller。 */
+    /** Web 环境下的自动配置：注册 service 与 REST API Controller。 */
     @Configuration
     @ConditionalOnClass(RestController.class)
     static class WebConfiguration {
 
+        // ─── service 层 ───────────────────────────────────
+        @Bean
+        @ConditionalOnMissingBean
+        public DataModelService dataModelService(
+                DataModelRepository dataModelRepository,
+                CredentialService credentials,
+                DataModelConfigConverter converter) {
+            return new DataModelService(dataModelRepository, credentials, converter);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceService dataSourceService(
+                DataModelService dataModelService, List<DataExtractor> extractors) {
+            return new DataSourceService(dataModelService, extractors);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ReportConfigService reportConfigService(
+                ReportRepository repository, DataModelService dataModelService) {
+            return new ReportConfigService(repository, dataModelService);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public ReportRenderService reportRenderService(
+                DataModelService dataModelService, List<DataExtractor> extractors) {
+            return new ReportRenderService(dataModelService, extractors);
+        }
+
+        // ─── Controller 层 ────────────────────────────────
         @Bean
         public FontController fontController(FontRegistry fontRegistry) {
             return new FontController(fontRegistry);
@@ -67,16 +109,15 @@ public class ReportEngineAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public ReportRenderController reportRenderController(
-                DataModel dataModel, CsvDataExtractor csvExtractor) {
-            return new ReportRenderController(dataModel, csvExtractor);
+        public ReportRenderController reportRenderController(ReportRenderService renderService) {
+            return new ReportRenderController(renderService);
         }
 
         @Bean
         @ConditionalOnMissingBean
         public DatasetController datasetController(
-                DataModel dataModel, CsvDataExtractor csvExtractor) {
-            return new DatasetController(dataModel, csvExtractor);
+                DataModelService dataModelService, DataSourceService dataSourceService) {
+            return new DatasetController(dataModelService, dataSourceService);
         }
 
         @Bean
@@ -88,14 +129,20 @@ public class ReportEngineAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public ReportConfigController reportConfigController(
-                ReportRepository repository, DataModel dataModel) {
-            return new ReportConfigController(repository, dataModel);
+                ReportConfigService reportConfigService) {
+            return new ReportConfigController(reportConfigService);
         }
 
         @Bean
         @ConditionalOnMissingBean
-        public DataModelController dataModelController(List<DataModel> dataModels) {
-            return new DataModelController(dataModels);
+        public DataModelMgmtController dataModelMgmtController(DataModelService dataModelService) {
+            return new DataModelMgmtController(dataModelService);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceController dataSourceController(DataSourceService dataSourceService) {
+            return new DataSourceController(dataSourceService);
         }
     }
 }
