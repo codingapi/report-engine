@@ -35,4 +35,5 @@ build/
 ### miss ###
 .DS_Store
 .codegraph
-.fonts
+.fontsreport-frontend/packages/*/dist
+report-frontend/packages/*/node_modules
