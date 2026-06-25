@@ -30,9 +30,9 @@ export interface DatasetPreview {
 // API
 // ============================================================
 
-/** 获取所有数据集列表（含字段定义） */
-export async function fetchDatasets(): Promise<DatasetInfo[]> {
-  const res = await http.get('/datasets');
+/** 获取指定数据模型下的数据集列表（含字段定义） */
+export async function fetchDatasets(dataModelId: string): Promise<DatasetInfo[]> {
+  const res = await http.get('/datasets', { params: { dataModelId } });
   return res.data.list;
 }
 

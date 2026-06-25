@@ -165,6 +165,7 @@ export const ReportEngine: React.FC<
     const args = collectRenderArgs();
     if (!args) return null;
     return {
+      dataModelId,
       bindings: args.bindingsOut,
       loops: loopBlocks,
       summaries: args.summariesOut,

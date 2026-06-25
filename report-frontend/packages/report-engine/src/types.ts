@@ -348,6 +348,8 @@ export interface RenderService {
 
 /** 渲染入参：单元格绑定 + 循环块 + 汇总行 + 模板快照 + 报表参数。 */
 export interface RenderConfig {
+  /** 数据模型 ID（构建渲染请求时透传给后端） */
+  dataModelId?: string;
   bindings: CellBinding[];
   loops: LoopBlock[];
   summaries: SummaryRow[];
