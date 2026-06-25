@@ -2,6 +2,7 @@ package com.codingapi.report.datasource;
 
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.csv.CsvDataExtractor;
+import com.codingapi.report.datasource.api.ApiDataExtractor;
 import com.codingapi.report.datasource.converter.DataModelConfigConverter;
 import com.codingapi.report.datasource.credential.CredentialService;
 import com.codingapi.report.datasource.db.DbDataExtractor;
@@ -43,5 +44,12 @@ public class DataModelMgmtAutoConfiguration {
     @ConditionalOnMissingBean
     public CsvDataExtractor csvDataExtractor() {
         return new CsvDataExtractor();
+    }
+
+    /** API 提取器：HTTP JSON 接口取数，JDK HttpClient + Jackson。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ApiDataExtractor apiDataExtractor() {
+        return new ApiDataExtractor();
     }
 }
