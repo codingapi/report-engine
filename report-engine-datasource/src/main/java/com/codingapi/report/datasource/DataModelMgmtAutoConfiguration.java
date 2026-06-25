@@ -6,6 +6,7 @@ import com.codingapi.report.datasource.api.ApiDataExtractor;
 import com.codingapi.report.datasource.converter.DataModelConfigConverter;
 import com.codingapi.report.datasource.credential.CredentialService;
 import com.codingapi.report.datasource.db.DbDataExtractor;
+import com.codingapi.report.datasource.excel.ExcelDataExtractor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -51,5 +52,12 @@ public class DataModelMgmtAutoConfiguration {
     @ConditionalOnMissingBean
     public ApiDataExtractor apiDataExtractor() {
         return new ApiDataExtractor();
+    }
+
+    /** Excel 提取器：复用 report-engine-excel 的 ExcelImporter 解析 .xlsx。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public ExcelDataExtractor excelDataExtractor() {
+        return new ExcelDataExtractor();
     }
 }
