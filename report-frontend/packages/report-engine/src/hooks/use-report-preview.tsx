@@ -68,6 +68,7 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
     config: RenderConfig,
     paramValues: Record<string, unknown>,
   ): RenderRequest => ({
+    dataModelId: config.dataModelId ?? 'default',
     cellBindings: config.bindings.map(toBindingDTO),
     loopBlocks: config.loops as unknown[],
     summaries: config.summaries as unknown[],

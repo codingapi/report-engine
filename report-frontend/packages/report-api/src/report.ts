@@ -41,6 +41,8 @@ export interface RenderBindingDTO {
 }
 
 export interface RenderRequest {
+  /** 数据模型 ID（后端按此加载数据模型，必传） */
+  dataModelId: string;
   cellBindings: RenderBindingDTO[];
   loopBlocks: unknown[];
   summaries: unknown[];
