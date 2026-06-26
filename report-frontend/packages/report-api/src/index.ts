@@ -46,8 +46,26 @@ export {
   testDataSource,
   exploreTables,
   exploreColumns,
+  listDataSources,
+  getDataSource,
+  saveDataSource,
+  deleteDataSource,
+  introspectDatasets,
+  uploadDataFile,
+  testConnection,
 } from './datasource';
-export type { TestResult, ColumnMeta, DataSourceTestRequest } from './datasource';
+export type {
+  TestResult,
+  ColumnMeta,
+  DataSourceTestRequest,
+  DataSourceKind,
+  DataSourceBrief,
+  DataSourceDTO,
+  IntrospectedColumn,
+  IntrospectedTable,
+  DataFileUploadResult,
+  DataSourcePage,
+} from './datasource';
 export {
   listDataSourceTypes,
   getDataSourceType,

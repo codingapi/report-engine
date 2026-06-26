@@ -26,6 +26,54 @@ export interface DataSourceTestRequest {
   config?: Record<string, unknown>;
 }
 
+/** 数据源类型判别串（对齐后端 DataSourceType.type()） */
+export type DataSourceKind = 'DB' | 'EXCEL' | 'CSV';
+
+/** 数据源列表项（GET /api/datasources 返回，不含 config 敏感字段） */
+export interface DataSourceBrief {
+  id: string;
+  name: string;
+  type: DataSourceKind;
+  typeConfigId?: string;
+  createTime: number;
+  updateTime: number;
+}
+
+/** 数据源持久化 DTO（POST /api/datasources 入参 / GET /{id} 出参） */
+export interface DataSourceDTO {
+  id?: string;
+  name: string;
+  type: DataSourceKind;
+  typeConfigId?: string;
+  /** 配置（含敏感字段，出口由后端脱敏；保存时 `***` 占位回填旧值） */
+  config: Record<string, unknown>;
+}
+
+/** 元数据解析：一张表/sheet/CSV 文件解析出的列元数据 */
+export interface IntrospectedColumn {
+  name: string;
+  dataType: string;
+  primaryKey: boolean;
+}
+
+export interface IntrospectedTable {
+  name: string;
+  columns: IntrospectedColumn[];
+}
+
+/** 文件上传响应：保存路径 + 解析出的表列表（前端据此构造 DataSourceDTO.config.path） */
+export interface DataFileUploadResult {
+  savedPath: string;
+  type: DataSourceKind;
+  tables: IntrospectedTable[];
+}
+
+/** 分页结果 */
+export interface DataSourcePage {
+  list: DataSourceBrief[];
+  total: number;
+}
+
 // ============================================================
 // API
 // ============================================================
@@ -79,4 +127,54 @@ export async function exploreColumns(sourceId: string, table: string): Promise<C
     params: { sourceId, table },
   });
   return res.data.list;
+}
+
+// ============================================================
+// 数据源 CRUD + 元数据解析 + 文件上传 + 连接测试
+// ============================================================
+
+/** 分页列表 */
+export async function listDataSources(current = 1, pageSize = 10): Promise<DataSourcePage> {
+  const res = await http.get('/datasources', { params: { current, pageSize } });
+  return { list: res.data.list, total: res.data.total };
+}
+
+/** 详情（凭证字段脱敏） */
+export async function getDataSource(id: string): Promise<DataSourceDTO> {
+  const res = await http.get(`/datasources/${id}`);
+  return res.data as DataSourceDTO;
+}
+
+/** 保存（含 id 更新，不含新建），返回 id */
+export async function saveDataSource(dto: DataSourceDTO): Promise<string> {
+  const res = await http.post('/datasources', dto);
+  return res.data as string;
+}
+
+/** 删除 */
+export async function deleteDataSource(id: string): Promise<void> {
+  await http.delete(`/datasources/${id}`);
+}
+
+/** 元数据解析：返回所有表/sheet + 列定义 */
+export async function introspectDatasets(id: string): Promise<IntrospectedTable[]> {
+  const res = await http.post(`/datasources/${id}/introspect`);
+  return res.data.list;
+}
+
+/** 上传 Excel/CSV 文件并解析元数据（multipart） */
+export async function uploadDataFile(file: File, type?: DataSourceKind): Promise<DataFileUploadResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await http.post('/datasources/upload', form, {
+    params: type ? { type } : undefined,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data as DataFileUploadResult;
+}
+
+/** 连接测试（按完整 DTO；DB 需 typeConfigId/url/账密；EXCEL/CSV 需 config.path） */
+export async function testConnection(dto: DataSourceDTO): Promise<TestResult> {
+  const res = await http.post('/datasources/test', dto);
+  return res.data as TestResult;
 }

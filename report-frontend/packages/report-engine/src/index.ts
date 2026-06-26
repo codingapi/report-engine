@@ -17,6 +17,11 @@ export type {
   DataSourceTypeService,
   DataSourceTypeManagerProps,
 } from './components/datasource/datasource-type-manager';
+export { default as DataSourceManager } from './components/datasource/datasource-manager';
+export type {
+  DataSourceService,
+  DataSourceManagerProps,
+} from './components/datasource/datasource-manager';
 export { useDatasource } from './hooks/use-datasource';
 export { useExplore } from './hooks/use-explore';
 
