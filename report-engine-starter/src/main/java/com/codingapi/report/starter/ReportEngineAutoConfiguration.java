@@ -99,8 +99,9 @@ public class ReportEngineAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public DataSourceTypeService dataSourceTypeService(DataSourceTypeRepository repository) {
-            return new DataSourceTypeService(repository);
+        public DataSourceTypeService dataSourceTypeService(
+                DataSourceTypeRepository repository, ReportProperties properties) {
+            return new DataSourceTypeService(repository, properties);
         }
 
         // ─── Controller 层 ────────────────────────────────
