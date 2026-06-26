@@ -13,7 +13,7 @@ import com.codingapi.report.starter.controller.ExpressionController;
 import com.codingapi.report.starter.controller.FontController;
 import com.codingapi.report.starter.controller.ReportConfigController;
 import com.codingapi.report.starter.controller.ReportRenderController;
-import com.codingapi.report.starter.properties.ReportFontProperties;
+import com.codingapi.report.starter.properties.ReportProperties;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.report.starter.service.DataSourceService;
 import com.codingapi.report.starter.service.ReportConfigService;
@@ -37,16 +37,17 @@ import org.springframework.web.bind.annotation.RestController;
  * 层（{@code com.codingapi.report.starter.service}），Controller 只做 HTTP 编排。
  */
 @Configuration
-@EnableConfigurationProperties(ReportFontProperties.class)
+@EnableConfigurationProperties(ReportProperties.class)
 public class ReportEngineAutoConfiguration {
 
     @Bean
-    public FontRegistry fontRegistry(ReportFontProperties properties) throws IOException {
+    public FontRegistry fontRegistry(ReportProperties properties) throws IOException {
         Path builtinDir = FontRegistry.extractBuiltinFonts();
 
         Path customDir = null;
-        if (properties.getDir() != null && !properties.getDir().isBlank()) {
-            customDir = Path.of(properties.getDir());
+        String fontDir = properties.getFont().getDir();
+        if (fontDir != null && !fontDir.isBlank()) {
+            customDir = Path.of(fontDir);
         }
 
         FontRegistry registry =

@@ -149,7 +149,7 @@ pnpm dev:app-pc
 在 `application.properties` 中配置字体目录：
 
 ```properties
-report.fonts.dir=/path/to/custom/fonts
+codingapi.report.font.dir=/path/to/custom/fonts
 ```
 
 字体文件命名约定：数字前缀控制排序（如 `01_微软雅黑.ttf`、`02_宋体.ttf`），无编号按文件名自然序。
