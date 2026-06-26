@@ -1,6 +1,8 @@
 package com.example.report.config;
 
+import com.codingapi.report.repository.DataModelRepository;
 import com.codingapi.report.repository.ReportRepository;
+import com.example.report.repository.InMemoryDataModelRepository;
 import com.example.report.repository.InMemoryReportRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,5 +18,10 @@ public class RepositoryConfig {
     @Bean
     public ReportRepository reportRepository() {
         return new InMemoryReportRepository();
+    }
+
+    @Bean
+    public DataModelRepository dataModelRepository() {
+        return new InMemoryDataModelRepository();
     }
 }

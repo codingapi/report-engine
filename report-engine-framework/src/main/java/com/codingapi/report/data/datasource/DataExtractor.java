@@ -1,6 +1,7 @@
 package com.codingapi.report.data.datasource;
 
 import com.codingapi.report.data.dataset.Dataset;
+import java.util.List;
 
 /**
  * 数据提取器接口（SPI）：每种 {@link DataSourceType} 对应一个实现， <b>唯一职责是把数据取成规整的 {@link RawTable}</b>。
@@ -18,7 +19,7 @@ import com.codingapi.report.data.dataset.Dataset;
  * 这是"提取 / 加工"的分界线：
  *
  * <ul>
- *   <li><b>提取</b>（本接口的职责）：从物理数据源读取数据，转为统一的内存表格式。 每种连接类型（DB/CSV/API/Excel/JSON）各一个实现类
+ *   <li><b>提取</b>（本接口的职责）：从物理数据源读取数据，转为统一的内存表格式。 每种连接类型（DB/EXCEL/CSV）各一个实现类
  *   <li><b>加工</b>（{@link Operators} 的范畴）：filter/join/aggregate 全在 Java 完成， 与数据源类型无关。这使得跨源计算（如 MySQL
  *       表 JOIN CSV 文件）成为可能
  * </ul>
@@ -38,8 +39,8 @@ import com.codingapi.report.data.dataset.Dataset;
  * <p>新增一个数据源类型只需三步：
  *
  * <ol>
- *   <li>在 {@link DataSourceType} 枚举中新增值（如 {@code MONGO}）
- *   <li>实现本接口：{@code supports()} 返回 true 当 type == MONGO，{@code extract()} 实现具体读取逻辑
+ *   <li>在 {@link DataSourceKind} 中新增判别码（如 {@code MONGO}），并实现 {@link DataSourceType} 承载类型级配置
+ *   <li>实现本接口：{@code supports()} 返回 true 当 kind == MONGO，{@code extract()} 实现具体读取逻辑
  *   <li>注册到 {@link ReportRenderer} 的 extractors 列表中
  * </ol>
  *
@@ -48,11 +49,11 @@ import com.codingapi.report.data.dataset.Dataset;
 public interface DataExtractor {
 
     /**
-     * 是否支持指定的数据源类型。
+     * 是否支持指定的数据源类型（按 {@code DataSourceType.type()} 判别串匹配，如 {@code "DB"}）。
      *
      * <p>ReportRenderer 遍历 extractors 列表，调用此方法找到匹配的提取器。
      */
-    boolean supports(DataSourceType type);
+    boolean supports(String type);
 
     /**
      * 从数据源提取一个数据集的全部数据，返回规整的内存表。
@@ -62,4 +63,33 @@ public interface DataExtractor {
      * @return 内存表，列名为限定名 {@code datasetId.field}，值已按 DataType 归一化
      */
     RawTable extract(DataSource source, Dataset dataset);
+
+    // ============================================================
+    // 管理能力（连接测试 + 元数据探查）
+    // ============================================================
+    //
+    // 这些方法服务于"数据源管理"而非渲染：测试连接可达性、探查表/列元数据， 供建模界面选表、推断字段。提取器按能力实现——
+    // 文件类（CSV/EXCEL）通常无需探查（表即文件、列即表头），可不实现走默认抛异常； DB/API 类应实现。
+    // 用 default 方法而非另立 SPI，避免多接口装配；未实现的能力显式抛 UnsupportedOperationException，
+    // 不会静默放行（与本项目算子/聚合/函数的注册表范式一致）。
+
+    /**
+     * 测试连接是否可达且凭证有效。
+     *
+     * <p>不落库、不影响现有数据，仅建连 + 最小探测（如 {@code SELECT 1}）后立即关闭。 默认抛 {@link
+     * UnsupportedOperationException}，表示该提取器不支持连接测试（文件类无此概念）。
+     */
+    default TestResult test(DataSource source) {
+        throw new UnsupportedOperationException("提取器不支持连接测试");
+    }
+
+    /** 探查连接下可用的表/集合列表（DB/API 类实现）。 默认抛 {@link UnsupportedOperationException}。 */
+    default List<String> listTables(DataSource source) {
+        throw new UnsupportedOperationException("提取器不支持表探查");
+    }
+
+    /** 探查指定表的列元数据（DB/API 类实现）。 默认抛 {@link UnsupportedOperationException}。 */
+    default List<ColumnMeta> listColumns(DataSource source, String table) {
+        throw new UnsupportedOperationException("提取器不支持列探查");
+    }
 }

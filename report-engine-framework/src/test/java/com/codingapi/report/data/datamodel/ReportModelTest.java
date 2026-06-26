@@ -14,7 +14,7 @@ import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.data.dataset.Query;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.DataSourceType;
+import com.codingapi.report.data.datasource.type.DbDataSourceType;
 import com.codingapi.report.data.relation.JoinType;
 import com.codingapi.report.data.relation.RelationOrigin;
 import com.codingapi.report.data.relation.Relationship;
@@ -24,12 +24,12 @@ import com.codingapi.report.operator.condition.CompareOperator;
 import com.codingapi.report.operator.condition.Condition;
 import com.codingapi.report.param.ParamSource;
 import com.codingapi.report.param.Parameter;
-import com.codingapi.report.render.Report;
-import com.codingapi.report.render.grid.CellBinding;
-import com.codingapi.report.render.grid.CellRef;
-import com.codingapi.report.render.grid.ExpandMode;
-import com.codingapi.report.render.grid.Expansion;
-import com.codingapi.report.render.grid.LoopBlock;
+import com.codingapi.report.core.Report;
+import com.codingapi.report.core.grid.CellBinding;
+import com.codingapi.report.core.grid.CellRef;
+import com.codingapi.report.core.grid.ExpandMode;
+import com.codingapi.report.core.grid.Expansion;
+import com.codingapi.report.core.grid.LoopBlock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -88,8 +88,10 @@ class ReportModelTest {
         TableDataset right = (TableDataset) findDataset(hr, rel.getRight().datasetId());
         assertNotEquals(left.getDatasourceId(), right.getDatasourceId(), "薪资库与人事库是两个不同连接");
         // 两个连接都是 DB 类型（JDBC），不区分厂商
-        assertEquals(DataSourceType.DB, findDatasource(hr, left.getDatasourceId()).getType());
-        assertEquals(DataSourceType.DB, findDatasource(hr, right.getDatasourceId()).getType());
+        assertEquals(
+                "DB", findDatasource(hr, left.getDatasourceId()).getType().type());
+        assertEquals(
+                "DB", findDatasource(hr, right.getDatasourceId()).getType().type());
     }
 
     // ============================================================
@@ -250,14 +252,14 @@ class ReportModelTest {
     /** 人事数据模型：员工(人事库) + 薪资(薪资库) + 跨库关系。被部门报表与薪资条共享。 */
     private static DataModel hrDataModel() {
         DataSource hrDb =
-                DataSource.builder().id("ds_hr").name("人事库").type(DataSourceType.DB).build();
+                DataSource.builder().id("ds_hr").name("人事库").type(new DbDataSourceType(null, null)).build();
         DataSource payDb =
-                DataSource.builder().id("ds_pay").name("薪资库").type(DataSourceType.DB).build();
+                DataSource.builder().id("ds_pay").name("薪资库").type(new DbDataSourceType(null, null)).build();
 
         Dataset emp =
                 TableDataset.builder()
                         .id("d_emp")
-                        .datasourceId("ds_hr")
+                        .datasource(hrDb).datasourceId("ds_hr")
                         .sourceTable("employee")
                         .alias("员工")
                         .fields(
@@ -288,7 +290,7 @@ class ReportModelTest {
         Dataset salary =
                 TableDataset.builder()
                         .id("d_salary")
-                        .datasourceId("ds_pay")
+                        .datasource(payDb).datasourceId("ds_pay")
                         .sourceTable("salary")
                         .alias("薪资")
                         .fields(
@@ -322,7 +324,6 @@ class ReportModelTest {
         return DataModel.builder()
                 .id("dm_hr")
                 .name("人事数据模型")
-                .datasources(List.of(hrDb, payDb))
                 .datasets(List.of(emp, salary))
                 .relationships(List.of(rel))
                 .build();
@@ -331,11 +332,11 @@ class ReportModelTest {
     /** 教务数据模型：成绩宽表（单数据集，无需关系） */
     private static DataModel eduDataModel() {
         DataSource edu =
-                DataSource.builder().id("ds_edu").name("教务库").type(DataSourceType.DB).build();
+                DataSource.builder().id("ds_edu").name("教务库").type(new DbDataSourceType(null, null)).build();
         Dataset score =
                 TableDataset.builder()
                         .id("d_score")
-                        .datasourceId("ds_edu")
+                        .datasource(edu).datasourceId("ds_edu")
                         .sourceTable("score_view")
                         .alias("成绩")
                         .fields(
@@ -359,7 +360,6 @@ class ReportModelTest {
         return DataModel.builder()
                 .id("dm_edu")
                 .name("教务数据模型")
-                .datasources(List.of(edu))
                 .datasets(List.of(score))
                 .relationships(List.of())
                 .build();
@@ -368,11 +368,11 @@ class ReportModelTest {
     /** 统计数据模型：单位/部门/明细 宽表 */
     private static DataModel statDataModel() {
         DataSource db =
-                DataSource.builder().id("ds_stat").name("统计库").type(DataSourceType.DB).build();
+                DataSource.builder().id("ds_stat").name("统计库").type(new DbDataSourceType(null, null)).build();
         Dataset stat =
                 TableDataset.builder()
                         .id("d_stat")
-                        .datasourceId("ds_stat")
+                        .datasource(db).datasourceId("ds_stat")
                         .sourceTable("stat_view")
                         .alias("统计")
                         .fields(
@@ -401,7 +401,6 @@ class ReportModelTest {
         return DataModel.builder()
                 .id("dm_stat")
                 .name("统计数据模型")
-                .datasources(List.of(db))
                 .datasets(List.of(stat))
                 .relationships(List.of())
                 .build();
@@ -628,8 +627,13 @@ class ReportModelTest {
     }
 
     private static DataSource findDatasource(DataModel dm, String id) {
-        return dm.getDatasources().stream()
-                .filter(d -> d.getId().equals(id))
+        return dm.getDatasets().stream()
+                .filter(
+                        d ->
+                                d instanceof TableDataset t
+                                        && t.getDatasource() != null
+                                        && id.equals(t.getDatasource().getId()))
+                .map(d -> ((TableDataset) d).getDatasource())
                 .findFirst()
                 .orElseThrow();
     }

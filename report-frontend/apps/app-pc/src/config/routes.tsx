@@ -1,8 +1,9 @@
-import { HomeOutlined, TableOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, HomeOutlined, TableOutlined } from '@ant-design/icons';
 import HomePage from '@/pages/home';
 import ReportsPage from '@/pages/reports';
 import AppReport from '@/pages/engine';
 import AppPreview from '@/pages/preview';
+import DataModelsPage from '@/pages/datamodels';
 import React from 'react';
 
 export interface RouteConfig {
@@ -24,6 +25,12 @@ const routes: RouteConfig[] = [
     name: '报表管理',
     icon: <TableOutlined />,
     element: <ReportsPage />,
+  },
+  {
+    path: '/datamodels',
+    name: '数据模型',
+    icon: <DatabaseOutlined />,
+    element: <DataModelsPage />,
   },
   {
     path: '/engine',

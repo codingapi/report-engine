@@ -47,6 +47,7 @@ const AppPreview = () => {
         if (!active) return;
         if (config.name) setReportName(config.name);
         setPreviewConfig({
+          dataModelId: config.dataModelId,
           bindings: config.cellBindings as CellBinding[],
           loops: config.loopBlocks as LoopBlock[],
           summaries: config.summaries as SummaryRow[],

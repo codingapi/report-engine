@@ -1,11 +1,8 @@
 package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.config.ReportConfig;
-import com.codingapi.report.data.datamodel.DataModel;
-import com.codingapi.report.repository.PageQuery;
 import com.codingapi.report.repository.PageResult;
-import com.codingapi.report.repository.ReportRepository;
-import com.codingapi.report.starter.converter.DataModelDtoAssembler;
+import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.springboot.framework.dto.request.SearchRequest;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
@@ -22,54 +19,40 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 报表配置的保存 / 加载 / 列表 / 删除。
  *
- * <p>配置以强类型 {@link ReportConfig} 实体存取（name/cellBindings/loopBlocks/summaries/params/template +
- * 时间戳）， 打开报表时整体恢复前端状态。加载时附带数据模型信息（datasets + relationships）。
- *
- * <p>存储交给 {@link ReportRepository}（使用方提供实现）。
+ * <p>仅做 HTTP 编排，业务（CRUD + 富化）下沉 {@link ReportConfigService}。 存储交给 {@link
+ * com.codingapi.report.repository.ReportRepository}（使用方提供实现）。
  */
 @RestController
 @RequestMapping("/api/report")
 @ConditionalOnClass(RestController.class)
 public class ReportConfigController {
 
-    private final ReportRepository repository;
-    private final DataModel dataModel;
+    private final ReportConfigService reportConfigService;
 
-    public ReportConfigController(ReportRepository repository, DataModel dataModel) {
-        this.repository = repository;
-        this.dataModel = dataModel;
+    public ReportConfigController(ReportConfigService reportConfigService) {
+        this.reportConfigService = reportConfigService;
     }
 
-    /** 保存报表配置，返回报表 id。 */
     @PostMapping("/configs")
     public SingleResponse<String> save(@RequestBody ReportConfig config) {
-        return SingleResponse.of(repository.save(config));
+        return SingleResponse.of(reportConfigService.save(config));
     }
 
-    /** 加载指定报表的完整配置（附带数据模型信息）。 */
     @GetMapping("/configs/{id}")
     public SingleResponse<ReportConfig> get(@PathVariable String id) {
-        ReportConfig config = repository.find(id);
-        if (config == null) {
-            return SingleResponse.of(null);
-        }
-        config.setDataModel(DataModelDtoAssembler.assemble(dataModel));
-        return SingleResponse.of(config);
+        return SingleResponse.of(reportConfigService.get(id));
     }
 
-    /** 删除指定报表配置。 */
     @DeleteMapping("/configs/{id}")
     public SingleResponse<Void> delete(@PathVariable String id) {
-        repository.delete(id);
+        reportConfigService.delete(id);
         return SingleResponse.of(null);
     }
 
-    /** 报表列表（id + name + dataModelId + 时间戳），按 SearchRequest 分页。 */
     @GetMapping("/configs")
     public MultiResponse<ReportBrief> list(SearchRequest searchRequest) {
-        // Spring 入参 → framework 分页类型（接口本身不依赖 Spring）
-        PageQuery query = new PageQuery(searchRequest.getCurrent(), searchRequest.getPageSize());
-        PageResult<ReportConfig> result = repository.page(query);
+        PageResult<ReportConfig> result =
+                reportConfigService.page(searchRequest.getCurrent(), searchRequest.getPageSize());
         List<ReportBrief> briefs =
                 result.content().stream()
                         .map(
