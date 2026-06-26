@@ -1,6 +1,6 @@
 package com.example.report.config;
 
-import com.codingapi.report.config.ReportConfig;
+import com.codingapi.report.config.dto.ReportDTO;
 import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
 import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
 import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
@@ -173,8 +173,8 @@ public class ReportConfigBuilder {
 
     // ─── 构建 ───
 
-    public ReportConfig build() {
-        ReportConfig rc = new ReportConfig();
+    public ReportDTO build() {
+        ReportDTO rc = new ReportDTO();
         rc.setName(name);
         rc.setDataModelId("default");
         rc.setCellBindings(List.copyOf(bindings));

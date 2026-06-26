@@ -8,7 +8,8 @@ import static com.example.report.config.ReportConfigBuilder.fieldValue;
 import static com.example.report.config.ReportConfigBuilder.labelCell;
 import static com.example.report.config.ReportConfigBuilder.literal;
 
-import com.codingapi.report.config.ReportConfig;
+import com.codingapi.report.config.dto.ReportDTO;
+import com.codingapi.report.core.Report;
 import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
 import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
 import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
@@ -513,10 +514,10 @@ public class ReportTemplateSeeder {
     // 辅助
     // ============================================================
 
-    /** 保存配置并指定稳定 id（重启后不变）。 */
-    private void save(String id, ReportConfig config) {
+    /** 保存配置并指定稳定 id（重启后不变）。DTO → 领域 Report 入库。 */
+    private void save(String id, ReportDTO config) {
         config.setId(id);
-        repository.save(config);
+        repository.save(Report.fromDTO(config));
         count++;
     }
 }

@@ -1,10 +1,13 @@
 package com.codingapi.report.core;
 
-import com.codingapi.report.data.relation.Relationship;
-import com.codingapi.report.param.Parameter;
+import com.codingapi.report.config.dto.ReportDTO;
 import com.codingapi.report.core.grid.CellBinding;
 import com.codingapi.report.core.grid.LoopBlock;
 import com.codingapi.report.core.grid.SummaryRow;
+import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.relation.Relationship;
+import com.codingapi.report.excel.pojo.Workbook;
+import com.codingapi.report.param.Parameter;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
@@ -125,4 +128,34 @@ public class Report {
      * <p>例如"按单位分组"的员工报表，可以在每个单位结束后插入一行"XX单位小计"， 全表末尾插入一行"总计"。行位置随数据量自适应。
      */
     private List<SummaryRow> summaries;
+
+    /** 创建时间（epoch 毫秒）。 */
+    private long createTime;
+
+    /** 修改时间（epoch 毫秒）。 */
+    private long updateTime;
+
+    /** 模板画布快照（Univer/Excel 工作簿 POJO）；承载静态文本/样式/合并/行列尺寸。 */
+    private Workbook template;
+
+    /**
+     * 引用的数据模型（运行时解析填充，持久化只存 {@link #dataModelId}）。
+     *
+     * <p>对应 point 4「Report 引用 DataModel 而非 id」：取数/渲染时直接用解析后的模型，由服务层在加载时 set。
+     */
+    private DataModel dataModel;
+
+    // ============================================================
+    // 领域 ↔ DTO（委托 RenderDtoConverter，同包无需 import）
+    // ============================================================
+
+    /** 领域 → 出入站 DTO（前端展示用字段如 preview/param.id 不反向产出，由前端重建）。 */
+    public ReportDTO toDTO() {
+        return RenderDtoConverter.toDTO(this);
+    }
+
+    /** 出入站 DTO → 领域（构建 sealed {@code Value} 树等）。 */
+    public static Report fromDTO(ReportDTO dto) {
+        return RenderDtoConverter.fromDTO(dto);
+    }
 }

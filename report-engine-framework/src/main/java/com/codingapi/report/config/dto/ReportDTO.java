@@ -1,26 +1,25 @@
-package com.codingapi.report.config;
+package com.codingapi.report.config.dto;
 
 import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
 import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
 import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
-import com.codingapi.report.config.dto.ReportParam;
 import com.codingapi.report.excel.pojo.Workbook;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import lombok.Data;
 
 /**
- * 报表配置实体（持久化契约）：强类型 POJO，替代原 {@code Map<String,Object>} 存取。
+ * 报表出入站契约（GET 返回 / POST 保存）。纯 DTO——前端 JSON ↔ 领域 {@code core.Report}（经 {@code
+ * RenderDtoConverter.fromDTO/toDTO} 互转）。
  *
- * <p>字段包含报表元数据（id/name/dataModelId/createTime/updateTime）与配置内容
- * （cellBindings/loopBlocks/summaries/params/template）。配置内容引用 {@link ConfigDtos} 的 DTO record
- * （Jackson 可序列化，不依赖无注解的 {@code Value} sealed interface），便于落库 JSON。
+ * <p>{@code Value} 等 sealed interface 未加 Jackson 多态注解，故配置内容用 {@link ConfigDtos} 的 record 承接。 {@code
+ * dataModel} 为响应富化字段：仅 {@code GET /api/report/configs/{id}} 返回时由 starter 填充，不持久化（{@link
+ * JsonInclude.Include#NON_NULL} 省略空值）。
  *
- * <p>{@code dataModel} 为响应富化字段：仅 {@code GET /api/report/configs/{id}} 返回时由 starter 填充，
- * 不参与持久化（{@link JsonInclude.Include#NON_NULL} 省略空值）。
+ * <p>注意:前端展示用字段（{@code BindingDTO.preview}、{@code ReportParam.id} 等）不进领域对象、不持久化，由前端按需重建。
  */
 @Data
-public class ReportConfig {
+public class ReportDTO {
 
     private String id;
 

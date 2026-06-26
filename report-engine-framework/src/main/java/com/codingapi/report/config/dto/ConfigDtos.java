@@ -5,10 +5,10 @@ import java.util.List;
 /**
  * 报表配置的 DTO 契约容器（前端 JSON ↔ 这些 record ↔ framework 领域对象）。
  *
- * <p>{@code Value} 等 sealed interface 未加 Jackson 多态注解，故用这些 record 承接前端 JSON， 再由 starter 的 {@code
- * RenderDtoConverter} 转为 framework 领域对象。
+ * <p>{@code Value} 等 sealed interface 未加 Jackson 多态注解，故用这些 record 承接前端 JSON， 再由 framework 的 {@code
+ * com.codingapi.report.core.RenderDtoConverter} 与领域对象（{@code core.Report}）互转。
  *
- * <p>这些 record 同时是 {@code ReportConfig} 实体的字段类型（持久化契约）， 保证实体全字段强类型且 Jackson 可序列化（便于落库 JSON）。
+ * <p>这些 record 是 {@link ReportDTO} 的字段类型（出入站契约），全字段强类型且 Jackson 可序列化。
  */
 public final class ConfigDtos {
 
