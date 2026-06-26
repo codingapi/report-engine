@@ -1,8 +1,8 @@
 package com.codingapi.report.starter.controller;
 
+import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.dto.datamodel.DataModelDTO;
 import com.codingapi.report.dto.datamodel.RelationshipDTO;
-import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;

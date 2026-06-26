@@ -1,13 +1,13 @@
 package com.codingapi.report.starter.service;
 
-import com.codingapi.report.dto.datamodel.DataModelDTO;
-import com.codingapi.report.dto.datamodel.DataSourceDTO;
-import com.codingapi.report.dto.datamodel.RelationshipDTO;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.credential.CredentialService;
+import com.codingapi.report.dto.datamodel.DataModelDTO;
+import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.dto.datamodel.RelationshipDTO;
 import com.codingapi.report.repository.DataModelRepository;
 import com.codingapi.report.repository.PageQuery;
 import com.codingapi.report.repository.PageResult;
@@ -21,8 +21,8 @@ import java.util.Map;
 /**
  * 数据模型业务：CRUD + 凭证（出口脱敏 / *** 回填）+ 数据集列表视图。
  *
- * <p>仓库以领域 {@link DataModel} 存取（{@code config} 明文，落盘加密交仓库实现）。出入站用 {@link DataModelDTO}：
- * {@link DataModel#toDTO()} / {@link DataModel#fromDTO} 互转，敏感字段仅在出口 {@link #getMasked} 脱敏。
+ * <p>仓库以领域 {@link DataModel} 存取（{@code config} 明文，落盘加密交仓库实现）。出入站用 {@link DataModelDTO}： {@link
+ * DataModel#toDTO()} / {@link DataModel#fromDTO} 互转，敏感字段仅在出口 {@link #getMasked} 脱敏。
  */
 public class DataModelService {
 
@@ -48,8 +48,7 @@ public class DataModelService {
     /** 新建/更新：{@code ***} 凭证回填旧值（明文存储，落盘加密交仓库实现）。 */
     public String save(DataModelDTO dto) {
         DataModel incoming = DataModel.fromDTO(dto);
-        DataModel old =
-                dto.id() != null && !dto.id().isBlank() ? repository.find(dto.id()) : null;
+        DataModel old = dto.id() != null && !dto.id().isBlank() ? repository.find(dto.id()) : null;
         mergeMaskedCredentials(incoming, old);
         return repository.save(incoming);
     }
@@ -105,7 +104,9 @@ public class DataModelService {
                             .toList();
             String type =
                     tds.getDatasource() != null ? tds.getDatasource().getType().type() : "CSV";
-            out.add(new DatasetDTO(tds.getId(), tds.getAlias(), tds.getDatasourceId(), type, fields));
+            out.add(
+                    new DatasetDTO(
+                            tds.getId(), tds.getAlias(), tds.getDatasourceId(), type, fields));
         }
         return out;
     }

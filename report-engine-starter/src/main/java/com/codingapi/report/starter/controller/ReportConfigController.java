@@ -1,7 +1,7 @@
 package com.codingapi.report.starter.controller;
 
-import com.codingapi.report.dto.report.ReportDTO;
 import com.codingapi.report.core.Report;
+import com.codingapi.report.dto.report.ReportDTO;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.springboot.framework.dto.request.SearchRequest;

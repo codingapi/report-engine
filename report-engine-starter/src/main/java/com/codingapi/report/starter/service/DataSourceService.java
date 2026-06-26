@@ -1,15 +1,15 @@
 package com.codingapi.report.starter.service;
 
-import com.codingapi.report.dto.datamodel.DataSourceDTO;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
-import com.codingapi.report.data.datasource.type.DataSourceType;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
+import com.codingapi.report.data.datasource.type.DataSourceType;
+import com.codingapi.report.dto.datamodel.DataSourceDTO;
 import com.codingapi.report.starter.dto.DatasetDtos.PreviewDTO;
 import java.util.LinkedHashMap;
 import java.util.List;
