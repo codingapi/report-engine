@@ -1,0 +1,241 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  App as AntdApp,
+  Button,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import type { DataModelBrief, DataModelSaveDTO } from '@coding-report/report-api';
+
+const { Title } = Typography;
+
+const PAGE_SIZE = 10;
+
+const STATUS_LABELS: Record<string, { text: string; color: string }> = {
+  DRAFT: { text: '草稿', color: 'default' },
+};
+
+/**
+ * 数据模型列表页对外依赖的服务注入（app-pc 用 report-api 实现）。
+ * 组件本身不直接调 API，保持纯 UI 可复用。
+ */
+export interface DataModelService {
+  /** 分页列表 */
+  list: (current: number, pageSize: number) => Promise<{
+    list: DataModelBrief[];
+    total: number;
+  }>;
+  /** 新建/更新（含 id 更新，不含新建），返回 id */
+  save: (dto: DataModelSaveDTO) => Promise<string>;
+  /** 删除 */
+  remove: (id: string) => Promise<void>;
+}
+
+export interface DataModelListPageProps {
+  service: DataModelService;
+  /** 进入设计页的回调（行内「设计」与新建成功后触发），由消费方注入路由跳转 */
+  onOpenDesign: (id: string) => void;
+  pageSize?: number;
+}
+
+interface CreateForm {
+  name: string;
+}
+
+const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
+
+const renderStatus = (status?: string) => {
+  if (!status) return <Tag>未知</Tag>;
+  const cfg = STATUS_LABELS[status];
+  if (cfg) return <Tag color={cfg.color}>{cfg.text}</Tag>;
+  return <Tag>{status}</Tag>;
+};
+
+export default function DataModelListPage({
+  service,
+  onOpenDesign,
+  pageSize = PAGE_SIZE,
+}: DataModelListPageProps) {
+  const { message } = AntdApp.useApp();
+  const [list, setList] = useState<DataModelBrief[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm<CreateForm>();
+
+  const refresh = useCallback(
+    async (targetPage = page) => {
+      setLoading(true);
+      try {
+        const res = await service.list(targetPage, pageSize);
+        setList(res.list);
+        setTotal(res.total);
+      } catch (e) {
+        message.error(`加载数据模型列表失败: ${(e as Error).message}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, pageSize, service, message],
+  );
+
+  useEffect(() => {
+    refresh(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onPageChange = (next: number) => {
+    setPage(next);
+    refresh(next);
+  };
+
+  const openCreate = () => {
+    form.resetFields();
+    setCreateOpen(true);
+  };
+
+  const handleCreate = async () => {
+    try {
+      const values = await form.validateFields();
+      setCreating(true);
+      const id = await service.save({ name: values.name });
+      message.success('数据模型已创建');
+      setCreateOpen(false);
+      form.resetFields();
+      onOpenDesign(id);
+    } catch (e) {
+      if (e instanceof Error) {
+        message.error(`创建数据模型失败: ${e.message}`);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await service.remove(id);
+      message.success('数据模型已删除');
+      const remaining = list.length - 1;
+      const targetPage = remaining === 0 && page > 1 ? page - 1 : page;
+      setPage(targetPage);
+      await refresh(targetPage);
+    } catch (e) {
+      message.error(`删除数据模型失败: ${(e as Error).message}`);
+    }
+  };
+
+  const columns: ColumnsType<DataModelBrief> = useMemo(
+    () => [
+      { title: '名称', dataIndex: 'name', key: 'name' },
+      {
+        title: '状态',
+        key: 'status',
+        width: 120,
+        render: (_, r) => renderStatus(r.status),
+      },
+      {
+        title: '创建时间',
+        key: 'createTime',
+        width: 180,
+        render: (_, r) => formatTime(r.createTime),
+      },
+      {
+        title: '更新时间',
+        key: 'updateTime',
+        width: 180,
+        render: (_, r) => formatTime(r.updateTime),
+      },
+      {
+        title: '操作',
+        key: 'actions',
+        width: 180,
+        render: (_, r) => (
+          <Space size="middle">
+            <a onClick={() => onOpenDesign(r.id)}>设计</a>
+            <Popconfirm
+              title="确认删除该数据模型？"
+              onConfirm={() => handleDelete(r.id)}
+              okText="删除"
+              cancelText="取消"
+            >
+              <a style={{ color: '#ff4d4f' }}>删除</a>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [list, page, onOpenDesign],
+  );
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          数据模型管理
+        </Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          新建数据模型
+        </Button>
+      </div>
+
+      <Table<DataModelBrief>
+        rowKey="id"
+        columns={columns}
+        dataSource={list}
+        loading={loading}
+        locale={{
+          emptyText: <Empty description="暂无数据模型，点右上「新建数据模型」开始" />,
+        }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: false,
+          showTotal: (t) => `共 ${t} 条`,
+          onChange: onPageChange,
+        }}
+      />
+
+      <Modal
+        title="新建数据模型"
+        open={createOpen}
+        onOk={handleCreate}
+        onCancel={() => setCreateOpen(false)}
+        confirmLoading={creating}
+        okText="创建"
+        cancelText="取消"
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="name"
+            label="名称"
+            rules={[{ required: true, message: '请输入数据模型名称' }]}
+          >
+            <Input placeholder="如 销售明细模型" onPressEnter={handleCreate} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}

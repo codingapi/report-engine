@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from '@rstest/core';
 import http from '../src/http';
 import {
   listDataModelBriefs,
+  listDataModelsPage,
   getDataModel,
   createDataModel,
   updateDataModel,
@@ -45,7 +46,7 @@ describe('datasource api', () => {
   });
 
   it('createDataModel POST /datamodels 并返回 id', async () => {
-    const payload = { datasets: [], relationships: [] };
+    const payload = { name: '销售模型', datasets: [], relationships: [] };
     mockedHttp.post.mockResolvedValueOnce({ data: 'dm-new' } as never);
     const id = await createDataModel(payload);
     expect(mockedHttp.post).toHaveBeenCalledWith('/datamodels', payload);
@@ -53,11 +54,23 @@ describe('datasource api', () => {
   });
 
   it('updateDataModel PUT /datamodels/{id} 并返回 id', async () => {
-    const payload = { datasets: [], relationships: [] };
+    const payload = { name: '销售模型', datasets: [], relationships: [] };
     mockedHttp.put.mockResolvedValueOnce({ data: 'dm1' } as never);
     const id = await updateDataModel('dm1', payload);
     expect(mockedHttp.put).toHaveBeenCalledWith('/datamodels/dm1', payload);
     expect(id).toBe('dm1');
+  });
+
+  it('listDataModelsPage 传分页参数并返回 list+total', async () => {
+    mockedHttp.get.mockResolvedValueOnce({
+      data: { total: 2, list: [{ id: 'dm1', name: 'A' }, { id: 'dm2', name: 'B' }] },
+    } as never);
+    const r = await listDataModelsPage(2, 5);
+    expect(mockedHttp.get).toHaveBeenCalledWith('/datamodels', {
+      params: { current: 2, pageSize: 5 },
+    });
+    expect(r.total).toBe(2);
+    expect(r.list).toHaveLength(2);
   });
 
   it('deleteDataModel DELETE /datamodels/{id}', async () => {
