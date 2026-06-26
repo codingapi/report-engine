@@ -12,6 +12,11 @@ export { default as ConnectionForm } from './components/datasource/connection-fo
 export { default as ExploreTree } from './components/datasource/explore-tree';
 export { default as DatasetManager } from './components/datasource/dataset-manager';
 export { default as RelationEditor } from './components/datasource/relation-editor';
+export { default as DataSourceTypeManager } from './components/datasource/datasource-type-manager';
+export type {
+  DataSourceTypeService,
+  DataSourceTypeManagerProps,
+} from './components/datasource/datasource-type-manager';
 export { useDatasource } from './hooks/use-datasource';
 export { useExplore } from './hooks/use-explore';
 

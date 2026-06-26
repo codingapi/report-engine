@@ -48,3 +48,16 @@ export {
   exploreColumns,
 } from './datasource';
 export type { TestResult, ColumnMeta, DataSourceTestRequest } from './datasource';
+export {
+  listDataSourceTypes,
+  getDataSourceType,
+  saveDataSourceType,
+  deleteDataSourceType,
+  uploadDriverJar,
+} from './datasource-type';
+export type {
+  DataSourceTypeBrief,
+  DataSourceTypeDTO,
+  DriverJarUploadResult,
+  DataSourceTypePage,
+} from './datasource-type';
