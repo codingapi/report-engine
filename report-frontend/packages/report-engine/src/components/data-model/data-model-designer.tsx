@@ -10,6 +10,7 @@ import type {
   RelationshipInfo,
 } from '@coding-report/report-api';
 import DatasetTab from './dataset-tab';
+import UnionEditor from './union-editor';
 
 const { Title } = Typography;
 
@@ -52,11 +53,6 @@ export interface DataModelDesignerProps {
   dataModelId: string;
   service: DataModelDesignerService;
 }
-
-const unionColumns: ColumnsType<DataModelDataset> = [
-  { title: '别名', dataIndex: 'alias', key: 'alias' },
-  { title: '成员数', key: 'memberCount', width: 100 },
-];
 
 const relationshipColumns: ColumnsType<RelationshipInfo> = [
   {
@@ -185,12 +181,9 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
             key: 'unions',
             label: '数据合集',
             children: (
-              <Table<DataModelDataset>
-                rowKey="id"
-                size="small"
-                columns={unionColumns}
-                dataSource={[]}
-                pagination={false}
+              <UnionEditor
+                datasets={model.datasets}
+                onChange={handleDatasetsChange}
               />
             ),
           },
