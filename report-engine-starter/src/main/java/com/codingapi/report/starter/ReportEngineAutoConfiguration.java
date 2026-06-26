@@ -19,6 +19,7 @@ import com.codingapi.report.starter.properties.ReportProperties;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.report.starter.service.DataSourceService;
 import com.codingapi.report.starter.service.DataSourceTypeService;
+import com.codingapi.report.starter.service.DriverLoader;
 import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.report.starter.service.ReportRenderService;
 import java.io.IOException;
@@ -102,6 +103,13 @@ public class ReportEngineAutoConfiguration {
         public DataSourceTypeService dataSourceTypeService(
                 DataSourceTypeRepository repository, ReportProperties properties) {
             return new DataSourceTypeService(repository, properties);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DriverLoader driverLoader(
+                DataSourceTypeRepository repository, ReportProperties properties) {
+            return new DriverLoader(repository, properties);
         }
 
         // ─── Controller 层 ────────────────────────────────
