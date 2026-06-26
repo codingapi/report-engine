@@ -1,6 +1,6 @@
 package com.codingapi.report.starter.controller;
 
-import com.codingapi.report.config.dto.DataModelDtos.DataSourceDTO;
+import com.codingapi.report.dto.datamodel.DataSourceDTO;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.TestResult;
 import com.codingapi.report.starter.service.DataSourceService;

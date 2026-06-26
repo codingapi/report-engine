@@ -5,9 +5,9 @@ import type {
   CellBinding,
   LoopBlock,
   SummaryRow,
-  ReportParam,
+  ParamDTO,
   Dataset,
-  ReportConfig,
+  ReportDTO,
   ReportEngineProps,
 } from '@/types';
 import { valueDisplayText, templateToString } from '@/value-text';
@@ -20,7 +20,7 @@ export interface UseReportIOOptions {
   cellBindings: CellBinding[];
   loopBlocks: LoopBlock[];
   summaries: SummaryRow[];
-  params: ReportParam[];
+  params: ParamDTO[];
   reportId: string | null;
   reportName: string;
   onReportIdChange: (id: string) => void;
@@ -143,7 +143,7 @@ export function useReportIO(opts: UseReportIOOptions) {
       };
 
       // displayText 是设计态 transient 字段（回声判别/显示用），不持久化 → 保存前剥离
-      const config: ReportConfig = {
+      const config: ReportDTO = {
         id: reportId ?? undefined,
         name: reportName,
         dataModelId,

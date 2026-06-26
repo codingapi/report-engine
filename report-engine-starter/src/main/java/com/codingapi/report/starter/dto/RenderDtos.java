@@ -1,8 +1,8 @@
 package com.codingapi.report.starter.dto;
 
-import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
-import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
+import com.codingapi.report.dto.report.BindingDTO;
+import com.codingapi.report.dto.report.LoopBlockDTO;
+import com.codingapi.report.dto.report.SummaryRowDTO;
 import com.codingapi.report.excel.pojo.Workbook;
 import java.util.List;
 import java.util.Map;
@@ -10,9 +10,9 @@ import java.util.Map;
 /**
  * 渲染请求/响应的 DTO 契约（前端 JSON ↔ 这些 DTO ↔ framework 领域对象）。
  *
- * <p>单元格绑定 / 循环块 / 汇总行的 DTO record 已上提到 framework {@code
- * com.codingapi.report.config.dto.ConfigDtos}（同时作为 {@code ReportConfig} 实体的持久化契约）， 本类保留渲染请求 {@link
- * RenderRequest} 与渲染响应（预览结果 / 反查请求与结果）。
+ * <p>单元格绑定 / 循环块 / 汇总行的 DTO record 在 framework {@code com.codingapi.report.dto.report} 包
+ * （与领域 {@code core.Report} 经 {@code RenderDtoConverter} 互转），本类保留渲染请求 {@link RenderRequest} 与渲染响应（预览结果 /
+ * 反查请求与结果）。
  */
 public final class RenderDtos {
 

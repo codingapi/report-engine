@@ -33,7 +33,6 @@ build/
 .vscode/
 
 ### miss ###
+.fonts
 .DS_Store
 .codegraph
-.fontsreport-frontend/packages/*/dist
-report-frontend/packages/*/node_modules

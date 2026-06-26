@@ -11,7 +11,6 @@
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
     "@coding-report/report-api": "workspace:*",
-    "@coding-report/report-datasource": "workspace:*",
     "@coding-report/report-engine": "workspace:*",
     "@univerjs/core": "^0.25.0",
     "@univerjs/design": "^0.25.0",

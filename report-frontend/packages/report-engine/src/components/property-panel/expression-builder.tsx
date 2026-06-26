@@ -6,7 +6,7 @@ import type {
   ReportValue,
   Dataset,
   LoopBlock,
-  ReportParam,
+  ParamDTO,
   ExpressionCatalog,
   FunctionMeta,
 } from '@/types';
@@ -18,7 +18,7 @@ interface ExpressionBuilderProps {
   value: ReportValue;
   datasets: Dataset[];
   loopBlocks: LoopBlock[];
-  params?: ReportParam[];
+  params?: ParamDTO[];
   functions?: ExpressionCatalog;
   onChange: (value: ReportValue) => void;
 }

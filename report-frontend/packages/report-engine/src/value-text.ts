@@ -6,13 +6,13 @@
  * 2. Template 值的可逆编辑：parts 结构 ↔ `${...}` 文本字符串
  */
 
-import type { ReportValue, Dataset, LoopBlock, ReportParam } from './types';
+import type { ReportValue, Dataset, LoopBlock, ParamDTO } from './types';
 import { findField, findDataset } from './types';
 
 // ─── 参数名 → 别名 ───────────────────────────
 
 /** 参数名 → 别名（找不到回退参数名） */
-function paramLabel(name: string | undefined, params: ReportParam[]): string {
+function paramLabel(name: string | undefined, params: ParamDTO[]): string {
   if (!name) return '';
   const p = params.find((pp) => pp.name === name);
   return p?.alias || name;
@@ -63,7 +63,7 @@ function exprToDisplay(
   v: ReportValue,
   datasets: Dataset[],
   loopBlocks: LoopBlock[],
-  params: ReportParam[] = [],
+  params: ParamDTO[] = [],
 ): string {
   switch (v.type) {
     case 'Literal':
@@ -95,7 +95,7 @@ export function valueDisplayText(
   value: ReportValue,
   datasets: Dataset[],
   loopBlocks: LoopBlock[] = [],
-  params: ReportParam[] = [],
+  params: ParamDTO[] = [],
 ): string {
   if (value.type === 'Literal') return value.payload || '';
   if (value.type === 'Template') {

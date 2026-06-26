@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.codingapi.report.config.dto.DataModelDtos.DataModelDTO;
+import com.codingapi.report.dto.datamodel.DataModelDTO;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;

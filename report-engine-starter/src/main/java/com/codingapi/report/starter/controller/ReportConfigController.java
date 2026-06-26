@@ -1,6 +1,7 @@
 package com.codingapi.report.starter.controller;
 
-import com.codingapi.report.config.ReportConfig;
+import com.codingapi.report.dto.report.ReportDTO;
+import com.codingapi.report.core.Report;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.springboot.framework.dto.request.SearchRequest;
@@ -34,12 +35,12 @@ public class ReportConfigController {
     }
 
     @PostMapping("/configs")
-    public SingleResponse<String> save(@RequestBody ReportConfig config) {
+    public SingleResponse<String> save(@RequestBody ReportDTO config) {
         return SingleResponse.of(reportConfigService.save(config));
     }
 
     @GetMapping("/configs/{id}")
-    public SingleResponse<ReportConfig> get(@PathVariable String id) {
+    public SingleResponse<ReportDTO> get(@PathVariable String id) {
         return SingleResponse.of(reportConfigService.get(id));
     }
 
@@ -51,7 +52,7 @@ public class ReportConfigController {
 
     @GetMapping("/configs")
     public MultiResponse<ReportBrief> list(SearchRequest searchRequest) {
-        PageResult<ReportConfig> result =
+        PageResult<Report> result =
                 reportConfigService.page(searchRequest.getCurrent(), searchRequest.getPageSize());
         List<ReportBrief> briefs =
                 result.content().stream()

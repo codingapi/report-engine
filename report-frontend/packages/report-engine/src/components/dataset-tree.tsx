@@ -18,11 +18,9 @@ interface FieldDragData {
 // ─── 数据源类型标签 ──────────────────────────────────────
 
 const SOURCE_COLORS: Record<DataSourceType, string> = {
-  CSV: 'green',
-  JSON: 'orange',
   DB: 'blue',
-  API: 'purple',
   EXCEL: 'cyan',
+  CSV: 'green',
 };
 
 function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
