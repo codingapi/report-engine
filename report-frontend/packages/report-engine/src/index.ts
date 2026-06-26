@@ -32,6 +32,14 @@ export type {
   DataModelListPageProps,
 } from './components/data-model/data-model-list';
 
+// 数据模型设计页
+export { default as DataModelDesigner } from './components/data-model/data-model-designer';
+export type {
+  DataModelDTO,
+  DataModelDesignerService,
+  DataModelDesignerProps,
+} from './components/data-model/data-model-designer';
+
 export { useReportPreview } from './hooks/use-report-preview';
 export type { UseReportPreviewOptions } from './hooks/use-report-preview';
 
