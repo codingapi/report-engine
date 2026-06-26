@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { App as AntdApp, Button, Spin, Tabs, Table, Typography, Space } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { App as AntdApp, Button, Spin, Tabs, Typography, Space } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
 import type {
   DataModelDataset,
   DataModelSource,
@@ -9,8 +8,10 @@ import type {
   IntrospectedTable,
   RelationshipInfo,
 } from '@coding-report/report-api';
+import type { Relationship } from '@/types';
 import DatasetTab from './dataset-tab';
 import UnionEditor from './union-editor';
+import RelationTab from './relation-tab';
 
 const { Title } = Typography;
 
@@ -54,19 +55,15 @@ export interface DataModelDesignerProps {
   service: DataModelDesignerService;
 }
 
-const relationshipColumns: ColumnsType<RelationshipInfo> = [
-  {
-    title: '左字段',
-    key: 'left',
-    render: (_v, r) => `${r.left.datasetId}.${r.left.field}`,
-  },
-  { title: 'JOIN', dataIndex: 'joinType', key: 'joinType', width: 80 },
-  {
-    title: '右字段',
-    key: 'right',
-    render: (_v, r) => `${r.right.datasetId}.${r.right.field}`,
-  },
-];
+/** RelationshipInfo（无 id）→ Relationship（带 id，编辑期稳定 rowKey 用），保存时再剥离 */
+function withLocalIds(list: RelationshipInfo[]): Relationship[] {
+  return list.map((r, i) => ({ ...r, id: `rel-${i}` }));
+}
+
+/** Relationship → RelationshipInfo（剥离 id，对齐后端 DTO） */
+function stripIds(list: Relationship[]): RelationshipInfo[] {
+  return list.map(({ id: _id, ...rest }) => rest);
+}
 
 const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
 
@@ -107,6 +104,18 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
   const handleDatasetsChange = useCallback((datasets: DataModelDataset[]) => {
     setModel((prev) => (prev ? { ...prev, datasets } : prev));
   }, []);
+
+  const editingRelationships = useMemo(
+    () => (model ? withLocalIds(model.relationships) : []),
+    [model?.relationships],
+  );
+
+  const handleRelationshipsChange = useCallback(
+    (next: Relationship[]) => {
+      setModel((prev) => (prev ? { ...prev, relationships: stripIds(next) } : prev));
+    },
+    [],
+  );
 
   const handleSave = useCallback(async () => {
     if (!model) return;
@@ -191,14 +200,10 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
             key: 'relations',
             label: '关系',
             children: (
-              <Table<RelationshipInfo>
-                rowKey={(r) =>
-                  `${r.left.datasetId}.${r.left.field}-${r.right.datasetId}.${r.right.field}`
-                }
-                size="small"
-                columns={relationshipColumns}
-                dataSource={[]}
-                pagination={false}
+              <RelationTab
+                datasets={model.datasets}
+                relationships={editingRelationships}
+                onChange={handleRelationshipsChange}
               />
             ),
           },

@@ -302,9 +302,16 @@ export interface DatasetManagerProps {
   onChange?: (datasets: DatasetDef[]) => void;
 }
 
+/** 关系编辑用的最小数据集形状（id/alias/fields），兼容 DatasetDef 与 DataModelDataset */
+export interface RelationDataset {
+  id: string;
+  alias?: string;
+  fields: Array<{ name: string; alias?: string }>;
+}
+
 export interface RelationEditorProps {
   /** 数据集列表（关系引用其中的 id/alias） */
-  datasets: DatasetDef[];
+  datasets: RelationDataset[];
   /** 已有关系列表 */
   relationships: Relationship[];
   /** 关系变更回调 */

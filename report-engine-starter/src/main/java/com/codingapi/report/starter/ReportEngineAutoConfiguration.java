@@ -74,8 +74,10 @@ public class ReportEngineAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public DataModelService dataModelService(
-                DataModelRepository dataModelRepository, CredentialService credentials) {
-            return new DataModelService(dataModelRepository, credentials);
+                DataModelRepository dataModelRepository,
+                DataSourceRepository dataSourceRepository,
+                CredentialService credentials) {
+            return new DataModelService(dataModelRepository, dataSourceRepository, credentials);
         }
 
         @Bean

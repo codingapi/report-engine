@@ -91,6 +91,7 @@ export type {
   ExploreTreeProps,
   DatasetManagerProps,
   RelationEditorProps,
+  RelationDataset,
   // 参数域
   ParamDTO,
   // 渲染域
