@@ -125,6 +125,7 @@ public class DataModelService {
                                                 s.id(),
                                                 s.name(),
                                                 s.type(),
+                                                s.typeConfigId(),
                                                 credentials.maskConfig(s.config())))
                         .toList();
         return new DataModelDTO(
