@@ -1,8 +1,8 @@
 package com.codingapi.report.starter.service;
 
-import com.codingapi.report.config.dto.DataModelDtos.DataModelDTO;
-import com.codingapi.report.config.dto.DataModelDtos.DataSourceDTO;
-import com.codingapi.report.config.dto.DataModelDtos.RelationshipDTO;
+import com.codingapi.report.dto.datamodel.DataModelDTO;
+import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.dto.datamodel.RelationshipDTO;
 import com.codingapi.report.data.datamodel.DataModel;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;

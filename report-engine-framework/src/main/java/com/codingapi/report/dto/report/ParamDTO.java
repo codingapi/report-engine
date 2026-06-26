@@ -1,4 +1,4 @@
-package com.codingapi.report.config.dto;
+package com.codingapi.report.dto.report;
 
 import lombok.Data;
 
@@ -9,7 +9,7 @@ import lombok.Data;
  * sealed （后者无 Jackson 注解，不便于持久化）。dataType 用 String 存储枚举名。
  */
 @Data
-public class ReportParam {
+public class ParamDTO {
 
     private String id;
 

@@ -1,12 +1,12 @@
 package com.codingapi.report.data.datamodel;
 
-import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
-import com.codingapi.report.config.dto.DataModelDtos.DataModelDTO;
-import com.codingapi.report.config.dto.DataModelDtos.DataSourceDTO;
-import com.codingapi.report.config.dto.DataModelDtos.DatasetDTO;
-import com.codingapi.report.config.dto.DataModelDtos.FieldDTO;
-import com.codingapi.report.config.dto.DataModelDtos.RelationshipDTO;
-import com.codingapi.report.config.dto.DataModelDtos.UnionMemberDTO;
+import com.codingapi.report.dto.report.FieldRefDTO;
+import com.codingapi.report.dto.datamodel.DataModelDTO;
+import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.dto.datamodel.DatasetDTO;
+import com.codingapi.report.dto.datamodel.FieldDTO;
+import com.codingapi.report.dto.datamodel.RelationshipDTO;
+import com.codingapi.report.dto.datamodel.UnionMemberDTO;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.Field;

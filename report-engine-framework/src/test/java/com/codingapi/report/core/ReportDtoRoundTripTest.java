@@ -4,14 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
-import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryCellDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
-import com.codingapi.report.config.dto.ReportDTO;
-import com.codingapi.report.config.dto.ReportParam;
+import com.codingapi.report.dto.report.BindingDTO;
+import com.codingapi.report.dto.report.ConditionDTO;
+import com.codingapi.report.dto.report.PartDTO;
+import com.codingapi.report.dto.report.SummaryCellDTO;
+import com.codingapi.report.dto.report.SummaryRowDTO;
+import com.codingapi.report.dto.report.ValueDTO;
+import com.codingapi.report.dto.report.ReportDTO;
+import com.codingapi.report.dto.report.ParamDTO;
 import com.codingapi.report.core.grid.CellBinding;
 import com.codingapi.report.expression.Value;
 import java.util.List;
@@ -99,7 +99,7 @@ class ReportDtoRoundTripTest {
                                         "d")),
                         0);
 
-        ReportParam param = new ReportParam();
+        ParamDTO param = new ParamDTO();
         param.setId("p1");
         param.setName("deptId");
         param.setAlias("部门");
@@ -151,7 +151,7 @@ class ReportDtoRoundTripTest {
         assertEquals("d", s.cells().get(0).drillView());
 
         // 参数（语义保真；id 前端字段不持久化）
-        ReportParam rp = back.getParams().get(0);
+        ParamDTO rp = back.getParams().get(0);
         assertEquals("deptId", rp.getName());
         assertEquals("部门", rp.getAlias());
         assertEquals("NUMBER", rp.getDataType());

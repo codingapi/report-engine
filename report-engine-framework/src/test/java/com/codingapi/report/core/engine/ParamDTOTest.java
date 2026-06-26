@@ -49,7 +49,7 @@ import org.junit.jupiter.api.Test;
  *
  * 文件输出到 {@code target/reports/param-*.xlsx}。
  */
-class ReportParamTest {
+class ParamDTOTest {
 
     private final ReportRenderer renderer = new ReportRenderer(List.of(new CsvDataExtractor()));
 

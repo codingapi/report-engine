@@ -227,7 +227,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - `ReportConfig` 实体在 **framework**（`com.codingapi.report.config`）：强类型 POJO，`id/name/dataModelId/createTime/updateTime`（long 时间戳）+ `cellBindings/loopBlocks/summaries/params/template`（引用 DTO record）+ `dataModel`（响应富化字段，`@JsonInclude NON_NULL`，仅 GET 返回不持久化）。example 的 `InMemoryReportRepository` 在 save 时设时间戳、null 列表归一空。
 - Spring 类型仅存在于 starter 的 `ReportConfigController` 边界：入参 `SearchRequest` → `PageQuery`，返回 `PageResult` → `MultiResponse`，转换在 Controller 内完成。
 
-**DTO 契约层**（DTO record 在 **framework** `com.codingapi.report.config.dto.ConfigDtos`，转换在 starter `RenderDtoConverter`）：
+**DTO 契约层**（DTO record 在 **framework** `com.codingapi.report.dto.ReportDtos`，转换在 starter `RenderDtoConverter`）：
 - DTO record（`BindingDTO`/`ValueDTO`/`LoopBlockDTO`/`SummaryRowDTO`/`SummaryCellDTO`/`ConditionDTO`/`PartDTO`/`SourceDTO`/`FieldRefDTO`）同时是 `ReportConfig` 实体的持久化字段类型 + 前端 JSON 契约。
 - 前端 JSON → DTO record（Jackson）→ framework 领域对象（`CellBinding`/`Value`/`LoopBlock`/`SummaryRow`）由 `RenderDtoConverter` 转换。
 - `Value` 等 sealed interface **未加 Jackson 多态注解**，故用 DTO 中间层而非直接反序列化；`RenderDtos` 仅剩 `RenderRequest`（渲染请求，`params` 为运行时值 Map，与实体的 `params` 定义不同）。

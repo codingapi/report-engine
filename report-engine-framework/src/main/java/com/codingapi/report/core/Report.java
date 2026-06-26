@@ -1,6 +1,6 @@
 package com.codingapi.report.core;
 
-import com.codingapi.report.config.dto.ReportDTO;
+import com.codingapi.report.dto.report.ReportDTO;
 import com.codingapi.report.core.grid.CellBinding;
 import com.codingapi.report.core.grid.LoopBlock;
 import com.codingapi.report.core.grid.SummaryRow;

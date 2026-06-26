@@ -1,14 +1,14 @@
 package com.example.report.config;
 
-import com.codingapi.report.config.dto.ReportDTO;
-import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
-import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
-import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
-import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryCellDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
+import com.codingapi.report.dto.report.ReportDTO;
+import com.codingapi.report.dto.report.BindingDTO;
+import com.codingapi.report.dto.report.ConditionDTO;
+import com.codingapi.report.dto.report.FieldRefDTO;
+import com.codingapi.report.dto.report.LoopBlockDTO;
+import com.codingapi.report.dto.report.PartDTO;
+import com.codingapi.report.dto.report.SummaryCellDTO;
+import com.codingapi.report.dto.report.SummaryRowDTO;
+import com.codingapi.report.dto.report.ValueDTO;
 import com.codingapi.report.excel.CellRefs;
 import com.codingapi.report.excel.pojo.Cell;
 import com.codingapi.report.excel.pojo.Sheet;

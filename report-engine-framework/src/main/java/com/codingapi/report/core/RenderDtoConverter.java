@@ -1,16 +1,16 @@
 package com.codingapi.report.core;
 
-import com.codingapi.report.config.dto.ConfigDtos.BindingDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ConditionDTO;
-import com.codingapi.report.config.dto.ConfigDtos.LoopBlockDTO;
-import com.codingapi.report.config.dto.ConfigDtos.PartDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryCellDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SummaryRowDTO;
-import com.codingapi.report.config.dto.ConfigDtos.FieldRefDTO;
-import com.codingapi.report.config.dto.ConfigDtos.SourceDTO;
-import com.codingapi.report.config.dto.ConfigDtos.ValueDTO;
-import com.codingapi.report.config.dto.ReportDTO;
-import com.codingapi.report.config.dto.ReportParam;
+import com.codingapi.report.dto.report.BindingDTO;
+import com.codingapi.report.dto.report.ConditionDTO;
+import com.codingapi.report.dto.report.LoopBlockDTO;
+import com.codingapi.report.dto.report.PartDTO;
+import com.codingapi.report.dto.report.SummaryCellDTO;
+import com.codingapi.report.dto.report.SummaryRowDTO;
+import com.codingapi.report.dto.report.FieldRefDTO;
+import com.codingapi.report.dto.report.SourceDTO;
+import com.codingapi.report.dto.report.ValueDTO;
+import com.codingapi.report.dto.report.ReportDTO;
+import com.codingapi.report.dto.report.ParamDTO;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.FieldRef;
 import com.codingapi.report.param.ParamSource;
@@ -200,10 +200,10 @@ public final class RenderDtoConverter {
         return result;
     }
 
-    public static List<Parameter> toParameters(List<ReportParam> params) {
+    public static List<Parameter> toParameters(List<ParamDTO> params) {
         if (params == null) return List.of();
         List<Parameter> out = new ArrayList<>();
-        for (ReportParam p : params) {
+        for (ParamDTO p : params) {
             out.add(
                     Parameter.builder()
                             .name(p.getName())
@@ -428,11 +428,11 @@ public final class RenderDtoConverter {
         return out;
     }
 
-    public static List<ReportParam> toParamDtos(List<Parameter> params) {
+    public static List<ParamDTO> toParamDtos(List<Parameter> params) {
         if (params == null) return List.of();
-        List<ReportParam> out = new ArrayList<>();
+        List<ParamDTO> out = new ArrayList<>();
         for (Parameter p : params) {
-            ReportParam rp = new ReportParam();
+            ParamDTO rp = new ParamDTO();
             rp.setName(p.getName());
             rp.setAlias(p.getAlias());
             rp.setDataType(p.getDataType() != null ? p.getDataType().name() : null);
