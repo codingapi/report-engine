@@ -6,6 +6,7 @@ import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
 import com.codingapi.report.data.datasource.credential.CredentialService;
@@ -17,11 +18,16 @@ import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.PageQuery;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.dto.DatasetDtos.PreviewDTO;
+import com.codingapi.report.starter.properties.ReportProperties;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 数据源（连接）操作业务：CRUD + 连接测试 + 表/列探查 + 数据集预览。
@@ -42,6 +48,7 @@ public class DataSourceService {
     private final CredentialService credentials;
     private final DriverLoader driverLoader;
     private final DataSourceTypeRepository typeRepository;
+    private final ReportProperties properties;
 
     public DataSourceService(
             DataModelService dataModelService,
@@ -49,13 +56,15 @@ public class DataSourceService {
             DataSourceRepository repository,
             CredentialService credentials,
             DriverLoader driverLoader,
-            DataSourceTypeRepository typeRepository) {
+            DataSourceTypeRepository typeRepository,
+            ReportProperties properties) {
         this.dataModelService = dataModelService;
         this.extractors = extractors;
         this.repository = repository;
         this.credentials = credentials;
         this.driverLoader = driverLoader;
         this.typeRepository = typeRepository;
+        this.properties = properties;
     }
 
     // ============================================================
@@ -96,6 +105,87 @@ public class DataSourceService {
         registerDriverIfNeeded(ds);
         return findExtractor(ds.getType()).test(ds);
     }
+
+    /**
+     * 元数据探查：按已保存的连接 id 解析所有可用表/sheet 及列定义。
+     *
+     * <p>从仓库取出的 {@code config} 若含 {@code enc:} 加密值（落盘加密由仓库实现）， 先用 {@link
+     * CredentialService#decryptConfig} 解密；DB 类型还会触发外部驱动注册。 之后派发到对应 {@link DataExtractor#introspect}。
+     */
+    public List<IntrospectedTable> introspect(String id) {
+        DataSource ds = repository.find(id);
+        if (ds == null) {
+            throw new IllegalArgumentException("数据源不存在: " + id);
+        }
+        if (ds.getConfig() != null && credentials != null) {
+            ds.setConfig(credentials.decryptConfig(ds.getConfig()));
+        }
+        registerDriverIfNeeded(ds);
+        return findExtractor(ds.getType()).introspect(ds);
+    }
+
+    /**
+     * 上传 Excel/CSV 文件到 {@link ReportProperties} 配置的目录，并返回解析后的表/列元数据。
+     *
+     * <p>EXCEL 落到 {@code properties.excel.dir}，CSV 落到 {@code properties.csv.dir}。 文件名做安全清洗（去路径分隔符 +
+     * 防 path traversal）。返回的 {@link UploadResult} 含保存路径与解析出的表列表， 前端可据此构造 {@link DataSourceDTO}
+     * 持久化（{@code config.path = savedPath}）。
+     *
+     * @param file 上传的文件
+     * @param type {@code EXCEL} 或 {@code CSV}；为空时按文件扩展名推断
+     */
+    public UploadResult uploadAndIntrospect(MultipartFile file, String type) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IOException("上传文件为空");
+        }
+        String kind = (type == null || type.isBlank()) ? detectKind(file.getOriginalFilename()) : type.toUpperCase();
+        String dir =
+                switch (kind) {
+                    case "EXCEL" -> properties.getExcel().getDir();
+                    case "CSV" -> properties.getCsv().getDir();
+                    default -> throw new IOException("不支持的上传类型: " + kind);
+                };
+        Path dirPath = Path.of(dir).toAbsolutePath().normalize();
+        Files.createDirectories(dirPath);
+        String filename = sanitizeFilename(file.getOriginalFilename());
+        Path target = dirPath.resolve(filename).normalize();
+        if (!target.startsWith(dirPath)) {
+            throw new IOException("非法文件名: " + filename);
+        }
+        try (var in = file.getInputStream()) {
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        String savedPath = target.toString();
+        DataSource ds =
+                DataSource.builder()
+                        .name(filename)
+                        .type(DataSourceType.of(kind, Map.of("path", savedPath)))
+                        .config(Map.of("path", savedPath))
+                        .build();
+        List<IntrospectedTable> tables = findExtractor(ds.getType()).introspect(ds);
+        return new UploadResult(savedPath, kind, tables);
+    }
+
+    private static String detectKind(String filename) {
+        if (filename == null) {
+            throw new IllegalArgumentException("无法推断上传类型：文件名为空");
+        }
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".csv")) return "CSV";
+        if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) return "EXCEL";
+        throw new IllegalArgumentException("无法推断上传类型（.csv/.xlsx/.xls）: " + filename);
+    }
+
+    private static String sanitizeFilename(String name) {
+        if (name == null || name.isBlank()) return "upload";
+        int slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        if (slash >= 0) name = name.substring(slash + 1);
+        if (name.isBlank() || ".".equals(name) || "..".equals(name)) return "upload";
+        return name;
+    }
+
+    /** 上传结果：保存路径 + 类型 + 解析出的表/列元数据。 */
+    public record UploadResult(String savedPath, String type, List<IntrospectedTable> tables) {}
 
     public List<String> listTables(String dataModelId, String datasourceId) {
         DataSource ds = loadDataSource(dataModelId, datasourceId);

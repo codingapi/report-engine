@@ -6,6 +6,7 @@ import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
 import java.sql.Connection;
@@ -113,6 +114,15 @@ public class DbDataExtractor implements DataExtractor {
             throw new IllegalStateException("列探查失败: " + table, e);
         }
         return columns;
+    }
+
+    @Override
+    public List<IntrospectedTable> introspect(DataSource source) {
+        List<IntrospectedTable> tables = new ArrayList<>();
+        for (String t : listTables(source)) {
+            tables.add(new IntrospectedTable(t, listColumns(source, t)));
+        }
+        return tables;
     }
 
     // ============================================================

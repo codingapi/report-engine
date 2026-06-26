@@ -5,6 +5,8 @@ import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.ColumnMeta;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
 import com.codingapi.report.excel.ExcelImporter;
@@ -78,6 +80,44 @@ public class ExcelDataExtractor implements DataExtractor {
             long latency = System.currentTimeMillis() - start;
             return new TestResult(false, "文件读取失败: " + e.getMessage(), latency);
         }
+    }
+
+    @Override
+    public List<IntrospectedTable> introspect(DataSource source) {
+        ExcelConfig config = ExcelConfig.from(source);
+        try (InputStream input = openStream(config.path())) {
+            Workbook workbook = excelImporter.importFrom(input);
+            List<Sheet> sheets = workbook.getSheets();
+            if (sheets == null || sheets.isEmpty()) {
+                throw new IllegalStateException("Excel 工作簿无工作表");
+            }
+            List<IntrospectedTable> tables = new ArrayList<>();
+            for (Sheet sheet : sheets) {
+                tables.add(new IntrospectedTable(sheet.getName(), readHeaderColumns(sheet, config.headerRow())));
+            }
+            return tables;
+        } catch (IOException e) {
+            throw new IllegalStateException("Excel 元数据探查失败: " + config.path(), e);
+        }
+    }
+
+    /** 读取 sheet 表头行 → 列元数据（列名按列序排序，类型默认 STRING）。 */
+    private static List<ColumnMeta> readHeaderColumns(Sheet sheet, int headerRow) {
+        List<Cell> cells = sheet.getCells() != null ? sheet.getCells() : new ArrayList<>();
+        Map<Integer, Cell> headerRowCells = new LinkedHashMap<>();
+        for (Cell c : cells) {
+            if (c.getRow() == headerRow) {
+                headerRowCells.put(c.getCol(), c);
+            }
+        }
+        List<ColumnMeta> columns = new ArrayList<>();
+        for (Map.Entry<Integer, Cell> e : headerRowCells.entrySet()) {
+            String name = textOf(e.getValue().getValue());
+            if (name != null && !name.isBlank()) {
+                columns.add(new ColumnMeta(name.trim(), "STRING", false));
+            }
+        }
+        return columns;
     }
 
     // ============================================================

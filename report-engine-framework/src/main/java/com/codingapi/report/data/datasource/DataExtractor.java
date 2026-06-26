@@ -92,4 +92,16 @@ public interface DataExtractor {
     default List<ColumnMeta> listColumns(DataSource source, String table) {
         throw new UnsupportedOperationException("提取器不支持列探查");
     }
+
+    /**
+     * 元数据探查：解析连接下所有可用"表"及其列定义。
+     *
+     * <p>DB 类型：每张物理表一个 {@link IntrospectedTable}（列含主键标记）。 EXCEL 类型：每个 sheet 一个，首行当列名，类型默认
+     * STRING。 CSV 类型：单个，首行当列名，类型默认 STRING。
+     *
+     * <p>默认抛 {@link UnsupportedOperationException}，由各提取器按能力实现。
+     */
+    default List<IntrospectedTable> introspect(DataSource source) {
+        throw new UnsupportedOperationException("提取器不支持元数据探查");
+    }
 }

@@ -86,14 +86,16 @@ public class ReportEngineAutoConfiguration {
                 DataSourceRepository dataSourceRepository,
                 CredentialService credentials,
                 DriverLoader driverLoader,
-                DataSourceTypeRepository dataSourceTypeRepository) {
+                DataSourceTypeRepository dataSourceTypeRepository,
+                ReportProperties properties) {
             return new DataSourceService(
                     dataModelService,
                     extractors,
                     dataSourceRepository,
                     credentials,
                     driverLoader,
-                    dataSourceTypeRepository);
+                    dataSourceTypeRepository,
+                    properties);
         }
 
         @Bean
