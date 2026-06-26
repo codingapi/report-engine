@@ -25,6 +25,13 @@ export type {
 export { useDatasource } from './hooks/use-datasource';
 export { useExplore } from './hooks/use-explore';
 
+// 数据模型列表页
+export { default as DataModelListPage } from './components/data-model/data-model-list';
+export type {
+  DataModelService,
+  DataModelListPageProps,
+} from './components/data-model/data-model-list';
+
 export { useReportPreview } from './hooks/use-report-preview';
 export type { UseReportPreviewOptions } from './hooks/use-report-preview';
 

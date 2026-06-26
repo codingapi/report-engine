@@ -115,10 +115,14 @@ export interface ReportBrief {
   updateTime?: number;
 }
 
-/** 数据模型简要信息 */
+/** 数据模型简要信息（对齐后端 DataModelMgmtController.DataModelBrief record） */
 export interface DataModelBrief {
   id: string;
   name: string;
+  /** 状态名（DRAFT 等），后端 DataModelStatus.name() */
+  status?: string;
+  createTime?: number;
+  updateTime?: number;
 }
 
 /** 保存报表配置（含 id 则更新），返回报表 id */

@@ -1,5 +1,10 @@
 import http from './http';
-import type { DataModelInfo } from './datamodel';
+import type {
+  DataModelInfo,
+  DataModelDataset,
+  DataModelSource,
+  RelationshipInfo,
+} from './datamodel';
 import type { DataModelBrief } from './report';
 
 // ============================================================
@@ -74,14 +79,45 @@ export interface DataSourcePage {
   total: number;
 }
 
+/** 数据模型分页结果 */
+export interface DataModelPage {
+  list: DataModelBrief[];
+  total: number;
+}
+
+/**
+ * 数据模型保存 DTO（对齐后端 DataModelDTO record）。
+ * - 新建：不传 id，至少传 name；datasets/relationships/datasources 可空。
+ * - 更新：传 id；敏感字段回填 `***` 由后端按旧值合并。
+ */
+export interface DataModelSaveDTO {
+  id?: string;
+  name: string;
+  status?: string;
+  createTime?: number;
+  updateTime?: number;
+  datasources?: DataModelSource[];
+  datasets?: DataModelDataset[];
+  relationships?: RelationshipInfo[];
+}
+
 // ============================================================
 // API
 // ============================================================
 
-/** 数据模型列表（id + name） */
+/** 数据模型列表（id + name，不带分页参数，后端默认返回首页） */
 export async function listDataModelBriefs(): Promise<DataModelBrief[]> {
   const res = await http.get('/datamodels');
   return res.data.list;
+}
+
+/** 数据模型分页列表（按 current/pageSize 查询） */
+export async function listDataModelsPage(
+  current = 1,
+  pageSize = 10,
+): Promise<DataModelPage> {
+  const res = await http.get('/datamodels', { params: { current, pageSize } });
+  return { list: res.data.list, total: res.data.total };
 }
 
 /** 获取数据模型详情（数据集 + 数据关系） */
@@ -91,13 +127,16 @@ export async function getDataModel(id: string): Promise<DataModelInfo> {
 }
 
 /** 创建数据模型，返回新数据模型 id */
-export async function createDataModel(data: DataModelInfo): Promise<string> {
+export async function createDataModel(data: DataModelSaveDTO): Promise<string> {
   const res = await http.post('/datamodels', data);
   return res.data as string;
 }
 
 /** 更新数据模型，返回数据模型 id */
-export async function updateDataModel(id: string, data: DataModelInfo): Promise<string> {
+export async function updateDataModel(
+  id: string,
+  data: DataModelSaveDTO,
+): Promise<string> {
   const res = await http.put(`/datamodels/${id}`, data);
   return res.data as string;
 }

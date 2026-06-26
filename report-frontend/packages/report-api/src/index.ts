@@ -39,6 +39,7 @@ export type {
 } from './datamodel';
 export {
   listDataModelBriefs,
+  listDataModelsPage,
   getDataModel,
   createDataModel,
   updateDataModel,
@@ -65,6 +66,8 @@ export type {
   IntrospectedTable,
   DataFileUploadResult,
   DataSourcePage,
+  DataModelPage,
+  DataModelSaveDTO,
 } from './datasource';
 export {
   listDataSourceTypes,
