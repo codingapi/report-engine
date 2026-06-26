@@ -4,8 +4,10 @@ import com.codingapi.report.data.datasource.DataSourceTypeConfig;
 import com.codingapi.report.dto.datasource.DataSourceTypeDTO;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.DataSourceTypeService;
+import com.codingapi.report.starter.service.DriverJarScanner;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/datasource-types")
@@ -61,6 +64,17 @@ public class DataSourceTypeController {
         return SingleResponse.of(null);
     }
 
+    /** 上传驱动 jar，返回保存的文件名与扫描出的驱动类名列表供前端选择。 */
+    @PostMapping("/driver-jar")
+    public SingleResponse<DriverJarUploadResponse> uploadDriverJar(
+            @RequestParam("file") MultipartFile file) throws IOException {
+        DriverJarScanner.DriverJarScanResult result = dataSourceTypeService.uploadDriverJar(file);
+        return SingleResponse.of(
+                new DriverJarUploadResponse(result.jarFile(), result.driverClasses()));
+    }
+
     public record DataSourceTypeBrief(
             String id, String name, String kind, long createTime, long updateTime) {}
+
+    public record DriverJarUploadResponse(String jarFile, List<String> driverClasses) {}
 }
