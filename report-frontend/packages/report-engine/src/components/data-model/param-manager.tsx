@@ -1,21 +1,21 @@
 import { useState, useCallback } from 'react';
 import { Button, List, Tag, Empty, Popconfirm, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, HolderOutlined } from '@ant-design/icons';
-import type { ReportParam } from '@/types';
+import type { ParamDTO } from '@/types';
 import { genId, dataTypeLabel } from '@/types';
 import ParamModal from './param-modal';
 
 const { Text } = Typography;
 
 interface ParamManagerProps {
-  params: ReportParam[];
-  onChange: (params: ReportParam[]) => void;
+  params: ParamDTO[];
+  onChange: (params: ParamDTO[]) => void;
 }
 
 /** 报表参数管理：列表展示 + 弹窗编辑 + 拖拽到报表画布。 */
 const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingParam, setEditingParam] = useState<ReportParam | null>(null);
+  const [editingParam, setEditingParam] = useState<ParamDTO | null>(null);
 
   const existingNames = params.map((p) => p.name);
 
@@ -26,12 +26,12 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
     setModalOpen(true);
   };
 
-  const openEdit = (param: ReportParam) => {
+  const openEdit = (param: ParamDTO) => {
     setEditingParam(param);
     setModalOpen(true);
   };
 
-  const handleConfirm = (param: ReportParam) => {
+  const handleConfirm = (param: ParamDTO) => {
     if (editingParam) {
       onChange(params.map((p) => (p.id === editingParam.id ? { ...p, ...param } : p)));
     } else {
@@ -50,7 +50,7 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
 
   // ─── 拖拽 ──────────────────────────────────
 
-  const handleDragStart = (e: React.DragEvent, param: ReportParam) => {
+  const handleDragStart = (e: React.DragEvent, param: ParamDTO) => {
     const dragData = {
       type: 'report-param',
       paramName: param.name,

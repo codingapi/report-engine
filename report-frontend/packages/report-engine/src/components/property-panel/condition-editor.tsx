@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Tag, Empty } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import type { Condition, Dataset, LoopBlock, CompareOperator, ReportParam } from '@/types';
+import type { Condition, Dataset, LoopBlock, CompareOperator, ParamDTO } from '@/types';
 import { OPERATOR_LABELS } from '@/types';
 import ConditionModal from './condition-modal';
 
@@ -9,7 +9,7 @@ interface ConditionEditorProps {
   conditions: Condition[];
   datasets: Dataset[];
   loopBlocks?: LoopBlock[];
-  params?: ReportParam[];
+  params?: ParamDTO[];
   onChange: (conditions: Condition[]) => void;
 }
 
@@ -26,7 +26,7 @@ function resolveFieldValue(payload: string | undefined, datasets: Dataset[]): st
 }
 
 /** 解析参数名为别名 */
-function resolveParamName(payload: string | undefined, params: ReportParam[]): string {
+function resolveParamName(payload: string | undefined, params: ParamDTO[]): string {
   if (!payload) return '(未选)';
   const param = params.find((p) => p.name === payload);
   return param?.alias || payload;
@@ -65,7 +65,7 @@ function describeValue(
   cond: Condition,
   datasets: Dataset[],
   loopBlocks: LoopBlock[],
-  params: ReportParam[],
+  params: ParamDTO[],
 ): { left: string; op: string; right: string } {
   const describeOne = (v: Condition['left'] | null | undefined): string => {
     if (!v) return '';

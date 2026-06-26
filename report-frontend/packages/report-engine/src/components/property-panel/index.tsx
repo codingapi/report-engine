@@ -6,7 +6,7 @@ import type {
   SummaryRow,
   LoopBlock,
   Dataset,
-  ReportParam,
+  ParamDTO,
   ExpressionCatalog,
 } from '@/types';
 import type { SheetCellSelectInfo } from '@/components/sheet-panel';
@@ -25,7 +25,7 @@ interface PropertyPanelProps {
   summaries: SummaryRow[];
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
-  params: ReportParam[];
+  params: ParamDTO[];
   functions?: ExpressionCatalog;
   onBindingChange: (cellKey: string, binding: CellBinding) => void;
   onBindingCreate: (cellKey: string) => void;

@@ -30,8 +30,8 @@ import type {
   LoopBlock,
   SummaryRow,
   SummaryCell,
-  ReportParam,
-  ReportConfig,
+  ParamDTO,
+  ReportDTO,
   ReportValue,
   RenderConfig,
 } from './types';
@@ -84,9 +84,9 @@ import './index.css';
 export interface ReportEngineHandle {
   applyTemplate: (template: TemplatePreset) => void;
   /** 加载报表配置，整体恢复设计态 */
-  loadReportConfig: (config: ReportConfig) => void;
+  loadReportConfig: (config: ReportDTO) => void;
   /** 获取当前完整报表配置（外部调试/持久化用），表格为空时返回 null */
-  getReportConfig: () => ReportConfig | null;
+  getReportConfig: () => ReportDTO | null;
 }
 
 /**
@@ -125,7 +125,7 @@ export const ReportEngine: React.FC<
   const [cellBindings, setCellBindings] = useState<CellBinding[]>([]);
   const [loopBlocks, setLoopBlocks] = useState<LoopBlock[]>([]);
   const [summaries, setSummaries] = useState<SummaryRow[]>([]);
-  const [params, setParams] = useState<ReportParam[]>([]);
+  const [params, setParams] = useState<ParamDTO[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
   const [_activeTemplate, setActiveTemplate] = useState<string | null>(null);
@@ -290,7 +290,7 @@ export const ReportEngine: React.FC<
 
   // ─── 加载报表配置（整体恢复设计态） ───
   const loadReportConfig = useCallback(
-    (config: ReportConfig) => {
+    (config: ReportDTO) => {
       // 清除当前选中状态，避免 loadSnapshot 后旧 sheetId 的残留选中导致面板显示异常
       setSelectedCell(null);
 
@@ -360,7 +360,7 @@ export const ReportEngine: React.FC<
   );
 
   // 获取当前完整报表配置（外部按需调用）
-  const getReportConfig = useCallback((): ReportConfig | null => {
+  const getReportConfig = useCallback((): ReportDTO | null => {
     const snapshot = sheetRef.current?.getSnapshot();
     if (!snapshot) return null;
     return {

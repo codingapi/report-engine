@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Switch, message } from 'antd';
-import type { ReportParam } from '@/types';
+import type { ParamDTO } from '@/types';
 
 interface ParamInputModalProps {
-  params: ReportParam[];
+  params: ParamDTO[];
   open: boolean;
   onConfirm: (values: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -45,7 +45,7 @@ const ParamInputModal: React.FC<ParamInputModalProps> = ({ params, open, onConfi
     onConfirm(values);
   };
 
-  const renderField = (param: ReportParam) => {
+  const renderField = (param: ParamDTO) => {
     const isRequired = !param.defaultValue;
     const label = param.alias || param.name;
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'antd';
-import type { Dataset, Relationship, ReportParam } from '@/types';
+import type { Dataset, Relationship, ParamDTO } from '@/types';
 import DatasetTree from '@/components/dataset-tree';
 import RelationshipList from './relationship-list';
 import ParamManager from './param-manager';
@@ -8,8 +8,8 @@ import ParamManager from './param-manager';
 interface DataModelPanelProps {
   datasets: Dataset[];
   relationships: Relationship[];
-  params: ReportParam[];
-  onParamsChange: (params: ReportParam[]) => void;
+  params: ParamDTO[];
+  onParamsChange: (params: ParamDTO[]) => void;
 }
 
 /**

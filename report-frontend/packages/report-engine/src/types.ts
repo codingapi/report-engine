@@ -316,7 +316,7 @@ export interface RelationEditorProps {
 // ─── 参数域 ────────────────────────────────────
 
 /** 报表参数（报表级，设计时定义，可在表达式中以 ${name} 引用） */
-export interface ReportParam {
+export interface ParamDTO {
   id: string;
   /** 表达式中引用的名字（${name}） */
   name: string;
@@ -462,14 +462,14 @@ export interface TemplatePreset {
 // ─── 报表配置（持久化） ────────────────────────
 
 /** 整张报表配置（保存/加载用） */
-export interface ReportConfig {
+export interface ReportDTO {
   id?: string;
   name: string;
   dataModelId?: string;
   cellBindings: CellBinding[];
   loopBlocks: LoopBlock[];
   summaries: SummaryRow[];
-  params: ReportParam[];
+  params: ParamDTO[];
   /** 模板表格快照 */
   template: ExcelWorkbook;
 }
@@ -501,7 +501,7 @@ export interface RenderConfig {
   loops: LoopBlock[];
   summaries: SummaryRow[];
   workbook: ExcelWorkbook;
-  params: ReportParam[];
+  params: ParamDTO[];
 }
 
 export interface ReportEngineProps {
@@ -523,7 +523,7 @@ export interface ReportEngineProps {
   /** 导入回调：接收文件，返回快照 */
   onImport?: (file: File) => Promise<ExcelWorkbook>;
   /** 保存报表回调：接收整张报表配置，返回报表 id（用于后续更新） */
-  onSaveReport?: (config: ReportConfig) => Promise<string> | void;
+  onSaveReport?: (config: ReportDTO) => Promise<string> | void;
   /** 字体加载回调 */
   onFontRequest?: () => Promise<FontItem[]>;
   /** 自定义操作按钮，渲染在默认按钮组左侧 */

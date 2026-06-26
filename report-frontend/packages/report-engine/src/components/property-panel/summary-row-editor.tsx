@@ -5,7 +5,7 @@ import type {
   SummaryCell,
   Dataset,
   LoopBlock,
-  ReportParam,
+  ParamDTO,
   ExpressionCatalog,
   ReportValue,
 } from '@/types';
@@ -21,7 +21,7 @@ interface SummaryRowEditorProps {
   crossPos: number;
   datasets: Dataset[];
   loopBlocks: LoopBlock[];
-  params: ReportParam[];
+  params: ParamDTO[];
   functions?: ExpressionCatalog;
   onChange: (row: SummaryRow) => void;
 }

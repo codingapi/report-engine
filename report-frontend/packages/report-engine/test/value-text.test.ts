@@ -1,5 +1,5 @@
 import { parseTemplate, templateToString, valueDisplayText } from '@/value-text';
-import type { Dataset, LoopBlock, ReportParam, ReportValue } from '@/types';
+import type { Dataset, LoopBlock, ParamDTO, ReportValue } from '@/types';
 
 const datasets: Dataset[] = [
   {
@@ -25,7 +25,7 @@ const loopBlocks: LoopBlock[] = [
   },
 ];
 
-const params: ReportParam[] = [
+const params: ParamDTO[] = [
   { id: 'p1', name: 'startDate', alias: '开始日期', dataType: 'DATE' },
 ];
 

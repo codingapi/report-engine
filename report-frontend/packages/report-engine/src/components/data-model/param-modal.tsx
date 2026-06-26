@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
-import type { ReportParam, DataType } from '@/types';
+import type { ParamDTO, DataType } from '@/types';
 import { DATA_TYPE_OPTIONS } from '@/types';
 
 interface ParamModalProps {
   open: boolean;
   /** 编辑模式：传入已有参数（预填表单，name 不可改）；新增模式：null */
-  editingParam: ReportParam | null;
+  editingParam: ParamDTO | null;
   /** 已有参数名列表，用于唯一性校验 */
   existingNames: string[];
   onClose: () => void;
-  onConfirm: (param: ReportParam) => void;
+  onConfirm: (param: ParamDTO) => void;
 }
 
 const NAME_RE = /^[a-zA-Z_]\w*$/;
@@ -61,7 +61,7 @@ const ParamModal: React.FC<ParamModalProps> = ({
       return;
     }
 
-    const param: ReportParam = {
+    const param: ParamDTO = {
       id: editingParam?.id ?? '',
       name,
       alias: alias || undefined,

@@ -67,7 +67,7 @@ export type {
   DatasetManagerProps,
   RelationEditorProps,
   // 参数域
-  ReportParam,
+  ParamDTO,
   // 渲染域
   CellBinding,
   LoopBlock,
@@ -76,7 +76,7 @@ export type {
   // 模板预设
   TemplatePreset,
   // 报表配置
-  ReportConfig,
+  ReportDTO,
   // 渲染服务（预览/导出注入）
   RenderService,
   RenderConfig,
