@@ -4,9 +4,11 @@ import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.excel.FontRegistry;
 import com.codingapi.report.repository.DataModelRepository;
+import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.controller.DataModelMgmtController;
 import com.codingapi.report.starter.controller.DataSourceController;
+import com.codingapi.report.starter.controller.DataSourceTypeController;
 import com.codingapi.report.starter.controller.DatasetController;
 import com.codingapi.report.starter.controller.ExcelController;
 import com.codingapi.report.starter.controller.ExpressionController;
@@ -16,6 +18,7 @@ import com.codingapi.report.starter.controller.ReportRenderController;
 import com.codingapi.report.starter.properties.ReportProperties;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.report.starter.service.DataSourceService;
+import com.codingapi.report.starter.service.DataSourceTypeService;
 import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.report.starter.service.ReportRenderService;
 import java.io.IOException;
@@ -94,6 +97,12 @@ public class ReportEngineAutoConfiguration {
             return new ReportRenderService(dataModelService, extractors);
         }
 
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceTypeService dataSourceTypeService(DataSourceTypeRepository repository) {
+            return new DataSourceTypeService(repository);
+        }
+
         // ─── Controller 层 ────────────────────────────────
         @Bean
         public FontController fontController(FontRegistry fontRegistry) {
@@ -141,6 +150,13 @@ public class ReportEngineAutoConfiguration {
         @ConditionalOnMissingBean
         public DataSourceController dataSourceController(DataSourceService dataSourceService) {
             return new DataSourceController(dataSourceService);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceTypeController dataSourceTypeController(
+                DataSourceTypeService dataSourceTypeService) {
+            return new DataSourceTypeController(dataSourceTypeService);
         }
     }
 }
