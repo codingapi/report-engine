@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
-import { App as AntdApp, Spin, Tabs, Table, Typography } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { App as AntdApp, Button, Spin, Tabs, Table, Typography, Space } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type {
   DataModelDataset,
   DataModelSource,
+  DataSourceBrief,
+  IntrospectedTable,
   RelationshipInfo,
 } from '@coding-report/report-api';
+import DatasetTab from './dataset-tab';
 
 const { Title } = Typography;
 
@@ -38,24 +42,16 @@ export interface DataModelDesignerService {
   getDataModel: (id: string) => Promise<DataModelDTO>;
   /** 保存（新建/更新） */
   saveDataModel: (dto: DataModelDTO) => Promise<void>;
+  /** 数据源列表（添加数据集二级联动第一级） */
+  listDataSources: () => Promise<DataSourceBrief[]>;
+  /** 探查数据源下所有表/列（添加数据集二级联动第二级） */
+  introspectDatasets: (sourceId: string) => Promise<IntrospectedTable[]>;
 }
 
 export interface DataModelDesignerProps {
   dataModelId: string;
   service: DataModelDesignerService;
 }
-
-const datasetColumns: ColumnsType<DataModelDataset> = [
-  { title: '别名', dataIndex: 'alias', key: 'alias' },
-  { title: '形态', dataIndex: 'kind', key: 'kind', width: 100 },
-  { title: '物理表', dataIndex: 'sourceTable', key: 'sourceTable' },
-  {
-    title: '字段数',
-    key: 'fieldCount',
-    width: 80,
-    render: (_v, record) => record.fields?.length ?? 0,
-  },
-];
 
 const unionColumns: ColumnsType<DataModelDataset> = [
   { title: '别名', dataIndex: 'alias', key: 'alias' },
@@ -80,7 +76,7 @@ const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
 
 /**
  * 数据模型设计页：顶部标题栏 + 三 tab（数据集 / 数据合集 / 关系）。
- * 当前为框架骨架，每个 tab 内放 antd Table 空数据，columns 已定义。
+ * 数据集 tab 实现二级联动多选；其他 tab 暂为骨架。
  */
 const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
   dataModelId,
@@ -88,6 +84,7 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
 }) => {
   const { message } = AntdApp.useApp();
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [model, setModel] = useState<DataModelDTO | null>(null);
 
   useEffect(() => {
@@ -98,8 +95,10 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
       .then((dto) => {
         if (active) setModel(dto);
       })
-      .catch((err) => {
-        if (active) message.error(`加载数据模型失败：${err?.message ?? err}`);
+      .catch((err: unknown) => {
+        if (active) {
+          message.error(`加载数据模型失败：${err instanceof Error ? err.message : String(err)}`);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -108,6 +107,23 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
       active = false;
     };
   }, [dataModelId, service, message]);
+
+  const handleDatasetsChange = useCallback((datasets: DataModelDataset[]) => {
+    setModel((prev) => (prev ? { ...prev, datasets } : prev));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!model) return;
+    setSaving(true);
+    try {
+      await service.saveDataModel(model);
+      message.success('保存成功');
+    } catch (err: unknown) {
+      message.error(`保存失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [model, service, message]);
 
   if (loading || !model) {
     return (
@@ -119,32 +135,49 @@ const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
 
   return (
     <div style={{ padding: 16 }}>
-      <Title level={4} style={{ marginBottom: 16 }}>
-        {model.name}
-        <span
-          style={{
-            marginLeft: 12,
-            fontSize: 12,
-            color: 'rgba(0,0,0,0.45)',
-            fontWeight: 'normal',
-          }}
-        >
-          {model.status ? `（${model.status}）` : ''} 最后更新{' '}
-          {formatTime(model.updateTime)}
-        </span>
-      </Title>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          {model.name}
+          <span
+            style={{
+              marginLeft: 12,
+              fontSize: 12,
+              color: 'rgba(0,0,0,0.45)',
+              fontWeight: 'normal',
+            }}
+          >
+            {model.status ? `（${model.status}）` : ''} 最后更新{' '}
+            {formatTime(model.updateTime)}
+          </span>
+        </Title>
+        <Space>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            loading={saving}
+            onClick={handleSave}
+          >
+            保存
+          </Button>
+        </Space>
+      </div>
       <Tabs
         items={[
           {
             key: 'datasets',
             label: '数据集',
             children: (
-              <Table<DataModelDataset>
-                rowKey="id"
-                size="small"
-                columns={datasetColumns}
-                dataSource={[]}
-                pagination={false}
+              <DatasetTab
+                datasets={model.datasets}
+                onChange={handleDatasetsChange}
+                service={service}
               />
             ),
           },

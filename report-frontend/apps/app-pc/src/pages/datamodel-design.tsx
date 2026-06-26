@@ -5,7 +5,9 @@ import type { DataModelDesignerService } from '@coding-report/report-engine';
 import {
   createDataModel,
   getDataModel,
+  introspectDatasets,
   listDataModelsPage,
+  listDataSources,
   updateDataModel,
 } from '@coding-report/report-api';
 import { useParams } from 'react-router-dom';
@@ -60,6 +62,11 @@ const DatamodelDesignPage = () => {
           message.error(`保存失败：${err instanceof Error ? err.message : String(err)}`);
         }
       },
+      listDataSources: async () => {
+        const page = await listDataSources(1, 1000);
+        return page.list;
+      },
+      introspectDatasets: (sourceId: string) => introspectDatasets(sourceId),
     }),
     [message],
   );
