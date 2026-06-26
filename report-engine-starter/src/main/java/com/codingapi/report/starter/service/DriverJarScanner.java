@@ -20,9 +20,9 @@ import java.util.jar.JarFile;
 /**
  * 驱动 jar 扫描器：解析 jar 内 {@link Driver} 实现类名列表。
  *
- * <p>优先读 {@code META-INF/services/java.sql.Driver}（ServiceLoader 机制，JDBC 驱动通用约定）；
- * 文件不存在或为空时回退到扫描 jar 内 {@code .class} 条目，用 {@link URLClassLoader} 加载并按
- * {@code Driver.class.isAssignableFrom(...)} 判定。回退路径会跳过接口、抽象类、自身及加载失败的类。
+ * <p>优先读 {@code META-INF/services/java.sql.Driver}（ServiceLoader 机制，JDBC 驱动通用约定）； 文件不存在或为空时回退到扫描
+ * jar 内 {@code .class} 条目，用 {@link URLClassLoader} 加载并按 {@code Driver.class.isAssignableFrom(...)}
+ * 判定。回退路径会跳过接口、抽象类、自身及加载失败的类。
  */
 public class DriverJarScanner {
 

@@ -38,12 +38,14 @@ public class DataSourceTypeController {
         PageResult<DataSourceTypeConfig> result = dataSourceTypeService.page(current, pageSize);
         List<DataSourceTypeBrief> briefs =
                 result.content().stream()
-                        .map(c -> new DataSourceTypeBrief(
-                                c.getId(),
-                                c.getName() != null ? c.getName() : "未命名类型",
-                                c.getType() != null ? c.getType().type() : null,
-                                c.getCreateTime(),
-                                c.getUpdateTime()))
+                        .map(
+                                c ->
+                                        new DataSourceTypeBrief(
+                                                c.getId(),
+                                                c.getName() != null ? c.getName() : "未命名类型",
+                                                c.getType() != null ? c.getType().type() : null,
+                                                c.getCreateTime(),
+                                                c.getUpdateTime()))
                         .toList();
         return MultiResponse.of(briefs, result.total());
     }

@@ -8,40 +8,93 @@ import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
 import com.codingapi.report.data.datasource.RawTable;
 import com.codingapi.report.data.datasource.TestResult;
+import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.data.datasource.type.DataSourceType;
+import com.codingapi.report.data.datasource.type.DbDataSourceType;
 import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.repository.DataSourceRepository;
+import com.codingapi.report.repository.DataSourceTypeRepository;
+import com.codingapi.report.repository.PageQuery;
+import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.dto.DatasetDtos.PreviewDTO;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * 数据源（连接）操作业务：连接测试 + 表/列探查 + 数据集预览。
+ * 数据源（连接）操作业务：CRUD + 连接测试 + 表/列探查 + 数据集预览。
+ *
+ * <p>CRUD 走 {@link DataSourceRepository}（以领域 {@link DataSource} 存取），出入站用 {@link DataSourceDTO}：
+ * 敏感字段仅在出口 {@link #getMasked} 脱敏；保存时 {@code ***} 占位用旧值回填。 DB 类型在保存/测试前由 {@link DriverLoader}
+ * 注册外部驱动， 使后续 {@code DriverManager.getConnection} 能识别外部 jar 加载的驱动。
  *
  * <p>提取器按 {@code supports(type)} 在 {@code List<DataExtractor>} 中派发，与渲染链路同一注册表范式。 预览/探查 的连接从 {@link
  * DataModelService#loadDataModel} 取（已解密）。
  */
+@Slf4j
 public class DataSourceService {
 
     private final DataModelService dataModelService;
     private final List<DataExtractor> extractors;
+    private final DataSourceRepository repository;
+    private final CredentialService credentials;
+    private final DriverLoader driverLoader;
+    private final DataSourceTypeRepository typeRepository;
 
-    public DataSourceService(DataModelService dataModelService, List<DataExtractor> extractors) {
+    public DataSourceService(
+            DataModelService dataModelService,
+            List<DataExtractor> extractors,
+            DataSourceRepository repository,
+            CredentialService credentials,
+            DriverLoader driverLoader,
+            DataSourceTypeRepository typeRepository) {
         this.dataModelService = dataModelService;
         this.extractors = extractors;
+        this.repository = repository;
+        this.credentials = credentials;
+        this.driverLoader = driverLoader;
+        this.typeRepository = typeRepository;
     }
 
-    /** 测试连接（不落库，凭证明文）。 */
+    // ============================================================
+    // CRUD
+    // ============================================================
+
+    public PageResult<DataSource> page(int current, int pageSize) {
+        return repository.page(new PageQuery(current, pageSize));
+    }
+
+    /** 详情（{@code config} 脱敏）。不存在返回 null。 */
+    public DataSourceDTO getMasked(String id) {
+        DataSource ds = repository.find(id);
+        return ds != null ? toDtoMasked(ds) : null;
+    }
+
+    /** 新建/更新：{@code ***} 凭证回填旧值（明文存储，落盘加密交仓库实现）；DB 类型触发驱动注册。 */
+    public String save(DataSourceDTO dto) {
+        DataSource incoming = fromDto(dto);
+        DataSource old = dto.id() != null && !dto.id().isBlank() ? repository.find(dto.id()) : null;
+        mergeMaskedCredentials(incoming, old);
+        String id = repository.save(incoming);
+        registerDriverIfNeeded(incoming);
+        return id;
+    }
+
+    public void delete(String id) {
+        repository.delete(id);
+    }
+
+    // ============================================================
+    // 连接测试 / 探查 / 预览（既有链路保留）
+    // ============================================================
+
+    /** 测试连接（不落库，凭证明文）。DB 类型先注册外部驱动。 */
     public TestResult testConnection(DataSourceDTO dto) {
-        DataSourceType type = DataSourceType.of(dto.type(), dto.config());
-        DataSource ds =
-                DataSource.builder()
-                        .id(dto.id())
-                        .name(dto.name())
-                        .type(type)
-                        .config(dto.config())
-                        .build();
-        return findExtractor(type).test(ds);
+        DataSource ds = fromDto(dto);
+        registerDriverIfNeeded(ds);
+        return findExtractor(ds.getType()).test(ds);
     }
 
     public List<String> listTables(String dataModelId, String datasourceId) {
@@ -94,6 +147,67 @@ public class DataSourceService {
                                 })
                         .toList();
         return new PreviewDTO(columns, rows);
+    }
+
+    // ============================================================
+    // 内部
+    // ============================================================
+
+    private DataSource fromDto(DataSourceDTO dto) {
+        DataSourceType type = DataSourceType.of(dto.type(), dto.config());
+        return DataSource.builder()
+                .id(dto.id())
+                .name(dto.name())
+                .type(type)
+                .typeConfigId(dto.typeConfigId())
+                .config(dto.config())
+                .build();
+    }
+
+    private DataSourceDTO toDtoMasked(DataSource ds) {
+        return new DataSourceDTO(
+                ds.getId(),
+                ds.getName(),
+                ds.getType() != null ? ds.getType().type() : null,
+                ds.getTypeConfigId(),
+                credentials.maskConfig(ds.getConfig()));
+    }
+
+    /** 前端回传的 {@code ***} 占位用旧连接的真实值回填，避免覆盖真实凭证。 */
+    private void mergeMaskedCredentials(DataSource incoming, DataSource old) {
+        if (old == null
+                || incoming.getConfig() == null
+                || old.getConfig() == null
+                || credentials == null) {
+            return;
+        }
+        Map<String, Object> merged = new LinkedHashMap<>(incoming.getConfig());
+        boolean changed = false;
+        for (Map.Entry<String, Object> e : merged.entrySet()) {
+            if (credentials.isMasked(e.getValue())) {
+                Object oldVal = old.getConfig().get(e.getKey());
+                if (oldVal != null) {
+                    e.setValue(oldVal);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) incoming.setConfig(merged);
+    }
+
+    /** DB 类型按 {@code typeConfigId} 找到类型配置，注册外部驱动 jar 到 DriverManager。 */
+    private void registerDriverIfNeeded(DataSource ds) {
+        if (driverLoader == null || typeRepository == null) return;
+        if (!(ds.getType() instanceof DbDataSourceType)) return;
+        String configId = ds.getTypeConfigId();
+        if (configId == null || configId.isBlank()) return;
+        var cfg = typeRepository.find(configId);
+        if (cfg == null || !(cfg.getType() instanceof DbDataSourceType db)) return;
+        try {
+            driverLoader.registerDriver(db.jarFile(), db.driverClass());
+        } catch (IOException e) {
+            log.warn("skip driver registration for typeConfigId={}: {}", configId, e.getMessage());
+        }
     }
 
     private DataExtractor findExtractor(DataSourceType type) {

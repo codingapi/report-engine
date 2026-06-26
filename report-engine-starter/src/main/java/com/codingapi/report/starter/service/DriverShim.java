@@ -9,12 +9,11 @@ import java.util.Properties;
 import java.util.logging.Logger;
 
 /**
- * 委托型 {@link Driver} 适配器：让 URLClassLoader 加载的外部驱动通过 {@link
- * java.sql.DriverManager#registerDriver} 注册后被 DriverManager 正常发现。
+ * 委托型 {@link Driver} 适配器：让 URLClassLoader 加载的外部驱动通过 {@link java.sql.DriverManager#registerDriver}
+ * 注册后被 DriverManager 正常发现。
  *
- * <p>背景：{@link java.sql.DriverManager} 的过滤逻辑只信任「系统类加载器加载的 Driver」。直接把外部 jar 加载的
- * Driver 实例注册进去，{@code getConnection} 时会被忽略。包一层 shim（本类由系统类加载器加载），所有方法委托给
- * 真实驱动实例即可绕过该限制。
+ * <p>背景：{@link java.sql.DriverManager} 的过滤逻辑只信任「系统类加载器加载的 Driver」。直接把外部 jar 加载的 Driver
+ * 实例注册进去，{@code getConnection} 时会被忽略。包一层 shim（本类由系统类加载器加载），所有方法委托给 真实驱动实例即可绕过该限制。
  */
 class DriverShim implements Driver {
 
