@@ -55,7 +55,8 @@ class DataSourceTypeControllerTest {
     @Test
     void saveAndGetMappingRoundTrip() {
         DataSourceTypeDTO dto =
-                new DataSourceTypeDTO(null, "MySQL 8", "DB", "/drivers/mysql.jar", "com.mysql.cj.Driver", 0L, 0L);
+                new DataSourceTypeDTO(
+                        null, "MySQL 8", "DB", "/drivers/mysql.jar", "com.mysql.cj.Driver", 0L, 0L);
 
         SingleResponse<String> saveResp = controller.save(dto);
         assertTrue(saveResp.isSuccess());
@@ -77,13 +78,15 @@ class DataSourceTypeControllerTest {
     @Test
     void saveUpdatePreservesCreateTime() throws Exception {
         DataSourceTypeDTO dto =
-                new DataSourceTypeDTO(null, "PG", "DB", "/drivers/pg.jar", "org.postgresql.Driver", 0L, 0L);
+                new DataSourceTypeDTO(
+                        null, "PG", "DB", "/drivers/pg.jar", "org.postgresql.Driver", 0L, 0L);
         String id = controller.save(dto).getData();
 
         Thread.sleep(5);
 
         DataSourceTypeDTO update =
-                new DataSourceTypeDTO(id, "PG-Updated", "DB", "/drivers/pg.jar", "org.postgresql.Driver", 0L, 0L);
+                new DataSourceTypeDTO(
+                        id, "PG-Updated", "DB", "/drivers/pg.jar", "org.postgresql.Driver", 0L, 0L);
         controller.save(update);
 
         DataSourceTypeDTO loaded = controller.get(id).getData();
@@ -94,8 +97,15 @@ class DataSourceTypeControllerTest {
     @Test
     void listReturnsBriefsPaginated() {
         for (int i = 0; i < 12; i++) {
-            controller.save(new DataSourceTypeDTO(
-                    null, "type-" + i, "DB", "/drivers/" + i + ".jar", "com.example.Driver" + i, 0L, 0L));
+            controller.save(
+                    new DataSourceTypeDTO(
+                            null,
+                            "type-" + i,
+                            "DB",
+                            "/drivers/" + i + ".jar",
+                            "com.example.Driver" + i,
+                            0L,
+                            0L));
         }
 
         MultiResponse<DataSourceTypeBrief> page1 = controller.list(1, 10);
@@ -129,8 +139,8 @@ class DataSourceTypeControllerTest {
 
     @Test
     void deleteRemovesRecord() {
-        String id = controller.save(
-                new DataSourceTypeDTO(null, "x", "DB", "j", "d", 0L, 0L)).getData();
+        String id =
+                controller.save(new DataSourceTypeDTO(null, "x", "DB", "j", "d", 0L, 0L)).getData();
         assertNotNull(controller.get(id).getData());
 
         SingleResponse<Void> del = controller.delete(id);
@@ -140,22 +150,21 @@ class DataSourceTypeControllerTest {
 
     @Test
     void saveRejectsUnknownKind() {
-        DataSourceTypeDTO bad =
-                new DataSourceTypeDTO(null, "bad", "WHAT", "j", "d", 0L, 0L);
+        DataSourceTypeDTO bad = new DataSourceTypeDTO(null, "bad", "WHAT", "j", "d", 0L, 0L);
         assertThrows(IllegalArgumentException.class, () -> controller.save(bad));
     }
 
     @Test
     void uploadDriverJarReadsServiceFile() throws IOException {
-        String serviceContent =
-                "com.mysql.cj.Driver\n# comment line\norg.postgresql.Driver\n\n";
-        Path jar = buildJar(
-                tempDir.resolve("src-service.jar"),
-                Map.of(
-                        "META-INF/services/java.sql.Driver",
-                        serviceContent.getBytes(StandardCharsets.UTF_8),
-                        "com/mysql/cj/Driver.class",
-                        new byte[] {0x00}));
+        String serviceContent = "com.mysql.cj.Driver\n# comment line\norg.postgresql.Driver\n\n";
+        Path jar =
+                buildJar(
+                        tempDir.resolve("src-service.jar"),
+                        Map.of(
+                                "META-INF/services/java.sql.Driver",
+                                serviceContent.getBytes(StandardCharsets.UTF_8),
+                                "com/mysql/cj/Driver.class",
+                                new byte[] {0x00}));
 
         SingleResponse<DriverJarUploadResponse> resp =
                 controller.uploadDriverJar(mockMultipartFile("mysql.jar", jar));
@@ -178,9 +187,10 @@ class DataSourceTypeControllerTest {
             return; // JRE-only environment, skip
         }
         byte[] classBytes = Files.readAllBytes(compiled);
-        Path jar = buildJar(
-                tempDir.resolve("scan.jar"),
-                Map.of("org/example/MyDriver.class", classBytes));
+        Path jar =
+                buildJar(
+                        tempDir.resolve("scan.jar"),
+                        Map.of("org/example/MyDriver.class", classBytes));
 
         SingleResponse<DriverJarUploadResponse> resp =
                 controller.uploadDriverJar(mockMultipartFile("scan.jar", jar));
@@ -193,9 +203,10 @@ class DataSourceTypeControllerTest {
 
     @Test
     void uploadDriverJarWithNoDriversReturnsEmpty() throws IOException {
-        Path jar = buildJar(
-                tempDir.resolve("empty.jar"),
-                Map.of("org/example/NotADriver.class", new byte[] {0x00}));
+        Path jar =
+                buildJar(
+                        tempDir.resolve("empty.jar"),
+                        Map.of("org/example/NotADriver.class", new byte[] {0x00}));
 
         SingleResponse<DriverJarUploadResponse> resp =
                 controller.uploadDriverJar(mockMultipartFile("empty.jar", jar));
@@ -216,11 +227,12 @@ class DataSourceTypeControllerTest {
 
     @Test
     void uploadDriverJarSanitizesPathTraversal() throws IOException {
-        Path jar = buildJar(
-                tempDir.resolve("svc.jar"),
-                Map.of(
-                        "META-INF/services/java.sql.Driver",
-                        "com.example.Driver\n".getBytes(StandardCharsets.UTF_8)));
+        Path jar =
+                buildJar(
+                        tempDir.resolve("svc.jar"),
+                        Map.of(
+                                "META-INF/services/java.sql.Driver",
+                                "com.example.Driver\n".getBytes(StandardCharsets.UTF_8)));
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getOriginalFilename()).thenReturn("../evil.jar");
@@ -233,11 +245,13 @@ class DataSourceTypeControllerTest {
         assertTrue(Files.exists(tempDir.resolve("drivers").resolve("evil.jar")));
     }
 
-    private static MultipartFile mockMultipartFile(String filename, Path content) throws IOException {
+    private static MultipartFile mockMultipartFile(String filename, Path content)
+            throws IOException {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getOriginalFilename()).thenReturn(filename);
-        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(Files.readAllBytes(content)));
+        when(file.getInputStream())
+                .thenReturn(new ByteArrayInputStream(Files.readAllBytes(content)));
         return file;
     }
 
@@ -279,8 +293,9 @@ class DataSourceTypeControllerTest {
                     public Logger getParentLogger() { return null; }
                 }
                 """);
-        int rc = ToolProvider.getSystemJavaCompiler()
-                .run(null, null, null, "-d", classesDir.toString(), srcFile.toString());
+        int rc =
+                ToolProvider.getSystemJavaCompiler()
+                        .run(null, null, null, "-d", classesDir.toString(), srcFile.toString());
         assertEquals(0, rc, "stub driver should compile");
         return classesDir.resolve("org/example/MyDriver.class");
     }
@@ -290,9 +305,10 @@ class DataSourceTypeControllerTest {
 
         @Override
         public String save(DataSourceTypeConfig config) {
-            String id = config.getId() != null && !config.getId().isBlank()
-                    ? config.getId()
-                    : UUID.randomUUID().toString();
+            String id =
+                    config.getId() != null && !config.getId().isBlank()
+                            ? config.getId()
+                            : UUID.randomUUID().toString();
             config.setId(id);
             long now = System.currentTimeMillis();
             DataSourceTypeConfig existing = store.get(id);

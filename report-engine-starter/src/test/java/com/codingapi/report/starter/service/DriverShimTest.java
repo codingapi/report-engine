@@ -37,9 +37,7 @@ class DriverShimTest {
     @Test
     void delegatesGetPropertyInfo() throws SQLException {
         RecordingDriver delegate = new RecordingDriver();
-        DriverPropertyInfo[] expected = new DriverPropertyInfo[] {
-            new DriverPropertyInfo("k", "v")
-        };
+        DriverPropertyInfo[] expected = new DriverPropertyInfo[] {new DriverPropertyInfo("k", "v")};
         delegate.propertyInfoReturn = expected;
         DriverShim shim = new DriverShim(delegate);
         DriverPropertyInfo[] actual = shim.getPropertyInfo("jdbc:stub://x", new Properties());

@@ -4,6 +4,7 @@ import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.excel.FontRegistry;
 import com.codingapi.report.repository.DataModelRepository;
+import com.codingapi.report.repository.DataSourceRepository;
 import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.controller.DataModelMgmtController;
@@ -80,8 +81,19 @@ public class ReportEngineAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public DataSourceService dataSourceService(
-                DataModelService dataModelService, List<DataExtractor> extractors) {
-            return new DataSourceService(dataModelService, extractors);
+                DataModelService dataModelService,
+                List<DataExtractor> extractors,
+                DataSourceRepository dataSourceRepository,
+                CredentialService credentials,
+                DriverLoader driverLoader,
+                DataSourceTypeRepository dataSourceTypeRepository) {
+            return new DataSourceService(
+                    dataModelService,
+                    extractors,
+                    dataSourceRepository,
+                    credentials,
+                    driverLoader,
+                    dataSourceTypeRepository);
         }
 
         @Bean

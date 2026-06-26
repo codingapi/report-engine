@@ -18,8 +18,7 @@ public class DataSourceTypeService {
     private final ReportProperties properties;
     private final DriverJarScanner driverJarScanner;
 
-    public DataSourceTypeService(
-            DataSourceTypeRepository repository, ReportProperties properties) {
+    public DataSourceTypeService(DataSourceTypeRepository repository, ReportProperties properties) {
         this.repository = repository;
         this.properties = properties;
         this.driverJarScanner = new DriverJarScanner();

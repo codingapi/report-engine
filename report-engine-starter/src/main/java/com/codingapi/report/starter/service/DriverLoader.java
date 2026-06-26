@@ -25,8 +25,8 @@ import org.springframework.context.event.EventListener;
 /**
  * 外部 JDBC 驱动加载器（starter 组件）。
  *
- * <p>启动时（{@link ApplicationReadyEvent}）扫描 {@link ReportProperties.DriverProperty#getDir()} 下全部 jar，按仓库中
- * 每个 DB 类型配置的 {@code driverClass} 实例化驱动，用 {@link DriverShim} 包装后通过 {@link
+ * <p>启动时（{@link ApplicationReadyEvent}）扫描 {@link ReportProperties.DriverProperty#getDir()} 下全部
+ * jar，按仓库中 每个 DB 类型配置的 {@code driverClass} 实例化驱动，用 {@link DriverShim} 包装后通过 {@link
  * DriverManager#registerDriver} 注册，使外部 jar 加载的驱动能被 DriverManager 正常发现。
  *
  * <p>新增 jar 时可调用 {@link #registerDriver(String, String)} 热注册。驱动按 {@code driverClass} 去重，同一驱动类只
@@ -73,12 +73,13 @@ public class DriverLoader {
      * 热注册：加载 {@code jarFile} → 实例化 {@code driverClass} → {@link DriverShim} 包装 → 注册到 {@link
      * DriverManager}。
      *
-     * <p>已注册（按 {@code driverClass} 去重）则直接返回已有 shim，不重复注册。jar 不存在、driverClass 无法加载
-     * 或实例化、注册失败时抛 {@link IOException}。{@code driverClass} 为空时返回 null。
+     * <p>已注册（按 {@code driverClass} 去重）则直接返回已有 shim，不重复注册。jar 不存在、driverClass 无法加载 或实例化、注册失败时抛
+     * {@link IOException}。{@code driverClass} 为空时返回 null。
      *
      * @return 注册的 {@link DriverShim}；driverClass 为空时返回 null
      */
-    public synchronized Driver registerDriver(String jarFile, String driverClass) throws IOException {
+    public synchronized Driver registerDriver(String jarFile, String driverClass)
+            throws IOException {
         if (driverClass == null || driverClass.isBlank()) {
             return null;
         }
@@ -93,9 +94,12 @@ public class DriverLoader {
         URLClassLoader loader;
         try {
             URL jarUrl = jarPath.toUri().toURL();
-            loader = loaders.computeIfAbsent(
-                    jarPath.toString(),
-                    k -> new URLClassLoader(new URL[] {jarUrl}, getClass().getClassLoader()));
+            loader =
+                    loaders.computeIfAbsent(
+                            jarPath.toString(),
+                            k ->
+                                    new URLClassLoader(
+                                            new URL[] {jarUrl}, getClass().getClassLoader()));
         } catch (java.net.MalformedURLException e) {
             throw new IOException("invalid jar url: " + jarPath, e);
         }
@@ -160,7 +164,8 @@ public class DriverLoader {
         int current = 1;
         int pageSize = 100;
         while (true) {
-            PageResult<DataSourceTypeConfig> page = repository.page(new PageQuery(current, pageSize));
+            PageResult<DataSourceTypeConfig> page =
+                    repository.page(new PageQuery(current, pageSize));
             all.addAll(page.content());
             if ((long) current * pageSize >= page.total()) {
                 break;

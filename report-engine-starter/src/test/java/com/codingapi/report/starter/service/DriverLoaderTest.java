@@ -3,7 +3,6 @@ package com.codingapi.report.starter.service;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.codingapi.report.data.datasource.DataSourceTypeConfig;
-import com.codingapi.report.data.datasource.type.DbDataSourceType;
 import com.codingapi.report.dto.datasource.DataSourceTypeDTO;
 import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.PageQuery;
@@ -123,11 +122,12 @@ class DriverLoaderTest {
     void loadOnStartupSkipsNonDbConfigs() throws IOException {
         Path jar = buildStubDriverJar(driverDir.resolve("stub.jar"));
         // 非 DB 类型（type=null）应被跳过
-        repository.save(DataSourceTypeConfig.builder()
-                .id(UUID.randomUUID().toString())
-                .name("non-db")
-                .type(null)
-                .build());
+        repository.save(
+                DataSourceTypeConfig.builder()
+                        .id(UUID.randomUUID().toString())
+                        .name("non-db")
+                        .type(null)
+                        .build());
         saveDbConfig(jar.getFileName().toString(), DRIVER_CLASS);
 
         loader.loadOnStartup();
@@ -180,20 +180,27 @@ class DriverLoaderTest {
 
     @Test
     void registerDriverThrowsForMissingJar() {
-        IOException ex = assertThrows(
-                IOException.class,
-                () -> loader.registerDriver("missing.jar", DRIVER_CLASS));
+        IOException ex =
+                assertThrows(
+                        IOException.class,
+                        () -> loader.registerDriver("missing.jar", DRIVER_CLASS));
         assertTrue(ex.getMessage().contains("driver jar not found"));
     }
 
     @Test
     void registerDriverThrowsForMissingClass() throws IOException {
-        Path jar = buildJar(
-                driverDir.resolve("empty.jar"),
-                Map.of("META-INF/services/java.sql.Driver", "org.nope.Driver\n".getBytes(StandardCharsets.UTF_8)));
-        IOException ex = assertThrows(
-                IOException.class,
-                () -> loader.registerDriver(jar.getFileName().toString(), "org.nope.Driver"));
+        Path jar =
+                buildJar(
+                        driverDir.resolve("empty.jar"),
+                        Map.of(
+                                "META-INF/services/java.sql.Driver",
+                                "org.nope.Driver\n".getBytes(StandardCharsets.UTF_8)));
+        IOException ex =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                loader.registerDriver(
+                                        jar.getFileName().toString(), "org.nope.Driver"));
         assertTrue(ex.getMessage().contains("driver class not found"));
     }
 
@@ -201,7 +208,11 @@ class DriverLoaderTest {
     void registerDriverThrowsForNonDriverClass() throws IOException {
         Path classesDir = tempDir.resolve("classes");
         Files.createDirectories(classesDir);
-        Path compiled = compileClass(classesDir, "org/example/NotADriver.java", """
+        Path compiled =
+                compileClass(
+                        classesDir,
+                        "org/example/NotADriver.java",
+                        """
                 package org.example;
                 public class NotADriver {
                     public NotADriver() {}
@@ -209,18 +220,25 @@ class DriverLoaderTest {
                 """);
         if (compiled == null) return;
         byte[] classBytes = Files.readAllBytes(compiled);
-        Path jar = buildJar(driverDir.resolve("notdriver.jar"), Map.of("org/example/NotADriver.class", classBytes));
+        Path jar =
+                buildJar(
+                        driverDir.resolve("notdriver.jar"),
+                        Map.of("org/example/NotADriver.class", classBytes));
 
-        IOException ex = assertThrows(
-                IOException.class,
-                () -> loader.registerDriver(jar.getFileName().toString(), "org.example.NotADriver"));
+        IOException ex =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                loader.registerDriver(
+                                        jar.getFileName().toString(), "org.example.NotADriver"));
         assertTrue(ex.getMessage().contains("not a java.sql.Driver"));
     }
 
     // ─── helpers ───────────────────────────────────────────
 
     private void saveDbConfig(String jarFile, String driverClass) {
-        DataSourceTypeDTO dto = new DataSourceTypeDTO(null, "stub", "DB", jarFile, driverClass, 0L, 0L);
+        DataSourceTypeDTO dto =
+                new DataSourceTypeDTO(null, "stub", "DB", jarFile, driverClass, 0L, 0L);
         repository.save(DataSourceTypeConfig.fromDTO(dto));
     }
 
@@ -250,7 +268,11 @@ class DriverLoaderTest {
     private Path buildStubDriverJar(Path target) throws IOException {
         Path classesDir = tempDir.resolve("stub-classes");
         Files.createDirectories(classesDir);
-        Path compiled = compileClass(classesDir, "org/example/MyDriver.java", """
+        Path compiled =
+                compileClass(
+                        classesDir,
+                        "org/example/MyDriver.java",
+                        """
                 package org.example;
                 import java.sql.*;
                 import java.util.Properties;
@@ -286,15 +308,17 @@ class DriverLoaderTest {
         return target;
     }
 
-    private static Path compileClass(Path classesDir, String relPath, String source) throws IOException {
+    private static Path compileClass(Path classesDir, String relPath, String source)
+            throws IOException {
         if (ToolProvider.getSystemJavaCompiler() == null) {
             return null; // JRE-only environment
         }
         Path srcFile = classesDir.resolve(relPath);
         Files.createDirectories(srcFile.getParent());
         Files.writeString(srcFile, source);
-        int rc = ToolProvider.getSystemJavaCompiler()
-                .run(null, null, null, "-d", classesDir.toString(), srcFile.toString());
+        int rc =
+                ToolProvider.getSystemJavaCompiler()
+                        .run(null, null, null, "-d", classesDir.toString(), srcFile.toString());
         assertEquals(0, rc, "stub should compile: " + relPath);
         String classRel = relPath.substring(0, relPath.length() - ".java".length()) + ".class";
         return classesDir.resolve(classRel);
@@ -305,9 +329,10 @@ class DriverLoaderTest {
 
         @Override
         public String save(DataSourceTypeConfig config) {
-            String id = config.getId() != null && !config.getId().isBlank()
-                    ? config.getId()
-                    : UUID.randomUUID().toString();
+            String id =
+                    config.getId() != null && !config.getId().isBlank()
+                            ? config.getId()
+                            : UUID.randomUUID().toString();
             config.setId(id);
             long now = System.currentTimeMillis();
             DataSourceTypeConfig existing = store.get(id);
