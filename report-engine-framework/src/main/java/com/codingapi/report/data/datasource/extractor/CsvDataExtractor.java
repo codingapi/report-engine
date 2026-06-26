@@ -3,13 +3,19 @@ package com.codingapi.report.data.datasource.extractor;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.Field;
+import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.RawTable;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -96,6 +102,50 @@ public class CsvDataExtractor implements DataExtractor {
             rows.add(row);
         }
         return new RawTable(qualifiedColumns(dataset), rows);
+    }
+
+    @Override
+    public List<IntrospectedTable> introspect(DataSource source) {
+        String path = String.valueOf(source.getConfig().get("path"));
+        try (InputStream in = openStream(path)) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            String header = reader.readLine();
+            List<ColumnMeta> columns = new ArrayList<>();
+            if (header != null && !header.isBlank()) {
+                for (String h : header.split(",", -1)) {
+                    String name = h.trim();
+                    if (!name.isEmpty()) {
+                        columns.add(new ColumnMeta(name, "STRING", false));
+                    }
+                }
+            }
+            return List.of(new IntrospectedTable(deriveTableName(path), columns));
+        } catch (IOException e) {
+            throw new IllegalStateException("CSV 元数据探查失败: " + path, e);
+        }
+    }
+
+    /** 优先文件系统路径；不存在则按 classpath 资源读取（兼容 {@link #extract} 的 classpath 约定）。 */
+    private InputStream openStream(String path) throws IOException {
+        Path p = Paths.get(path);
+        if (Files.exists(p)) {
+            return Files.newInputStream(p);
+        }
+        InputStream cp = getClass().getResourceAsStream(path);
+        if (cp == null) {
+            throw new IOException("CSV 文件不存在: " + path);
+        }
+        return cp;
+    }
+
+    /** 表名取文件主名（去扩展名），用于 introspect 结果。 */
+    private static String deriveTableName(String path) {
+        String p = path;
+        int slash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+        if (slash >= 0) p = p.substring(slash + 1);
+        int dot = p.lastIndexOf('.');
+        if (dot > 0) p = p.substring(0, dot);
+        return p.isBlank() ? "csv" : p;
     }
 
     /** 生成限定列名列表：每个字段 → "datasetId.field" */

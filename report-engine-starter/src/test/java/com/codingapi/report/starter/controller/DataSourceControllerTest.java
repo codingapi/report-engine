@@ -5,18 +5,30 @@ import static org.mockito.Mockito.*;
 
 import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.data.datasource.extractor.CsvDataExtractor;
+import com.codingapi.report.data.datasource.extractor.ExcelDataExtractor;
 import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.excel.ExcelExporter;
+import com.codingapi.report.excel.pojo.Cell;
+import com.codingapi.report.excel.pojo.Sheet;
+import com.codingapi.report.excel.pojo.Workbook;
 import com.codingapi.report.repository.DataSourceRepository;
 import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.PageQuery;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.controller.DataSourceController.DataSourceBrief;
+import com.codingapi.report.starter.properties.ReportProperties;
 import com.codingapi.report.starter.service.DataSourceService;
+import com.codingapi.report.starter.service.DataSourceService.UploadResult;
 import com.codingapi.report.starter.service.DriverLoader;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.mock.web.MockMultipartFile;
 
 /**
  * 前置条件：CRUD 与脱敏/回填走 {@link DataSourceService}；外部驱动注册在 {@link DriverLoader} 的单测里覆盖， 这里用 mock 的
@@ -36,20 +50,24 @@ class DataSourceControllerTest {
     private CredentialService credentials;
     private DriverLoader driverLoader;
     private DataSourceTypeRepository typeRepository;
+    private ReportProperties properties;
     private DataSourceService service;
     private DataSourceController controller;
 
     @BeforeEach
-    void setUp() {
+    void setUp(@TempDir Path tempDir) {
         repository = new FakeDataSourceRepository();
         // 真实的 CredentialService（默认 key），覆盖 maskConfig / isMasked / 解密链路。
         credentials = new CredentialService("test-key");
         driverLoader = mock(DriverLoader.class);
         typeRepository = mock(DataSourceTypeRepository.class);
-        // DataExtractor 列表给一个 CSV 提取器，testConnection 走 CSV 路径不需要 driver 注册。
-        List<DataExtractor> extractors = List.of(new CsvDataExtractor());
+        // DataExtractor 列表给 CSV + EXCEL 提取器，覆盖 introspect/upload 链路。
+        List<DataExtractor> extractors = List.of(new CsvDataExtractor(), new ExcelDataExtractor());
         // DataModelService 仅在 listTables/columns/preview 链路用，CRUD 测试不需要。
         var dataModelService = mock(com.codingapi.report.starter.service.DataModelService.class);
+        properties = new ReportProperties();
+        properties.getExcel().setDir(tempDir.resolve("excel").toString());
+        properties.getCsv().setDir(tempDir.resolve("csv").toString());
         service =
                 new DataSourceService(
                         dataModelService,
@@ -57,7 +75,8 @@ class DataSourceControllerTest {
                         repository,
                         credentials,
                         driverLoader,
-                        typeRepository);
+                        typeRepository,
+                        properties);
         controller = new DataSourceController(service);
     }
 
@@ -190,6 +209,107 @@ class DataSourceControllerTest {
     void csvSaveDoesNotInvokeDriverLoader() {
         controller.save(new DataSourceDTO(null, "csv", "CSV", null, Map.of("path", "x.csv")));
         verifyNoInteractions(driverLoader);
+    }
+
+    @Test
+    void introspectCsvFilesystemPathReturnsHeaderColumns(@TempDir Path tempDir) throws Exception {
+        Path csv = tempDir.resolve("staff.csv");
+        Files.writeString(csv, "id,name,age\n1,alice,30\n2,bob,25");
+
+        Map<String, Object> config = Map.of("path", csv.toString());
+        String id = controller.save(new DataSourceDTO(null, "csv", "CSV", null, config)).getData();
+
+        MultiResponse<IntrospectedTable> resp = controller.introspect(id);
+        assertTrue(resp.isSuccess());
+        List<IntrospectedTable> tables = new java.util.ArrayList<>(resp.getData().getList());
+        assertEquals(1, tables.size(), "CSV 探查应返回单张表");
+        IntrospectedTable table = tables.get(0);
+        assertEquals("staff", table.name());
+        List<String> colNames = table.columns().stream().map(c -> c.name()).toList();
+        assertEquals(List.of("id", "name", "age"), colNames);
+        assertTrue(table.columns().stream().allMatch(c -> "STRING".equals(c.dataType()) && !c.primaryKey()));
+    }
+
+    @Test
+    void introspectMissingDataSourceThrows() {
+        assertThrows(IllegalArgumentException.class, () -> controller.introspect("nope"));
+    }
+
+    @Test
+    void uploadCsvFileSavesAndIntrospects() throws Exception {
+        byte[] bytes = "code,label\nA,Apple\nB,Banana".getBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "fruits.csv", "text/csv", bytes);
+
+        SingleResponse<UploadResult> resp = controller.upload(file, "CSV");
+        assertTrue(resp.isSuccess());
+        UploadResult result = resp.getData();
+        assertNotNull(result);
+        assertEquals("CSV", result.type());
+        assertTrue(Files.exists(Path.of(result.savedPath())), "上传文件应落盘");
+        assertEquals("fruits.csv", Path.of(result.savedPath()).getFileName().toString());
+        assertEquals(1, result.tables().size());
+        IntrospectedTable table = result.tables().get(0);
+        assertEquals("fruits", table.name());
+        assertEquals(List.of("code", "label"), table.columns().stream().map(c -> c.name()).toList());
+    }
+
+    @Test
+    void uploadExcelFileSavesAndIntrospectsAllSheets() throws Exception {
+        Workbook wb = buildWorkbookWithSheets(List.of("Staff", "Depts"));
+        byte[] bytes = new ExcelExporter().export(wb);
+        MockMultipartFile file =
+                new MockMultipartFile("file", "book.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes);
+
+        SingleResponse<UploadResult> resp = controller.upload(file, "EXCEL");
+        assertTrue(resp.isSuccess());
+        UploadResult result = resp.getData();
+        assertEquals("EXCEL", result.type());
+        assertTrue(Files.exists(Path.of(result.savedPath())));
+        assertEquals(2, result.tables().size(), "应解析出两个 sheet");
+        assertEquals(List.of("Staff", "Depts"), result.tables().stream().map(IntrospectedTable::name).toList());
+        // 每个 sheet 表头应有 id/name 两列
+        for (IntrospectedTable t : result.tables()) {
+            assertEquals(List.of("id", "name"), t.columns().stream().map(c -> c.name()).toList());
+        }
+    }
+
+    @Test
+    void uploadInfersTypeFromExtensionWhenTypeParamMissing() throws Exception {
+        byte[] bytes = "x,y\n1,2".getBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "auto.csv", "text/csv", bytes);
+        SingleResponse<UploadResult> resp = controller.upload(file, null);
+        assertEquals("CSV", resp.getData().type());
+    }
+
+    @Test
+    void uploadRejectsUnknownExtension() {
+        MockMultipartFile file = new MockMultipartFile("file", "data.bin", "application/octet-stream", new byte[] {1});
+        assertThrows(IllegalArgumentException.class, () -> controller.upload(file, null));
+    }
+
+    private static Workbook buildWorkbookWithSheets(List<String> sheetNames) {
+        Workbook wb = new Workbook();
+        List<Sheet> sheets = new ArrayList<>();
+        for (String name : sheetNames) {
+            Sheet sheet = new Sheet();
+            sheet.setId(UUID.randomUUID().toString());
+            sheet.setName(name);
+            List<Cell> cells = new ArrayList<>();
+            cells.add(cellOf(0, 0, "id"));
+            cells.add(cellOf(0, 1, "name"));
+            sheet.setCells(cells);
+            sheets.add(sheet);
+        }
+        wb.setSheets(sheets);
+        return wb;
+    }
+
+    private static Cell cellOf(int row, int col, String text) {
+        Cell c = new Cell();
+        c.setRow(row);
+        c.setCol(col);
+        c.setValue(TextNode.valueOf(text));
+        return c;
     }
 
     private static class FakeDataSourceRepository implements DataSourceRepository {

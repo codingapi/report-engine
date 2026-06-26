@@ -2,12 +2,15 @@ package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataSource;
+import com.codingapi.report.data.datasource.IntrospectedTable;
 import com.codingapi.report.data.datasource.TestResult;
 import com.codingapi.report.dto.datamodel.DataSourceDTO;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.DataSourceService;
+import com.codingapi.report.starter.service.DataSourceService.UploadResult;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 数据源（连接）操作 API：CRUD + 连接测试 + 表/列探查。
@@ -74,6 +78,29 @@ public class DataSourceController {
     @PostMapping("/test")
     public SingleResponse<TestResult> test(@RequestBody DataSourceDTO dto) {
         return SingleResponse.of(dataSourceService.testConnection(dto));
+    }
+
+    /**
+     * 元数据探查：按已保存的连接 id 解析所有表/sheet + 列定义。 DB 返回物理表列表；EXCEL 每个 sheet 一张表；CSV 单张表。
+     */
+    @PostMapping("/{id}/introspect")
+    public MultiResponse<IntrospectedTable> introspect(@PathVariable String id) {
+        return MultiResponse.of(dataSourceService.introspect(id));
+    }
+
+    /**
+     * 上传 Excel/CSV 文件到配置目录并返回解析出的表/列元数据。 EXCEL 落到 {@code codingapi.report.excel.dir}，CSV 落到 {@code
+     * codingapi.report.csv.dir}。
+     *
+     * @param file 上传文件
+     * @param type {@code EXCEL} 或 {@code CSV}；省略时按扩展名推断
+     */
+    @PostMapping("/upload")
+    public SingleResponse<UploadResult> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "type", required = false) String type)
+            throws IOException {
+        return SingleResponse.of(dataSourceService.uploadAndIntrospect(file, type));
     }
 
     @GetMapping("/{dataModelId}/{datasourceId}/tables")
