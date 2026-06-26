@@ -14,18 +14,18 @@ import type {
 import {
   DatasetManager,
   RelationEditor,
-} from '@coding-report/report-datasource';
+} from '@coding-report/report-engine';
 import type {
   DatasetDef,
   DataSourceConfig,
   Relationship,
-} from '@coding-report/report-datasource';
+} from '@coding-report/report-engine';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 /**
- * 后端 DatasetDTO（kind=TABLE/UNION）→ report-datasource 的 DatasetDef（kind=PHYSICAL/UNION）。
+ * 后端 DatasetDTO（kind=TABLE/UNION）→ report-engine 的 DatasetDef（kind=PHYSICAL/UNION）。
  * 两个端点的 dataset 字段集不同（configs/{id} 精简视图无 kind，datamodels/{id} 完整 DTO 有），
  * 此处统一适配：kind 缺失或 TABLE 都按物理表处理。
  */
@@ -55,7 +55,7 @@ const toDatasetDef = (d: DataModelDataset): DatasetDef => {
   };
 };
 
-/** 后端 DataSourceDTO → report-datasource 的 DataSourceConfig（来源列只需 id/name/type） */
+/** 后端 DataSourceDTO → report-engine 的 DataSourceConfig（来源列只需 id/name/type） */
 const toDataSourceConfig = (s: DataModelSource): DataSourceConfig => ({
   id: s.id,
   name: s.name,

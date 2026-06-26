@@ -3,11 +3,9 @@ import { useState } from 'react';
 import type { ConnectionFormProps, DataSourceConfig, DataSourceType } from '@/types';
 
 const DATASOURCE_TYPE_OPTIONS: Array<{ label: string; value: DataSourceType }> = [
-  { label: 'CSV', value: 'CSV' },
-  { label: 'JSON', value: 'JSON' },
   { label: 'DB', value: 'DB' },
-  { label: 'API', value: 'API' },
   { label: 'EXCEL', value: 'EXCEL' },
+  { label: 'CSV', value: 'CSV' },
 ];
 
 /**
