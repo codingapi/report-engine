@@ -1,9 +1,11 @@
 package com.example.report.config;
 
 import com.codingapi.report.repository.DataModelRepository;
+import com.codingapi.report.repository.DataSourceRepository;
 import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.ReportRepository;
 import com.example.report.repository.InMemoryDataModelRepository;
+import com.example.report.repository.InMemoryDataSourceRepository;
 import com.example.report.repository.InMemoryDataSourceTypeRepository;
 import com.example.report.repository.InMemoryReportRepository;
 import org.springframework.context.annotation.Bean;
@@ -30,5 +32,10 @@ public class RepositoryConfig {
     @Bean
     public DataSourceTypeRepository dataSourceTypeRepository() {
         return new InMemoryDataSourceTypeRepository();
+    }
+
+    @Bean
+    public DataSourceRepository dataSourceRepository() {
+        return new InMemoryDataSourceRepository();
     }
 }

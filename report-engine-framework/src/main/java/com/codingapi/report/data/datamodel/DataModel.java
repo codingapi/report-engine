@@ -108,6 +108,7 @@ public class DataModel {
                             s.getId(),
                             s.getName(),
                             s.getType() != null ? s.getType().type() : null,
+                            s.getTypeConfigId(),
                             s.getConfig()));
         }
         return out;
@@ -216,6 +217,7 @@ public class DataModel {
                             .id(s.id())
                             .name(s.name())
                             .type(type)
+                            .typeConfigId(s.typeConfigId())
                             .config(s.config())
                             .build());
         }
