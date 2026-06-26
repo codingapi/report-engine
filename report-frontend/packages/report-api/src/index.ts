@@ -62,6 +62,8 @@ export type {
   DataSourceKind,
   DataSourceBrief,
   DataSourceDTO,
+  DatasetDTO,
+  DatasetFieldDTO,
   IntrospectedColumn,
   IntrospectedTable,
   DataFileUploadResult,

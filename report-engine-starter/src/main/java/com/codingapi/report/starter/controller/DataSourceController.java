@@ -53,6 +53,9 @@ public class DataSourceController {
                                                 ds.getName() != null ? ds.getName() : "未命名连接",
                                                 ds.getType() != null ? ds.getType().type() : null,
                                                 ds.getTypeConfigId(),
+                                                ds.getDatasets() != null
+                                                        ? ds.getDatasets().size()
+                                                        : 0,
                                                 ds.getCreateTime(),
                                                 ds.getUpdateTime()))
                         .toList();
@@ -123,6 +126,7 @@ public class DataSourceController {
             String name,
             String type,
             String typeConfigId,
+            int datasetCount,
             long createTime,
             long updateTime) {}
 }

@@ -43,7 +43,7 @@ const routes: RouteConfig[] = [
   },
   {
     path: '/datasource-types',
-    name: '数据源类型',
+    name: '数据库驱动',
     icon: <ApiOutlined />,
     element: <DataSourceTypesPage />,
   },

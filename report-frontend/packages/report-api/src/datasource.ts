@@ -40,8 +40,29 @@ export interface DataSourceBrief {
   name: string;
   type: DataSourceKind;
   typeConfigId?: string;
+  /** 该连接下已解析的数据集（表/sheet）数量 */
+  datasetCount: number;
   createTime: number;
   updateTime: number;
+}
+
+/** 数据集字段契约（对齐后端 FieldDTO） */
+export interface DatasetFieldDTO {
+  name: string;
+  alias: string;
+  dataType: string;
+  primaryKey: boolean;
+}
+
+/** 数据源下的数据集契约（对齐后端 DatasetDTO 的 TABLE 形态） */
+export interface DatasetDTO {
+  id?: string;
+  alias: string;
+  kind: 'TABLE';
+  datasourceId?: string;
+  sourceTable: string;
+  fields: DatasetFieldDTO[];
+  members?: null;
 }
 
 /** 数据源持久化 DTO（POST /api/datasources 入参 / GET /{id} 出参） */
@@ -52,6 +73,8 @@ export interface DataSourceDTO {
   typeConfigId?: string;
   /** 配置（含敏感字段，出口由后端脱敏；保存时 `***` 占位回填旧值） */
   config: Record<string, unknown>;
+  /** 该连接下维护的数据集（表别名/字段别名）；编辑回填用 */
+  datasets?: DatasetDTO[];
 }
 
 /** 元数据解析：一张表/sheet/CSV 文件解析出的列元数据 */

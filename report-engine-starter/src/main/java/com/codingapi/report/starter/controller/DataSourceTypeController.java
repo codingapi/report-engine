@@ -1,6 +1,7 @@
 package com.codingapi.report.starter.controller;
 
 import com.codingapi.report.data.datasource.DataSourceTypeConfig;
+import com.codingapi.report.data.datasource.type.DbDataSourceType;
 import com.codingapi.report.dto.datasource.DataSourceTypeDTO;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.DataSourceTypeService;
@@ -44,6 +45,9 @@ public class DataSourceTypeController {
                                                 c.getId(),
                                                 c.getName() != null ? c.getName() : "未命名类型",
                                                 c.getType() != null ? c.getType().type() : null,
+                                                c.getType() instanceof DbDataSourceType db
+                                                        ? db.driverClass()
+                                                        : null,
                                                 c.getCreateTime(),
                                                 c.getUpdateTime()))
                         .toList();
@@ -76,7 +80,12 @@ public class DataSourceTypeController {
     }
 
     public record DataSourceTypeBrief(
-            String id, String name, String kind, long createTime, long updateTime) {}
+            String id,
+            String name,
+            String kind,
+            String driverClass,
+            long createTime,
+            long updateTime) {}
 
     public record DriverJarUploadResponse(String jarFile, List<String> driverClasses) {}
 }

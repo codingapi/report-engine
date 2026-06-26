@@ -10,6 +10,8 @@ export interface DataSourceTypeBrief {
   name: string;
   /** 类型判别串，对齐 DataSourceType.type()（"DB" / "EXCEL" / "CSV"） */
   kind: string;
+  /** 驱动类（仅 DB 类型有，对齐 DbDataSourceType.driverClass()）；非 DB 为 null */
+  driverClass: string | null;
   createTime: number;
   updateTime: number;
 }

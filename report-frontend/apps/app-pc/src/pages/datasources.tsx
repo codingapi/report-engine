@@ -2,6 +2,7 @@ import { DataSourceManager } from '@coding-report/report-engine';
 import type { DataSourceService } from '@coding-report/report-engine';
 import {
   listDataSources,
+  getDataSource,
   saveDataSource,
   deleteDataSource,
   introspectDatasets,
@@ -12,7 +13,7 @@ import { listDataSourceTypes } from '@coding-report/report-api';
 
 const service: DataSourceService = {
   list: (current, pageSize) => listDataSources(current, pageSize),
-  get: () => Promise.resolve({} as any),
+  get: (id) => getDataSource(id),
   save: (dto) => saveDataSource(dto),
   remove: (id) => deleteDataSource(id),
   introspect: (id) => introspectDatasets(id),

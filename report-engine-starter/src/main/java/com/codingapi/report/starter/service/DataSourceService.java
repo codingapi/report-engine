@@ -1,7 +1,9 @@
 package com.codingapi.report.starter.service;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
+import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.ColumnMeta;
 import com.codingapi.report.data.datasource.DataExtractor;
@@ -13,6 +15,8 @@ import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.data.datasource.type.DataSourceType;
 import com.codingapi.report.data.datasource.type.DbDataSourceType;
 import com.codingapi.report.dto.datamodel.DataSourceDTO;
+import com.codingapi.report.dto.datamodel.DatasetDTO;
+import com.codingapi.report.dto.datamodel.FieldDTO;
 import com.codingapi.report.repository.DataSourceRepository;
 import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.PageQuery;
@@ -23,6 +27,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +91,12 @@ public class DataSourceService {
         DataSource incoming = fromDto(dto);
         DataSource old = dto.id() != null && !dto.id().isBlank() ? repository.find(dto.id()) : null;
         mergeMaskedCredentials(incoming, old);
+        // DTO 不带 datasets，更新时保留 introspect 阶段已解析持久化的数据集，避免被清空
+        if ((incoming.getDatasets() == null || incoming.getDatasets().isEmpty())
+                && old != null
+                && old.getDatasets() != null) {
+            incoming.setDatasets(old.getDatasets());
+        }
         String id = repository.save(incoming);
         registerDriverIfNeeded(incoming);
         return id;
@@ -121,7 +132,43 @@ public class DataSourceService {
             ds.setConfig(credentials.decryptConfig(ds.getConfig()));
         }
         registerDriverIfNeeded(ds);
-        return findExtractor(ds.getType()).introspect(ds);
+        return toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
+    }
+
+    /** 探查列的原生类型统一映射成报表业务 {@link DataType} 名（前端/数据集只认业务类型）。 */
+    private static List<IntrospectedTable> toBusinessTypes(List<IntrospectedTable> tables) {
+        return tables.stream()
+                .map(
+                        t ->
+                                new IntrospectedTable(
+                                        t.name(),
+                                        t.columns().stream()
+                                                .map(
+                                                        c ->
+                                                                new ColumnMeta(
+                                                                        c.name(),
+                                                                        mapDataType(c.dataType())
+                                                                                .name(),
+                                                                        c.primaryKey()))
+                                                .toList()))
+                .toList();
+    }
+
+    /** 原生类型名 / 业务类型名 → 业务 {@link DataType} 粗映射，无法识别回退 STRING。 */
+    private static DataType mapDataType(String nativeType) {
+        if (nativeType == null) return DataType.STRING;
+        String t = nativeType.toUpperCase();
+        if (t.contains("TIMESTAMP") || t.contains("DATETIME")) return DataType.DATETIME;
+        if (t.contains("DATE")) return DataType.DATE;
+        if (t.contains("BOOL")) return DataType.BOOLEAN;
+        if (t.contains("JSON")) return DataType.JSON;
+        if (t.contains("INT")
+                || t.contains("NUM")
+                || t.contains("DEC")
+                || t.contains("DOUBLE")
+                || t.contains("FLOAT")
+                || t.contains("REAL")) return DataType.NUMBER;
+        return DataType.STRING;
     }
 
     /**
@@ -162,7 +209,7 @@ public class DataSourceService {
                         .type(DataSourceType.of(kind, Map.of("path", savedPath)))
                         .config(Map.of("path", savedPath))
                         .build();
-        List<IntrospectedTable> tables = findExtractor(ds.getType()).introspect(ds);
+        List<IntrospectedTable> tables = toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
         return new UploadResult(savedPath, kind, tables);
     }
 
@@ -245,12 +292,45 @@ public class DataSourceService {
 
     private DataSource fromDto(DataSourceDTO dto) {
         DataSourceType type = DataSourceType.of(dto.type(), dto.config());
-        return DataSource.builder()
-                .id(dto.id())
-                .name(dto.name())
-                .type(type)
-                .typeConfigId(dto.typeConfigId())
-                .config(dto.config())
+        DataSource ds =
+                DataSource.builder()
+                        .id(dto.id())
+                        .name(dto.name())
+                        .type(type)
+                        .typeConfigId(dto.typeConfigId())
+                        .config(dto.config())
+                        .build();
+        if (dto.datasets() != null) {
+            ds.setDatasets(dto.datasets().stream().map(d -> toTableDataset(d, ds)).toList());
+        }
+        return ds;
+    }
+
+    /** DTO → 领域 {@link TableDataset}，回填所属 {@link DataSource}（取数时无需再按 id 查找）。 */
+    private static Dataset toTableDataset(DatasetDTO d, DataSource owner) {
+        List<Field> fields =
+                d.fields() == null
+                        ? List.of()
+                        : d.fields().stream()
+                                .map(
+                                        f ->
+                                                Field.builder()
+                                                        .name(f.name())
+                                                        .alias(f.alias())
+                                                        .dataType(mapDataType(f.dataType()))
+                                                        .primaryKey(f.primaryKey())
+                                                        .build())
+                                .toList();
+        return TableDataset.builder()
+                .id(
+                        d.id() != null && !d.id().isBlank()
+                                ? d.id()
+                                : owner.getId() + "::" + d.sourceTable())
+                .datasource(owner)
+                .datasourceId(owner.getId())
+                .sourceTable(d.sourceTable())
+                .alias(d.alias() != null ? d.alias() : d.sourceTable())
+                .fields(fields)
                 .build();
     }
 
@@ -260,7 +340,41 @@ public class DataSourceService {
                 ds.getName(),
                 ds.getType() != null ? ds.getType().type() : null,
                 ds.getTypeConfigId(),
-                credentials.maskConfig(ds.getConfig()));
+                credentials.maskConfig(ds.getConfig()),
+                toDatasetDtos(ds.getDatasets()));
+    }
+
+    /** 领域数据集 → DTO（仅物理表数据集；字段类型枚举名输出）。 */
+    private static List<DatasetDTO> toDatasetDtos(List<Dataset> datasets) {
+        if (datasets == null) return null;
+        List<DatasetDTO> out = new ArrayList<>();
+        for (Dataset d : datasets) {
+            if (!(d instanceof TableDataset t)) continue;
+            List<FieldDTO> fields =
+                    t.getFields() == null
+                            ? List.of()
+                            : t.getFields().stream()
+                                    .map(
+                                            f ->
+                                                    new FieldDTO(
+                                                            f.getName(),
+                                                            f.getAlias(),
+                                                            f.getDataType() != null
+                                                                    ? f.getDataType().name()
+                                                                    : null,
+                                                            f.isPrimaryKey()))
+                                    .toList();
+            out.add(
+                    new DatasetDTO(
+                            t.getId(),
+                            t.getAlias(),
+                            "TABLE",
+                            t.getDatasourceId(),
+                            t.getSourceTable(),
+                            fields,
+                            null));
+        }
+        return out;
     }
 
     /** 前端回传的 {@code ***} 占位用旧连接的真实值回填，避免覆盖真实凭证。 */

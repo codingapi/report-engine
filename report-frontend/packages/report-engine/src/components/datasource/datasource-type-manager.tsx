@@ -46,7 +46,6 @@ export interface DataSourceTypeManagerProps {
 interface EditForm {
   id?: string;
   name: string;
-  kind: string;
   jarFile: string;
   driverClass: string;
 }
@@ -78,7 +77,7 @@ export default function DataSourceTypeManager({
         setList(res.list);
         setTotal(res.total);
       } catch (e) {
-        message.error(`加载数据源类型列表失败: ${(e as Error).message}`);
+        message.error(`加载数据库驱动列表失败: ${(e as Error).message}`);
       } finally {
         setLoading(false);
       }
@@ -107,7 +106,7 @@ export default function DataSourceTypeManager({
 
   const openCreate = () => {
     resetModal();
-    form.setFieldsValue({ kind: 'DB', name: '', jarFile: '', driverClass: '' });
+    form.setFieldsValue({ name: '', jarFile: '', driverClass: '' });
     setModalOpen(true);
   };
 
@@ -122,12 +121,11 @@ export default function DataSourceTypeManager({
       form.setFieldsValue({
         id: dto.id,
         name: dto.name,
-        kind: dto.kind,
         jarFile: dto.jarFile,
         driverClass: dto.driverClass,
       });
     } catch (e) {
-      message.error(`加载数据源类型详情失败: ${(e as Error).message}`);
+      message.error(`加载驱动详情失败: ${(e as Error).message}`);
       setModalOpen(false);
     }
   };
@@ -159,12 +157,12 @@ export default function DataSourceTypeManager({
       const dto: DataSourceTypeDTO = {
         id: editingId ?? undefined,
         name: values.name,
-        kind: values.kind,
+        kind: 'DB',
         jarFile: values.jarFile,
         driverClass: values.driverClass,
       };
       await service.save(dto);
-      message.success(editingId ? '数据源类型已更新' : '数据源类型已创建');
+      message.success(editingId ? '数据库驱动已更新' : '数据库驱动已创建');
       resetModal();
       const targetPage = editingId ? page : 1;
       await refresh(targetPage);
@@ -180,7 +178,7 @@ export default function DataSourceTypeManager({
   const handleDelete = async (id: string) => {
     try {
       await service.remove(id);
-      message.success('数据源类型已删除');
+      message.success('数据库驱动已删除');
       const remaining = list.length - 1;
       const targetPage = remaining === 0 && page > 1 ? page - 1 : page;
       setPage(targetPage);
@@ -195,14 +193,10 @@ export default function DataSourceTypeManager({
   const columns: ColumnsType<DataSourceTypeBrief> = useMemo(
     () => [
       { title: '名称', dataIndex: 'name', key: 'name' },
-      { title: '类型', dataIndex: 'kind', key: 'kind', width: 120 },
       {
         title: '驱动类',
         key: 'driverClass',
-        render: (_, r) => {
-          // 列表项未带 driverClass，编辑时从详情拿；这里展示 kind 即可
-          return r.kind ?? '-';
-        },
+        render: (_, r) => r.driverClass || '-',
       },
       {
         title: '创建时间',
@@ -224,7 +218,7 @@ export default function DataSourceTypeManager({
           <Space size="middle">
             <a onClick={() => openEdit(r)}>编辑</a>
             <Popconfirm
-              title="确认删除该数据源类型？"
+              title="确认删除该数据库驱动？"
               onConfirm={() => handleDelete(r.id)}
               okText="删除"
               cancelText="取消"
@@ -250,7 +244,7 @@ export default function DataSourceTypeManager({
         }}
       >
         <Title level={4} style={{ margin: 0 }}>
-          数据源类型管理
+          数据库驱动管理
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           新建驱动
@@ -273,7 +267,7 @@ export default function DataSourceTypeManager({
       />
 
       <Modal
-        title={editingId ? '编辑数据源类型' : '新建数据源类型'}
+        title={editingId ? '编辑数据库驱动' : '新建数据库驱动'}
         open={modalOpen}
         onOk={handleSave}
         onCancel={resetModal}
@@ -283,7 +277,7 @@ export default function DataSourceTypeManager({
         destroyOnHidden
         width={520}
       >
-        <Form form={form} layout="vertical" initialValues={{ kind: 'DB' }}>
+        <Form form={form} layout="vertical">
           <Form.Item name="id" hidden>
             <Input />
           </Form.Item>
@@ -296,19 +290,6 @@ export default function DataSourceTypeManager({
             rules={[{ required: true, message: '请输入名称' }]}
           >
             <Input placeholder="如 MySQL 驱动" />
-          </Form.Item>
-          <Form.Item
-            label="类型"
-            name="kind"
-            rules={[{ required: true, message: '请选择类型' }]}
-          >
-            <Select
-              options={[
-                { value: 'DB', label: 'DB（JDBC）' },
-                { value: 'EXCEL', label: 'EXCEL' },
-                { value: 'CSV', label: 'CSV' },
-              ]}
-            />
           </Form.Item>
           <Form.Item label="驱动 jar 包" required>
             <Space direction="vertical" style={{ width: '100%' }}>
