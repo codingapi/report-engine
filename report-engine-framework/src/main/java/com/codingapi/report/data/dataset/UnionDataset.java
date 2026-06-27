@@ -35,6 +35,9 @@ public final class UnionDataset implements Dataset {
     /** 数据集唯一标识。 */
     private String id;
 
+    /** 英文标识名（用户输入，如 all_depts）。 */
+    private String name;
+
     /** 显示名/别名（面向用户）。 */
     private String alias;
 

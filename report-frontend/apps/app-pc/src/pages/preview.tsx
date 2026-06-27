@@ -79,7 +79,7 @@ const AppPreview = () => {
     <>
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/reports')}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/reports', { replace: true })}>
             返回报表管理
           </Button>
           <h3 style={{ margin: 0 }}>{reportName}</h3>
@@ -88,7 +88,7 @@ const AppPreview = () => {
       <ReportPreview
         renderService={{ preview: previewReport, export: renderReport, drill: drillReport }}
         config={previewConfig}
-        onClose={() => navigate('/reports')}
+        onClose={() => navigate('/reports', { replace: true })}
       />
     </>
   );

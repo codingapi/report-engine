@@ -1,9 +1,11 @@
-import { DatabaseOutlined, HomeOutlined, TableOutlined } from '@ant-design/icons';
+import { CloudServerOutlined, DatabaseOutlined, HomeOutlined, TableOutlined, ApiOutlined } from '@ant-design/icons';
 import HomePage from '@/pages/home';
 import ReportsPage from '@/pages/reports';
 import AppReport from '@/pages/engine';
 import AppPreview from '@/pages/preview';
 import DataModelsPage from '@/pages/datamodels';
+import DataSourceTypesPage from '@/pages/datasource-types';
+import DataSourcesPage from '@/pages/datasources';
 import React from 'react';
 
 export interface RouteConfig {
@@ -31,6 +33,18 @@ const routes: RouteConfig[] = [
     name: '数据模型',
     icon: <DatabaseOutlined />,
     element: <DataModelsPage />,
+  },
+  {
+    path: '/datasource-types',
+    name: '数据库驱动',
+    icon: <ApiOutlined />,
+    element: <DataSourceTypesPage />,
+  },
+  {
+    path: '/datasources',
+    name: '数据源',
+    icon: <CloudServerOutlined />,
+    element: <DataSourcesPage />,
   },
   {
     path: '/engine',

@@ -12,8 +12,33 @@ export { default as ConnectionForm } from './components/datasource/connection-fo
 export { default as ExploreTree } from './components/datasource/explore-tree';
 export { default as DatasetManager } from './components/datasource/dataset-manager';
 export { default as RelationEditor } from './components/datasource/relation-editor';
+export { default as DataSourceTypeManager } from './components/datasource/datasource-type-manager';
+export type {
+  DataSourceTypeService,
+  DataSourceTypeManagerProps,
+} from './components/datasource/datasource-type-manager';
+export { default as DataSourceManager } from './components/datasource/datasource-manager';
+export type {
+  DataSourceService,
+  DataSourceManagerProps,
+} from './components/datasource/datasource-manager';
 export { useDatasource } from './hooks/use-datasource';
 export { useExplore } from './hooks/use-explore';
+
+// 数据模型列表页
+export { default as DataModelListPage } from './components/data-model/data-model-list';
+export type {
+  DataModelService,
+  DataModelListPageProps,
+} from './components/data-model/data-model-list';
+
+// 数据模型设计页
+export { default as DataModelDesigner } from './components/data-model/data-model-designer';
+export type {
+  DataModelDTO,
+  DataModelDesignerService,
+  DataModelDesignerProps,
+} from './components/data-model/data-model-designer';
 
 export { useReportPreview } from './hooks/use-report-preview';
 export type { UseReportPreviewOptions } from './hooks/use-report-preview';
@@ -66,6 +91,7 @@ export type {
   ExploreTreeProps,
   DatasetManagerProps,
   RelationEditorProps,
+  RelationDataset,
   // 参数域
   ParamDTO,
   // 渲染域

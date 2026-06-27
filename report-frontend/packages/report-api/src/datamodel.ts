@@ -32,6 +32,8 @@ export interface UnionMember {
  */
 export interface DataModelDataset {
   id: string;
+  /** 英文标识名（TABLE=物理表名 sourceTable、UNION=合集名） */
+  name?: string;
   alias?: string;
   /** 数据源类型（仅 configs/{id} 精简视图返回） */
   dataSourceType?: DataSourceType;

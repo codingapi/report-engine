@@ -1,4 +1,5 @@
-import { Button, Form, Modal, Popconfirm, Select, Space, Table } from 'antd';
+import { Button, Empty, Form, Modal, Popconfirm, Select, Space, Table } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import type { JoinType, RelationEditorProps, Relationship } from '@/types';
@@ -10,9 +11,17 @@ const JOIN_OPTIONS: Array<{ label: string; value: JoinType }> = [
   { label: 'FULL', value: 'FULL' },
 ];
 
+const PAGE_SIZE = 10;
+
+function rowKey(r: Relationship): string {
+  if (r.id) return r.id;
+  return `${r.left.datasetId}.${r.left.field}-${r.right.datasetId}.${r.right.field}`;
+}
+
 /**
  * 关系列表编辑：在数据集之间定义 JOIN。
  * 字段下拉依赖 datasets 中各数据集的字段定义。
+ * 表格化 + 分页展示，支持新增/编辑/删除。
  */
 export default function RelationEditor({
   datasets,
@@ -69,7 +78,7 @@ export default function RelationEditor({
           </a>
           <Popconfirm
             title="确认删除？"
-            onConfirm={() => onChange?.(relationships.filter((x) => x.id !== r.id))}
+            onConfirm={() => onChange?.(relationships.filter((x) => rowKey(x) !== rowKey(r)))}
           >
             <a>删除</a>
           </Popconfirm>
@@ -92,32 +101,46 @@ export default function RelationEditor({
   const handleOk = async () => {
     const values = (await form.validateFields()) as Relationship;
     const next = editing
-      ? relationships.map((r) => (r.id === values.id ? values : r))
+      ? relationships.map((r) => (rowKey(r) === rowKey(editing) ? values : r))
       : [...relationships, values];
     onChange?.(next);
     setModalOpen(false);
   };
 
+  const canAdd = !disabled && datasets.length >= 2;
+
   return (
     <>
-      <Space style={{ marginBottom: 8 }}>
-        <Button onClick={handleAdd} disabled={disabled || datasets.length < 2}>
+      <div style={{ marginBottom: 12 }}>
+        <Button
+          icon={<PlusOutlined />}
+          type="primary"
+          onClick={handleAdd}
+          disabled={!canAdd}
+        >
           新建关系
         </Button>
-      </Space>
+      </div>
       <Table<Relationship>
-        rowKey="id"
+        rowKey={rowKey}
         columns={columns}
         dataSource={relationships}
-        pagination={false}
         size="small"
+        pagination={
+          relationships.length <= PAGE_SIZE
+            ? false
+            : { pageSize: PAGE_SIZE, size: 'small', showSizeChanger: false }
+        }
+        locale={{
+          emptyText: <Empty description={canAdd ? '暂无关系，点上方「新建关系」' : '至少需要 2 个数据集才能创建关系'} />,
+        }}
       />
       <Modal
         title={editing ? '编辑关系' : '新建关系'}
         open={modalOpen}
         onOk={handleOk}
         onCancel={() => setModalOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item name="id" hidden>

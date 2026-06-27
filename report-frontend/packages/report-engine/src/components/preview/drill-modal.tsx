@@ -32,6 +32,10 @@ const DrillModal: React.FC<DrillModalProps> = ({ open, loading, result, onClose 
 
   const { datasetId, alias, fields, rows } = result;
 
+  // rows 无稳定唯一字段，按序号注入 __key 供 Table rowKey 使用
+  // （antd 6 弃用 rowKey 函数的 index 参数，改用字符串字段）
+  const data = rows.map((r, i) => ({ ...r, __key: String(i) }));
+
   const columns = fields.map((f: { name: string; alias: string | null }) => ({
     title: f.alias || f.name,
     dataIndex: f.name,
@@ -52,9 +56,9 @@ const DrillModal: React.FC<DrillModalProps> = ({ open, loading, result, onClose 
         <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>无明细数据</div>
       ) : (
         <Table
-          dataSource={rows}
+          dataSource={data}
           columns={columns}
-          rowKey={(record, index) => String(index)}
+          rowKey="__key"
           size="small"
           pagination={{ pageSize: 20 }}
           loading={loading}

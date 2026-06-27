@@ -62,7 +62,8 @@ const AppReport = () => {
           setDatasets(
             dm.datasets.map((d) => ({
               id: d.id,
-              alias: d.alias || d.id,
+              alias: d.alias || '',
+              name: d.sourceTable ?? d.name,
               sourceType: d.dataSourceType || 'CSV',
               fields: d.fields.map((f) => ({
                 name: f.name,
@@ -136,7 +137,7 @@ const AppReport = () => {
         </Button>
       }
       extraActions={
-        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports')}>
+        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports', { replace: true })}>
           关闭
         </Button>
       }

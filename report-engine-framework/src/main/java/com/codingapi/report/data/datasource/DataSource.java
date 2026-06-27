@@ -47,10 +47,20 @@ public class DataSource {
     private DataSourceType type;
 
     /**
+     * 引用的 {@link DataSourceTypeConfig} id（DB 类型用），用于定位驱动 jar + 驱动类。
+     *
+     * <p>EXCEL/CSV 类型由系统参数默认目录派生，{@code typeConfigId} 可为空。
+     */
+    private String typeConfigId;
+
+    /**
      * 该连接下的数据集（聚合根）：构建连接时一次性把可见的表/sheet 建成 {@link
      * com.codingapi.report.data.dataset.TableDataset}。{@code DataModel} 引用其中被选中的若干数据集。
      */
     private List<Dataset> datasets;
+
+    private long createTime;
+    private long updateTime;
 
     /**
      * 连接配置（host/库名/密码/文件路径等），不进报表模板。

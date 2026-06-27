@@ -64,7 +64,7 @@
 - [x] **独立纵向带**（`CellBinding.independent`）：显式配置某列从自身声明行独立向下展开（交错/错位排版），默认仍按"一条记录一行"对齐同源列
 - [x] **样式/布局适配**：模板静态内容（标题/页脚）随带扩展下移、汇总行继承模板样式、合并区边框铺满整个区域、模板行高/列宽随渲染带出
 - [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联；JOIN 类型 INNER/LEFT/RIGHT/FULL（hash join，LEFT/RIGHT 保留侧相对 join 参数位置，无匹配侧补 null）
-- [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
+- [x] **数据模型面板**（`DataModelPanel`）：两 tab 布局（数据集 / 数据关系），始终显示数量徽标
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（DB/EXCEL/CSV）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
@@ -72,7 +72,7 @@
 - [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
 - [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `dto.report.*`）+ framework `core.RenderDtoConverter` 匹配前端 JSON 格式
 - [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
-- [x] **报表管理界面**：app-pc 报表管理页（antd Table 分页、新建/编辑/预览/删除），首页 + 报表管理两个入口
+- [x] **管理界面**：app-pc 五个菜单（首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理）；数据源管理为 4 步向导（类型 / 配置 / 解析 / 预览，解析不落库、保存才落库）；数据模型管理为列表 + 全屏抽屉设计器（`DataModelListPage` 内置 `DataModelDesigner`，三 tab：数据集 / 数据合集 / 关系），含**发布状态机**（草稿可修改/发布，已发布屏蔽修改、可转草稿；仅已发布模型可被报表选用）；报表管理页 antd Table 分页、新建/编辑/预览/删除，引用未发布模型的报表标「未发布」并禁用编辑/预览
 - [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发
@@ -84,9 +84,6 @@
 
 #### 数据与存储
 
-- [ ] **数据源管理全流程**：后端提取器 CSV/EXCEL/DB 三种均已实现（`CsvDataExtractor`/`ExcelDataExtractor`/`DbDataExtractor`，API/JSON 已移除），`DataSourceType` 为 sealed interface（Csv/Excel/Db）；前端数据源管理组件已并入 report-engine（`ConnectionForm`/`DatasetManager`/`RelationEditor`/`ExploreTree`）。**仍待打通**：DB 驱动 jar 上传 + 驱动类解析、Excel 文件上传、数据源/数据模型 CRUD 的端到端落地
-- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD（后端提取器是前置依赖）
-- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型（`GET /api/datamodels` 已支持多模型列举，仅 example 注册了 `"default"` 一个）
 - [ ] **持久化存储实现**：`ReportRepository` 接口齐全，starter 不提供默认实现（`@ConditionalOnMissingBean` 交使用方），example 为 `InMemoryReportRepository`（重启丢失）。生产接入需自实现 JPA/文件等持久化
 
 #### 产品演进
@@ -149,7 +146,7 @@ pnpm dev:app-pc
 在 `application.properties` 中配置字体目录：
 
 ```properties
-report.fonts.dir=/path/to/custom/fonts
+codingapi.report.font.dir=/path/to/custom/fonts
 ```
 
 字体文件命名约定：数字前缀控制排序（如 `01_微软雅黑.ttf`、`02_宋体.ttf`），无编号按文件名自然序。

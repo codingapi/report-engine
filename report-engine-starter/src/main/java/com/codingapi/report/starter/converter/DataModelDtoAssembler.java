@@ -51,6 +51,7 @@ public final class DataModelDtoAssembler {
                                                     .toList();
                                     Map<String, Object> dm = new LinkedHashMap<>();
                                     dm.put("id", tds.getId());
+                                    dm.put("name", tds.getName());
                                     dm.put("alias", tds.getAlias());
                                     dm.put(
                                             "dataSourceType",

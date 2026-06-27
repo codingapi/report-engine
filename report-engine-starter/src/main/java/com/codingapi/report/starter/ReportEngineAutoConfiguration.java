@@ -4,18 +4,23 @@ import com.codingapi.report.data.datasource.DataExtractor;
 import com.codingapi.report.data.datasource.credential.CredentialService;
 import com.codingapi.report.excel.FontRegistry;
 import com.codingapi.report.repository.DataModelRepository;
+import com.codingapi.report.repository.DataSourceRepository;
+import com.codingapi.report.repository.DataSourceTypeRepository;
 import com.codingapi.report.repository.ReportRepository;
 import com.codingapi.report.starter.controller.DataModelMgmtController;
 import com.codingapi.report.starter.controller.DataSourceController;
+import com.codingapi.report.starter.controller.DataSourceTypeController;
 import com.codingapi.report.starter.controller.DatasetController;
 import com.codingapi.report.starter.controller.ExcelController;
 import com.codingapi.report.starter.controller.ExpressionController;
 import com.codingapi.report.starter.controller.FontController;
 import com.codingapi.report.starter.controller.ReportConfigController;
 import com.codingapi.report.starter.controller.ReportRenderController;
-import com.codingapi.report.starter.properties.ReportFontProperties;
+import com.codingapi.report.starter.properties.ReportProperties;
 import com.codingapi.report.starter.service.DataModelService;
 import com.codingapi.report.starter.service.DataSourceService;
+import com.codingapi.report.starter.service.DataSourceTypeService;
+import com.codingapi.report.starter.service.DriverLoader;
 import com.codingapi.report.starter.service.ReportConfigService;
 import com.codingapi.report.starter.service.ReportRenderService;
 import java.io.IOException;
@@ -37,16 +42,17 @@ import org.springframework.web.bind.annotation.RestController;
  * 层（{@code com.codingapi.report.starter.service}），Controller 只做 HTTP 编排。
  */
 @Configuration
-@EnableConfigurationProperties(ReportFontProperties.class)
+@EnableConfigurationProperties(ReportProperties.class)
 public class ReportEngineAutoConfiguration {
 
     @Bean
-    public FontRegistry fontRegistry(ReportFontProperties properties) throws IOException {
+    public FontRegistry fontRegistry(ReportProperties properties) throws IOException {
         Path builtinDir = FontRegistry.extractBuiltinFonts();
 
         Path customDir = null;
-        if (properties.getDir() != null && !properties.getDir().isBlank()) {
-            customDir = Path.of(properties.getDir());
+        String fontDir = properties.getFont().getDir();
+        if (fontDir != null && !fontDir.isBlank()) {
+            customDir = Path.of(fontDir);
         }
 
         FontRegistry registry =
@@ -68,15 +74,30 @@ public class ReportEngineAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public DataModelService dataModelService(
-                DataModelRepository dataModelRepository, CredentialService credentials) {
-            return new DataModelService(dataModelRepository, credentials);
+                DataModelRepository dataModelRepository,
+                DataSourceRepository dataSourceRepository,
+                CredentialService credentials) {
+            return new DataModelService(dataModelRepository, dataSourceRepository, credentials);
         }
 
         @Bean
         @ConditionalOnMissingBean
         public DataSourceService dataSourceService(
-                DataModelService dataModelService, List<DataExtractor> extractors) {
-            return new DataSourceService(dataModelService, extractors);
+                DataModelService dataModelService,
+                List<DataExtractor> extractors,
+                DataSourceRepository dataSourceRepository,
+                CredentialService credentials,
+                DriverLoader driverLoader,
+                DataSourceTypeRepository dataSourceTypeRepository,
+                ReportProperties properties) {
+            return new DataSourceService(
+                    dataModelService,
+                    extractors,
+                    dataSourceRepository,
+                    credentials,
+                    driverLoader,
+                    dataSourceTypeRepository,
+                    properties);
         }
 
         @Bean
@@ -91,6 +112,20 @@ public class ReportEngineAutoConfiguration {
         public ReportRenderService reportRenderService(
                 DataModelService dataModelService, List<DataExtractor> extractors) {
             return new ReportRenderService(dataModelService, extractors);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceTypeService dataSourceTypeService(
+                DataSourceTypeRepository repository, ReportProperties properties) {
+            return new DataSourceTypeService(repository, properties);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DriverLoader driverLoader(
+                DataSourceTypeRepository repository, ReportProperties properties) {
+            return new DriverLoader(repository, properties);
         }
 
         // ─── Controller 层 ────────────────────────────────
@@ -140,6 +175,13 @@ public class ReportEngineAutoConfiguration {
         @ConditionalOnMissingBean
         public DataSourceController dataSourceController(DataSourceService dataSourceService) {
             return new DataSourceController(dataSourceService);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public DataSourceTypeController dataSourceTypeController(
+                DataSourceTypeService dataSourceTypeService) {
+            return new DataSourceTypeController(dataSourceTypeService);
         }
     }
 }

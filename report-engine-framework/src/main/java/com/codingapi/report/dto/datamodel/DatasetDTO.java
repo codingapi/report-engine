@@ -12,6 +12,7 @@ import java.util.List;
  */
 public record DatasetDTO(
         String id,
+        String name,
         String alias,
         String kind,
         String datasourceId,

@@ -10,5 +10,6 @@ package com.codingapi.report.data.datasource;
  * @param dataType 数据源原生类型名（如 {@code VARCHAR}/{@code INTEGER}/{@code TIMESTAMP}）， 由提取器返回，映射到业务
  *     {@link com.codingapi.report.data.dataset.DataType} 由建模层完成
  * @param primaryKey 是否主键（来自 JDBC {@code getPrimaryKeys} 或外键元数据）
+ * @param remark 字段备注（来自 JDBC {@code getColumns} 的 REMARKS 列），用作字段别名默认值；CSV/Excel 无备注为 null
  */
-public record ColumnMeta(String name, String dataType, boolean primaryKey) {}
+public record ColumnMeta(String name, String dataType, boolean primaryKey, String remark) {}

@@ -108,6 +108,7 @@ public class DataModel {
                             s.getId(),
                             s.getName(),
                             s.getType() != null ? s.getType().type() : null,
+                            s.getTypeConfigId(),
                             s.getConfig()));
         }
         return out;
@@ -121,6 +122,7 @@ public class DataModel {
                 out.add(
                         new DatasetDTO(
                                 t.getId(),
+                                t.getName(),
                                 t.getAlias(),
                                 "TABLE",
                                 t.getDatasourceId(),
@@ -131,6 +133,7 @@ public class DataModel {
                 out.add(
                         new DatasetDTO(
                                 u.getId(),
+                                u.getName(),
                                 u.getAlias(),
                                 "UNION",
                                 null,
@@ -216,6 +219,7 @@ public class DataModel {
                             .id(s.id())
                             .name(s.name())
                             .type(type)
+                            .typeConfigId(s.typeConfigId())
                             .config(s.config())
                             .build());
         }
@@ -231,6 +235,7 @@ public class DataModel {
                 out.add(
                         UnionDataset.builder()
                                 .id(d.id())
+                                .name(d.name())
                                 .alias(d.alias())
                                 .fields(buildFields(d.fields()))
                                 .members(buildUnionMembers(d.members()))

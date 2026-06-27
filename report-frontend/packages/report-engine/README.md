@@ -7,6 +7,8 @@
 - **`ReportEngine`** — 三栏式报表设计器（左数据模型 / 中电子表格 / 右属性面板）。
 - **`ReportPreview`** — 预览能力组件（参数弹窗 → 渲染 → 预览抽屉 → 反查 → 抽屉内导出）。
 - **`useReportPreview`** — 预览流程 hook（逻辑/状态）。
+- **`DataModelListPage`** — 数据模型管理页（列表 + 全屏抽屉内置 `DataModelDesigner`，`designerService` 注入加载/保存）。
+- **`DataModelDesigner`** — 数据模型设计器（数据集 / 数据合集 / 关系 三 tab）。
 - 领域类型：`CellBinding` / `LoopBlock` / `SummaryRow` / `ParamDTO` / `ReportValue` / `ReportDTO` / `RenderConfig` / `RenderService` 等（`ReportDTO`/`ParamDTO` 与后端同名对齐）。
 
 ## ReportEngine
