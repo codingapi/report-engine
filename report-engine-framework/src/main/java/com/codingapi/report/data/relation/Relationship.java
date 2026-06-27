@@ -14,7 +14,7 @@ import lombok.Data;
  *
  * <ul>
  *   <li>通用关系 → 挂在 {@link DataModel#getRelationships()}，所有引用该模型的报表共享
- *   <li>报表专有关系 → 挂在 {@link com.codingapi.report.render.Report#getExtraRelationships()}， 仅本报表可见
+ *   <li>报表专有关系 → 挂在 {@link com.codingapi.report.core.Report#getExtraRelationships()}， 仅本报表可见
  * </ul>
  *
  * <h3>它不是 SQL JOIN</h3>

@@ -33,6 +33,6 @@ build/
 .vscode/
 
 ### miss ###
+.fonts
 .DS_Store
 .codegraph
-.fonts

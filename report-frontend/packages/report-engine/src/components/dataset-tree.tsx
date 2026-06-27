@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Tree, Tag } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
 import type { Dataset, DatasetField, Relationship, DataSourceType } from '@/types';
+import { formatDatasetLabel } from '@/utils/dataset-label';
 import { dataTypeLabel } from '@/types';
 
 interface DatasetTreeProps {
@@ -18,11 +19,9 @@ interface FieldDragData {
 // ─── 数据源类型标签 ──────────────────────────────────────
 
 const SOURCE_COLORS: Record<DataSourceType, string> = {
-  CSV: 'green',
-  JSON: 'orange',
   DB: 'blue',
-  API: 'purple',
   EXCEL: 'cyan',
+  CSV: 'green',
 };
 
 function getSourceTag(sourceType?: DataSourceType): React.ReactNode {
@@ -137,7 +136,7 @@ function buildDatasetNode(ds: Dataset, fieldRelationMap: Map<string, FieldRelati
     title: (
       <span>
         {getSourceTag(ds.sourceType)}
-        {ds.alias || ds.id}
+        {formatDatasetLabel(ds.alias, ds.name ?? ds.id)}
       </span>
     ),
     selectable: false,

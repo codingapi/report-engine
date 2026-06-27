@@ -46,13 +46,13 @@
 - [x] **字体管理系统**：
   - 后端：双目录扫描（内置 + 自定义）、文件名前缀排序、JVM 注册
   - 前端：`onFontRequest` 回调机制、localStorage 缓存、@font-face 动态注入
-- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 CRUD / 数据模型列表 / 字体 / Excel）；`ReportRepository` 接口（`save/find/page(PageQuery):PageResult/delete`）+ 强类型 `ReportConfig` 实体均在 **framework**（零 Spring 依赖，分页用 framework 纯类型 `PageQuery`/`PageResult`），starter 仅在 Controller 边界做 `SearchRequest↔PageQuery` / `PageResult↔MultiResponse` 适配，`@ConditionalOnMissingBean` 允许使用方覆盖实现
+- [x] **Spring Boot Starter**（`report-engine-starter`）：自动装配 FontRegistry + 全部通用 REST API（渲染 / 数据集 / 公式目录 / 报表配置 CRUD / 数据模型列表 / 字体 / Excel）；`ReportRepository` 接口（`save/find/page(PageQuery):PageResult/delete`）+ 领域实体 `core.Report` / `data.datamodel.DataModel`（自带 `toDTO/fromDTO`）均在 **framework**（零 Spring 依赖，分页用 framework 纯类型 `PageQuery`/`PageResult`），starter 仅在 Controller 边界做 `SearchRequest↔PageQuery` / `PageResult↔MultiResponse` 适配，`@ConditionalOnMissingBean` 允许使用方覆盖实现
 - [x] **API 响应标准化**：统一使用 `SingleResponse` / `MultiResponse` 包装，前端 axios 拦截器自动解包
 - [x] **报表设计器布局**（`report-engine`）：三栏式布局（数据模型 / 表格 / 属性），可拖拽调整宽度，面板可收缩
 - [x] **循环块管理**：右键菜单创建/删除，Tab 化多循环块管理，蓝色虚线高亮，循环字段级联选择
 - [x] **单元格操作句柄**（`CellHandle`）：样式读写、值设置、富文本支持
 - [x] **声明式数据模型**（`report-engine-framework`）：
-  - 数据域：DataSource（`DataSourceType` 枚举：CSV/JSON/DB/API/EXCEL）/ Dataset（sealed → TableDataset / UnionDataset）/ Field / Relationship
+  - 数据域：DataSource（聚合根，持有 List<Dataset>；`DataSourceType` **sealed interface**：CSV/EXCEL/DB 三实现）/ Dataset（sealed → TableDataset 聚合 DataSource / UnionDataset）/ Field / Relationship
   - 算子域：Aggregation（SUM/COUNT/AVG/MAX/MIN/COUNT_DISTINCT）/ Condition（已实现 13 种比较算子：EQ/NE/GT/GE/LT/LE/CONTAINS/NOT_CONTAINS/IN/NOT_IN/IS_NULL/IS_NOT_NULL/BETWEEN + SPI 扩展）
   - 表达式域：Value（sealed，8 种节点：Literal / FieldValue / ParamValue / LoopFieldValue / NameRef / Template / Aggregate / FunctionCall）/ ExpressionEngine 注册表分发 / ValueFunction SPI
   - 参数域：ParamSource（External / Cell / Constant）
@@ -64,15 +64,15 @@
 - [x] **独立纵向带**（`CellBinding.independent`）：显式配置某列从自身声明行独立向下展开（交错/错位排版），默认仍按"一条记录一行"对齐同源列
 - [x] **样式/布局适配**：模板静态内容（标题/页脚）随带扩展下移、汇总行继承模板样式、合并区边框铺满整个区域、模板行高/列宽随渲染带出
 - [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联；JOIN 类型 INNER/LEFT/RIGHT/FULL（hash join，LEFT/RIGHT 保留侧相对 join 参数位置，无匹配侧补 null）
-- [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
-- [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（CSV/JSON/DB/API/EXCEL）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
+- [x] **数据模型面板**（`DataModelPanel`）：两 tab 布局（数据集 / 数据关系），始终显示数量徽标
+- [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（DB/EXCEL/CSV）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
-- [x] **报表配置实体化**：`ReportConfig` 强类型实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/params/template），DTO record（`ConfigDtos`）同时作为持久化字段类型 + 前端 JSON 契约；`ReportRepository.page(PageQuery):PageResult` 分页查询（接口在 framework）
+- [x] **报表领域实体化**：`core.Report` 领域实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/parameters/template + 运行时 dataModel 引用），DTO record 在 framework `dto.report.*`（前端 JSON 契约），经 `Report.toDTO()`/`fromDTO()` 互转；仓库以领域对象存取，`ReportRepository.page(PageQuery):PageResult<Report>` 分页（接口在 framework）
 - [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
-- [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `ConfigDtos`）+ `RenderDtoConverter` 匹配前端 JSON 格式
+- [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `dto.report.*`）+ framework `core.RenderDtoConverter` 匹配前端 JSON 格式
 - [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
-- [x] **报表管理界面**：app-pc 报表管理页（antd Table 分页、新建/编辑/预览/删除），首页 + 报表管理两个入口
+- [x] **管理界面**：app-pc 五个菜单（首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理）；数据源管理为 4 步向导（类型 / 配置 / 解析 / 预览，解析不落库、保存才落库）；数据模型管理为列表 + 全屏抽屉设计器（`DataModelListPage` 内置 `DataModelDesigner`，三 tab：数据集 / 数据合集 / 关系），含**发布状态机**（草稿可修改/发布，已发布屏蔽修改、可转草稿；仅已发布模型可被报表选用）；报表管理页 antd Table 分页、新建/编辑/预览/删除，引用未发布模型的报表标「未发布」并禁用编辑/预览
 - [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发
@@ -84,9 +84,6 @@
 
 #### 数据与存储
 
-- [ ] **多数据源提取器**：`DataSourceType` 有 DB/API/EXCEL/CSV/JSON 五种，`DataExtractor` 仅实现 `CsvDataExtractor`。DB/API/EXCEL/JSON 提取器未实现，运行时会抛异常（需先补 `JdbcDataExtractor` 等，前端数据源管理才有意义）
-- [ ] **数据源管理面板**：数据库连接配置、元数据扫描、前端数据源 CRUD（后端提取器是前置依赖）
-- [ ] **多数据模型支持**：支持多个 DataModel 并存，报表绑定指定数据模型（`GET /api/datamodels` 已支持多模型列举，仅 example 注册了 `"default"` 一个）
 - [ ] **持久化存储实现**：`ReportRepository` 接口齐全，starter 不提供默认实现（`@ConditionalOnMissingBean` 交使用方），example 为 `InMemoryReportRepository`（重启丢失）。生产接入需自实现 JPA/文件等持久化
 
 #### 产品演进
@@ -149,7 +146,7 @@ pnpm dev:app-pc
 在 `application.properties` 中配置字体目录：
 
 ```properties
-report.fonts.dir=/path/to/custom/fonts
+codingapi.report.font.dir=/path/to/custom/fonts
 ```
 
 字体文件命名约定：数字前缀控制排序（如 `01_微软雅黑.ttf`、`02_宋体.ttf`），无编号按文件名自然序。

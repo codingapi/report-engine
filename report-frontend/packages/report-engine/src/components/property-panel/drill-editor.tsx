@@ -50,7 +50,7 @@ const DrillEditor: React.FC<DrillEditorProps> = ({
           <Alert
             type="info"
             showIcon={false}
-            message="视图后续将与数据源一样独立管理配置；本期直接用数据集本身作默认视图。"
+            title="视图后续将与数据源一样独立管理配置；本期直接用数据集本身作默认视图。"
             style={{ marginTop: 8, fontSize: 12 }}
           />
         </Form.Item>

@@ -8,8 +8,8 @@ package com.codingapi.report.data.dataset;
  * <ul>
  *   <li>{@link com.codingapi.report.expression.Value.FieldValue} — 格子绑定的字段
  *   <li>{@link com.codingapi.report.operator.condition.Condition} — 过滤条件的左值
- *   <li>{@link com.codingapi.report.render.grid.SummaryRow} — 小计/总计的分组键
- *   <li>{@link com.codingapi.report.render.grid.SummaryCell} — 汇总行的聚合字段
+ *   <li>{@link com.codingapi.report.core.grid.SummaryRow} — 小计/总计的分组键
+ *   <li>{@link com.codingapi.report.core.grid.SummaryCell} — 汇总行的聚合字段
  *   <li>{@link com.codingapi.report.data.relation.Relationship} — 跨数据集关联的左右端点
  * </ul>
  *

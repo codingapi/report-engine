@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 查询定义：从<b>一个数据集</b>提取数据的意图。主要用作 {@link com.codingapi.report.render.grid.LoopBlock}
+ * 查询定义：从<b>一个数据集</b>提取数据的意图。主要用作 {@link com.codingapi.report.core.grid.LoopBlock}
  * 的驱动源（决定循环迭代的范围和顺序）。
  *
  * <h3>在架构中的位置</h3>
@@ -24,7 +24,7 @@ import lombok.Data;
  *   <li>{@link #filters} 中"只引用本数据集列 + 常量/参数"的条件 → <b>可下推</b>到源 SELECT 的 WHERE，减少入内存的行数 （如 DB
  *       类型可直接拼成 SQL WHERE 子句）
  *   <li>跨数据集 / join 之后的条件 → 留在 Java 加工层（不在 Query 里， 而是放在 {@link
- *       com.codingapi.report.render.grid.CellBinding#getConditions()} 里）
+ *       com.codingapi.report.core.grid.CellBinding#getConditions()} 里）
  * </ul>
  *
  * <h3>分组与迭代的关系</h3>

@@ -5,7 +5,7 @@ import {
   mainPosOf,
   summaryHit,
 } from '@/utils/summary-axis';
-import type { SummaryRow, SummaryAxis } from '@/types';
+import type { SummaryRow } from '@/types';
 
 const vertical: SummaryRow = {
   id: 's1',

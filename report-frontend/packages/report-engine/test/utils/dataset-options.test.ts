@@ -5,19 +5,20 @@ const datasets: Dataset[] = [
   {
     id: 'ds1',
     alias: '员工表',
+    name: 'employee',
     fields: [
       { name: 'name', alias: '姓名', dataType: 'STRING' },
       { name: 'age', alias: '', dataType: 'NUMBER' }, // alias 为空，回退 name
     ],
   },
-  { id: 'ds2', alias: '', fields: [] }, // alias 为空，回退 id
+  { id: 'ds2', alias: '', name: 'dept', fields: [] }, // alias 为空，回退 name
 ];
 
 describe('datasetOptions', () => {
-  test('value=数据集 id，label=别名（缺省回退 id）', () => {
+  test('value=数据集 id，label=别名（名称）；alias 缺省只显示 name', () => {
     expect(datasetOptions(datasets)).toEqual([
-      { value: 'ds1', label: '员工表' },
-      { value: 'ds2', label: 'ds2' },
+      { value: 'ds1', label: '员工表（employee）' },
+      { value: 'ds2', label: 'dept' },
     ]);
   });
 });

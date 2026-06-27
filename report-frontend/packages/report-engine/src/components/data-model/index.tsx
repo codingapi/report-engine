@@ -1,26 +1,21 @@
 import React from 'react';
 import { Tabs } from 'antd';
-import type { Dataset, Relationship, ReportParam } from '@/types';
+import type { Dataset, Relationship } from '@/types';
 import DatasetTree from '@/components/dataset-tree';
 import RelationshipList from './relationship-list';
-import ParamManager from './param-manager';
 
 interface DataModelPanelProps {
   datasets: Dataset[];
   relationships: Relationship[];
-  params: ReportParam[];
-  onParamsChange: (params: ReportParam[]) => void;
 }
 
 /**
- * 左侧数据模型面板：数据集 / 数据关系 / 报表参数 三 tab。
- * 数据集、关系来自后端 DataModel（只读）；参数为报表级配置（前端管理）。
+ * 左侧数据模型面板：数据集 / 数据关系 两 tab。
+ * 数据集、关系来自后端 DataModel（只读）。
  */
 const DataModelPanel: React.FC<DataModelPanelProps> = ({
   datasets,
   relationships,
-  params,
-  onParamsChange,
 }) => {
   return (
     <div className="re-panel">
@@ -41,11 +36,6 @@ const DataModelPanel: React.FC<DataModelPanelProps> = ({
               key: 'relations',
               label: `数据关系(${relationships.length})`,
               children: <RelationshipList relationships={relationships} datasets={datasets} />,
-            },
-            {
-              key: 'params',
-              label: `报表参数(${params.length})`,
-              children: <ParamManager params={params} onChange={onParamsChange} />,
             },
           ]}
         />

@@ -6,7 +6,7 @@ import type {
   Dataset,
   ExpressionCatalog,
   Relationship,
-  ReportConfig,
+  ReportDTO,
   ReportEngineHandle,
 } from '@coding-report/report-engine';
 import { ReportEngine } from '@coding-report/report-engine';
@@ -25,7 +25,7 @@ import {
 // ─── 页面组件 ──────────────────────────────────
 
 /** 加载的报表配置（附带后端注入的数据模型信息） */
-interface LoadedReportConfig extends ReportConfig {
+interface LoadedReportConfig extends ReportDTO {
   dataModel?: DataModelInfo;
 }
 
@@ -62,7 +62,8 @@ const AppReport = () => {
           setDatasets(
             dm.datasets.map((d) => ({
               id: d.id,
-              alias: d.alias || d.id,
+              alias: d.alias || '',
+              name: d.sourceTable ?? d.name,
               sourceType: d.dataSourceType || 'CSV',
               fields: d.fields.map((f) => ({
                 name: f.name,
@@ -101,11 +102,11 @@ const AppReport = () => {
       message.warning('表格为空，无配置可打印');
       return;
     }
-    console.log('[ReportConfig object]', config);
-    console.log('[ReportConfig JSON]\n', JSON.stringify(config, null, 2));
+    console.log('[ReportDTO object]', config);
+    console.log('[ReportDTO JSON]\n', JSON.stringify(config, null, 2));
   };
 
-  const handleSaveReport = async (config: ReportConfig): Promise<string> => {
+  const handleSaveReport = async (config: ReportDTO): Promise<string> => {
     return saveReportConfig({ ...config, dataModelId });
   };
 
@@ -136,7 +137,7 @@ const AppReport = () => {
         </Button>
       }
       extraActions={
-        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports')}>
+        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports', { replace: true })}>
           关闭
         </Button>
       }

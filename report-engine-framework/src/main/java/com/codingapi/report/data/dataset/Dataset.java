@@ -32,6 +32,9 @@ public sealed interface Dataset permits TableDataset, UnionDataset {
     /** 数据集唯一标识，被 {@link FieldRef#datasetId()} 引用。 */
     String getId();
 
+    /** 英文标识名（物理表名或合集名），与 {@link #getAlias()}（中文别名）成对。 */
+    String getName();
+
     /** 显示名/别名（面向用户），如"员工表"、"全部人员"。用于属性面板等 UI 展示。 */
     String getAlias();
 

@@ -17,10 +17,34 @@ export interface DataModelField {
   primaryKey?: boolean;
 }
 
+/** UNION 成员（对齐后端 UnionMemberDTO：统一列名 → 成员实际字段名） */
+export interface UnionMember {
+  datasetId: string;
+  mapping?: Record<string, string>;
+}
+
+/**
+ * 数据集（兼容两种端点返回，字段按需可选）：
+ * - {@code GET /api/report/configs/{id}} 附带的 {@code dataModel.datasets}：精简视图
+ *   {@code { id, alias, dataSourceType, fields }}（无 kind/datasourceId/sourceTable/members）
+ * - {@code GET /api/datamodels/{id}} 返回的 {@code datasets}：完整 DatasetDTO
+ *   {@code { id, alias, kind, datasourceId, sourceTable, fields, members }}（无 dataSourceType）
+ */
 export interface DataModelDataset {
   id: string;
+  /** 英文标识名（TABLE=物理表名 sourceTable、UNION=合集名） */
+  name?: string;
   alias?: string;
+  /** 数据源类型（仅 configs/{id} 精简视图返回） */
   dataSourceType?: DataSourceType;
+  /** 数据集形态（仅 datamodels/{id} 完整 DTO 返回）：TABLE | UNION */
+  kind?: 'TABLE' | 'UNION';
+  /** 物理表所属数据源 id（kind=TABLE） */
+  datasourceId?: string;
+  /** 物理表名/查询（kind=TABLE） */
+  sourceTable?: string;
+  /** UNION 成员（kind=UNION） */
+  members?: UnionMember[];
   fields: DataModelField[];
 }
 
@@ -35,8 +59,19 @@ export interface RelationshipInfo {
   joinType: JoinType;
 }
 
+/** 数据源连接（对齐后端 DataSourceDTO：{@code { id, name, type, config }}，敏感字段后端已脱敏） */
+export interface DataModelSource {
+  id: string;
+  name: string;
+  type: DataSourceType;
+  /** 连接配置（含 path/url/凭证等，后端出口已脱敏） */
+  config?: Record<string, unknown>;
+}
+
 /** 报表所用的数据模型：数据集 + 数据关系（报表参数属报表级，前端管理，不在此） */
 export interface DataModelInfo {
   datasets: DataModelDataset[];
   relationships: RelationshipInfo[];
+  /** 数据源连接列表（仅 GET /api/datamodels/{id} 完整返回；精简视图不含） */
+  datasources?: DataModelSource[];
 }

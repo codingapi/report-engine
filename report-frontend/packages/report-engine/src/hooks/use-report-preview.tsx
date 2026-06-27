@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { DrillResult, PreviewResult, RenderRequest } from '@coding-report/report-api';
 import type { ExcelWorkbook } from '@coding-report/report-univer';
-import type { ReportParam, RenderConfig, RenderService } from '@/types';
+import type { ParamDTO, RenderConfig, RenderService } from '@/types';
 import { toBindingDTO } from '@/utils/render-dto';
 
 export interface UseReportPreviewOptions {
@@ -30,7 +30,7 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 /** 合并默认值与用户输入，生成参数值映射 */
-function buildParamValues(params: ReportParam[], userInput: Record<string, unknown>) {
+function buildParamValues(params: ParamDTO[], userInput: Record<string, unknown>) {
   return Object.fromEntries(
     params.map((p) => [p.name, userInput[p.name] ?? p.defaultValue ?? null]),
   );
@@ -68,6 +68,7 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
     config: RenderConfig,
     paramValues: Record<string, unknown>,
   ): RenderRequest => ({
+    dataModelId: config.dataModelId ?? 'default',
     cellBindings: config.bindings.map(toBindingDTO),
     loopBlocks: config.loops as unknown[],
     summaries: config.summaries as unknown[],

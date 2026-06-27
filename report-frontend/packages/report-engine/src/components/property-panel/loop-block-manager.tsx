@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Select, Popconfirm, Empty, Tabs } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import type { LoopBlock, Dataset, ReportParam } from '@/types';
+import type { LoopBlock, Dataset, ParamDTO } from '@/types';
 import { describeRange } from '@/utils/excel-cell';
 import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
 import ConditionEditor from './condition-editor';
@@ -9,7 +9,7 @@ import ConditionEditor from './condition-editor';
 interface LoopBlockManagerProps {
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
-  params?: ReportParam[];
+  params?: ParamDTO[];
   onChange: (loopBlocks: LoopBlock[]) => void;
 }
 
@@ -23,7 +23,7 @@ const LoopBlockForm: React.FC<{
   lb: LoopBlock;
   datasets: Dataset[];
   allLoops: LoopBlock[];
-  params?: ReportParam[];
+  params?: ParamDTO[];
   onUpdate: (patch: Partial<LoopBlock>) => void;
 }> = ({ lb, datasets, allLoops, params, onUpdate }) => {
   return (

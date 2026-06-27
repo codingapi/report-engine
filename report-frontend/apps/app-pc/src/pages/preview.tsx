@@ -6,8 +6,8 @@ import type {
   CellBinding,
   LoopBlock,
   RenderConfig,
-  ReportConfig,
-  ReportParam,
+  ReportDTO,
+  ParamDTO,
   SummaryRow,
 } from '@coding-report/report-engine';
 import { ReportPreview } from '@coding-report/report-engine';
@@ -21,7 +21,7 @@ import {
 } from '@coding-report/report-api';
 
 /** 加载的报表配置（附带后端注入的数据模型信息） */
-interface LoadedReportConfig extends ReportConfig {
+interface LoadedReportConfig extends ReportDTO {
   dataModel?: DataModelInfo;
 }
 
@@ -47,11 +47,12 @@ const AppPreview = () => {
         if (!active) return;
         if (config.name) setReportName(config.name);
         setPreviewConfig({
+          dataModelId: config.dataModelId,
           bindings: config.cellBindings as CellBinding[],
           loops: config.loopBlocks as LoopBlock[],
           summaries: config.summaries as SummaryRow[],
           workbook: config.template as ExcelWorkbook,
-          params: (config.params as ReportParam[]) ?? [],
+          params: (config.params as ParamDTO[]) ?? [],
         });
       } catch (e) {
         message.error(`加载报表失败: ${e}`);
@@ -78,7 +79,7 @@ const AppPreview = () => {
     <>
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/reports')}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/reports', { replace: true })}>
             返回报表管理
           </Button>
           <h3 style={{ margin: 0 }}>{reportName}</h3>
@@ -87,7 +88,7 @@ const AppPreview = () => {
       <ReportPreview
         renderService={{ preview: previewReport, export: renderReport, drill: drillReport }}
         config={previewConfig}
-        onClose={() => navigate('/reports')}
+        onClose={() => navigate('/reports', { replace: true })}
       />
     </>
   );
