@@ -28,9 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -132,7 +134,18 @@ public class DataSourceService {
             ds.setConfig(credentials.decryptConfig(ds.getConfig()));
         }
         registerDriverIfNeeded(ds);
-        return mergeSavedAliases(ds, toBusinessTypes(findExtractor(ds.getType()).introspect(ds)));
+        return mergeSavedMetadata(ds, toBusinessTypes(findExtractor(ds.getType()).introspect(ds)));
+    }
+
+    /**
+     * 元数据探查：按 DTO 配置直接解析（不落库），供数据源向导「解析」使用。
+     *
+     * <p>与 {@link #introspect(String)} 的区别：不读仓库、不落库、不合并已保存元数据（dto.datasets 是向导编辑态，非权威）。 只有最终「保存」才落库，避免解析阶段产生半成品数据源。DB 类型先注册外部驱动。
+     */
+    public List<IntrospectedTable> introspect(DataSourceDTO dto) {
+        DataSource ds = fromDto(dto);
+        registerDriverIfNeeded(ds);
+        return toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
     }
 
     /** 探查列的原生类型统一映射成报表业务 {@link DataType} 名（前端/数据集只认业务类型），并透传字段备注/表别名。 */
@@ -157,30 +170,63 @@ public class DataSourceService {
     }
 
     /**
-     * 把数据源下已保存的数据集别名按表名回填到探查结果，供数据模型管理添加数据集时展示「别名（表名）」。
+     * 把数据源下已保存的元数据（表别名 + 字段顺序）合并回探查结果，供数据模型管理添加数据集时沿用用户在数据源管理里的维护。
      *
-     * <p>探查层（extractor）只知物理表名，不知用户在数据源管理里维护的别名；此处从聚合根已持有的 {@link
-     * TableDataset} 取 alias 按 {@code sourceTable == table.name} 匹配回填。重新解析时前端 {@code mergeTables} 仍以用户已编辑的别名为准，不会被覆盖。
+     * <p>探查层（extractor）只知物理表名与数据库原始字段顺序；此处从聚合根已持有的 {@link TableDataset} 按 {@code
+     * sourceTable == table.name} 匹配：① 回填表别名；② 按已保存字段顺序重排列（{@link #reorderColumns}）。 字段别名仍以探查 remark 为默认（前端按需覆盖），重新解析时前端 {@code mergeTables} 以用户已编辑值为准。
      */
-    private static List<IntrospectedTable> mergeSavedAliases(
+    private static List<IntrospectedTable> mergeSavedMetadata(
             DataSource ds, List<IntrospectedTable> tables) {
         if (ds.getDatasets() == null || ds.getDatasets().isEmpty()) return tables;
         Map<String, String> aliasByTable = new LinkedHashMap<>();
+        Map<String, List<String>> orderByTable = new LinkedHashMap<>();
         for (Dataset d : ds.getDatasets()) {
             if (d instanceof TableDataset t && t.getSourceTable() != null) {
                 aliasByTable.put(t.getSourceTable(), t.getAlias());
+                if (t.getFields() != null) {
+                    orderByTable.put(
+                            t.getSourceTable(),
+                            t.getFields().stream().map(Field::getName).toList());
+                }
             }
         }
-        if (aliasByTable.isEmpty()) return tables;
+        if (aliasByTable.isEmpty() && orderByTable.isEmpty()) return tables;
         return tables.stream()
                 .map(
                         t -> {
-                            String saved = aliasByTable.get(t.name());
-                            return saved != null
-                                    ? new IntrospectedTable(t.name(), t.columns(), saved)
-                                    : t;
+                            String savedAlias = aliasByTable.get(t.name());
+                            List<String> savedOrder = orderByTable.get(t.name());
+                            List<ColumnMeta> columns =
+                                    savedOrder != null
+                                            ? reorderColumns(t.columns(), savedOrder)
+                                            : t.columns();
+                            return new IntrospectedTable(
+                                    t.name(),
+                                    columns,
+                                    savedAlias != null ? savedAlias : t.alias());
                         })
                 .toList();
+    }
+
+    /** 按已保存字段名顺序重排列：已保存顺序优先（取探查列的最新类型/备注），探查新增字段按原顺序追加末尾。 */
+    private static List<ColumnMeta> reorderColumns(
+            List<ColumnMeta> columns, List<String> savedOrder) {
+        if (savedOrder == null || savedOrder.isEmpty()) return columns;
+        Map<String, ColumnMeta> byName = new LinkedHashMap<>();
+        for (ColumnMeta c : columns) byName.put(c.name(), c);
+        List<ColumnMeta> reordered = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String name : savedOrder) {
+            ColumnMeta c = byName.get(name);
+            if (c != null) {
+                reordered.add(c);
+                seen.add(name);
+            }
+        }
+        for (ColumnMeta c : columns) {
+            if (!seen.contains(c.name())) reordered.add(c);
+        }
+        return reordered;
     }
 
     /** 原生类型名 / 业务类型名 → 业务 {@link DataType} 粗映射，无法识别回退 STRING。 */

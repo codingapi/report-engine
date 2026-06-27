@@ -45,6 +45,7 @@ export {
   updateDataModel,
   deleteDataModel,
   publishDataModel,
+  unpublishDataModel,
   testDataSource,
   exploreTables,
   exploreColumns,
@@ -53,6 +54,7 @@ export {
   saveDataSource,
   deleteDataSource,
   introspectDatasets,
+  introspectByConfig,
   uploadDataFile,
   testConnection,
 } from './datasource';

@@ -92,6 +92,16 @@ public class DataSourceController {
     }
 
     /**
+     * 元数据探查：按 DTO 配置直接解析（不落库），供数据源向导「解析」使用。
+     *
+     * <p>与 {@code /{id}/introspect} 的区别：不读仓库、不落库、不合并已保存元数据；只有最终「保存」才落库，避免解析阶段产生半成品数据源。
+     */
+    @PostMapping("/introspect")
+    public MultiResponse<IntrospectedTable> introspectByConfig(@RequestBody DataSourceDTO dto) {
+        return MultiResponse.of(dataSourceService.introspect(dto));
+    }
+
+    /**
      * 上传 Excel/CSV 文件到配置目录并返回解析出的表/列元数据。 EXCEL 落到 {@code codingapi.report.excel.dir}，CSV 落到 {@code
      * codingapi.report.csv.dir}。
      *

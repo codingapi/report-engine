@@ -173,6 +173,11 @@ export async function publishDataModel(id: string): Promise<void> {
   await http.post(`/datamodels/${id}/publish`);
 }
 
+/** 撤销发布数据模型（已发布 → 草稿） */
+export async function unpublishDataModel(id: string): Promise<void> {
+  await http.post(`/datamodels/${id}/unpublish`);
+}
+
 /** 删除指定数据模型 */
 export async function deleteDataModel(id: string): Promise<void> {
   await http.delete(`/datamodels/${id}`);
@@ -230,6 +235,12 @@ export async function deleteDataSource(id: string): Promise<void> {
 /** 元数据解析：返回所有表/sheet + 列定义 */
 export async function introspectDatasets(id: string): Promise<IntrospectedTable[]> {
   const res = await http.post(`/datasources/${id}/introspect`);
+  return res.data.list;
+}
+
+/** 元数据解析：按配置直接解析（不落库），供数据源向导「解析」用 */
+export async function introspectByConfig(dto: DataSourceDTO): Promise<IntrospectedTable[]> {
+  const res = await http.post('/datasources/introspect', dto);
   return res.data.list;
 }
 

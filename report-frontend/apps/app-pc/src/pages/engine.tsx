@@ -62,7 +62,7 @@ const AppReport = () => {
           setDatasets(
             dm.datasets.map((d) => ({
               id: d.id,
-              alias: d.alias || d.id,
+              alias: d.alias || '',
               name: d.sourceTable ?? d.name,
               sourceType: d.dataSourceType || 'CSV',
               fields: d.fields.map((f) => ({

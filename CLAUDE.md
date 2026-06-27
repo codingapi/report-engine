@@ -230,14 +230,15 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 **报表引擎 API**（`controller/`）：
 - `POST /api/report/render`（`ReportRenderController`）— 渲染请求 + 模板快照 → `RenderDtoConverter` → `ReportRenderer.render()` → 填充数据的 `.xlsx`
 - `/api/report/configs[...]`（`ReportConfigController`）— 报表保存（`@RequestBody ReportDTO` → `Report.fromDTO` 入库）/加载（`Report.toDTO` + `dataModel` 富化）/分页列表（GET，`SearchRequest`→`PageQuery`，`repository.page(PageQuery): PageResult<Report>` → brief）/删除
-- `/api/datamodels[...]`（`DataModelMgmtController`）— 数据模型 CRUD（`DataModelDTO` 出入站，出口凭证脱敏 / `***` 回填）
-- `/api/datasources[...]`（`DataSourceController`）— 连接测试 + 表/列探查
+- `/api/datamodels[...]`（`DataModelMgmtController`）— 数据模型 CRUD（`DataModelDTO` 出入站，出口凭证脱敏 / `***` 回填）+ `POST /{id}/publish`（草稿→已发布）/ `POST /{id}/unpublish`（已发布→草稿）
+- `/api/datasources[...]`（`DataSourceController`）— 连接测试（`POST /test`）/ 元数据探查：`POST /{id}/introspect`（按已保存连接 id，合并已保存表别名+字段顺序）/ `POST /introspect`（按 DTO 配置直接探查，**不落库**，供向导「解析」用，避免半成品数据源）
 - `GET /api/datasets[...]`（`DatasetController`）— 数据集列表（含字段）/预览前 N 行
 - `GET /api/expression/functions`（`ExpressionController`）— 公式目录（聚合 + 函数元信息）
 
 **存储抽象**（接口在 framework，实现由使用方提供）：
 - `ReportRepository` / `DataModelRepository` 接口在 **framework**（`com.codingapi.report.repository`），以**领域对象**存取：`ReportRepository.save(Report)/find:Report/page(PageQuery):PageResult<Report>/delete`，`DataModelRepository` 同范式存 `DataModel`。分页用 framework 纯类型 `PageQuery`/`PageResult<T>`，**不依赖 Spring**，保持 framework 可独立发布。starter **不提供默认实现**（存储交使用方），`@ConditionalOnMissingBean` 装配 Controller/Service 允许覆盖。
-- 领域实体均在 framework：`core.Report`（`id/name/dataModelId/createTime/updateTime` + `cellBindings/loopBlocks/summaries/parameters/template` + 运行时 `dataModel` 引用）、`data.datamodel.DataModel`（含 `DataModelStatus` 枚举 + 派生 `datasources()`）。二者自带 `toDTO()`/`fromDTO()` 与 `dto/` 记录互转。example 的 `InMemory*Repository` 在 save 时设时间戳、null 列表归一、默认 status。
+- 领域实体均在 framework：`core.Report`（`id/name/dataModelId/createTime/updateTime` + `cellBindings/loopBlocks/summaries/parameters/template` + 运行时 `dataModel` 引用）、`data.datamodel.DataModel`（含 `DataModelStatus` 枚举[DRAFT/PUBLISHED] + 派生 `datasources()`）。二者自带 `toDTO()`/`fromDTO()` 与 `dto/` 记录互转。example 的 `InMemory*Repository` 在 save 时设时间戳、null 列表归一、默认 status。
+- **数据模型发布状态机**：`DRAFT`（草稿，可「修改」/发布/删除）↔ `PUBLISHED`（已发布，**屏蔽修改**，仅可「转草稿」/删除）。仅 `PUBLISHED` 模型可在报表创建时被选用；报表列表对引用 `DRAFT` 模型的报表标「未发布」Tag 并禁用编辑/预览。publish/unpublish 只改 status（load 完整对象回写，数据集/关系不丢）。
 - 凭证（DB 密码等）：领域 `DataSource.config` **明文存内存**，仅出口 `toDTO` 由 `CredentialService` 脱敏、保存时 `***` 占位回填旧值；落盘加密交使用方仓库实现。
 - Spring 类型仅存在于 Controller 边界：入参 `SearchRequest` → `PageQuery`，返回 `PageResult` → `MultiResponse`，转换在 Controller 内完成。
 
@@ -276,7 +277,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 - **`report-univer`**：Univer 电子表格 React 封装。提供 `UniverSheet` 组件 + `UniverSheetHandle` 命令式句柄（`getSnapshot` / `loadSnapshot` / `setCellValue` / `getActiveSheetId`）。三层属性存储（cellProps / mergeProps / loopBlockProps）通过泛型自定义。
 - **`report-api`**：后端 API 客户端。axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `deleteReportConfig` / `listReportConfigs(current,pageSize)` / `listDataModels` / `renderReport` / `previewReport` / `drillReport` / `exportExcel` / `importExcel` / `fetchFonts`。
-- **`report-engine`**：报表设计器 + 数据源管理组件库（纯 UI，不直接调 API；原 `report-datasource` 已并入本包）。核心导出：`ReportEngine`（设计器）、`ReportPreview`（预览能力组件，含参数弹窗+预览抽屉+反查+抽屉内导出）、`useReportPreview` hook；数据源管理组件 `ConnectionForm`/`ExploreTree`/`DatasetManager`/`RelationEditor` + `useDatasource`/`useExplore`（经 `DatasourceService` 注入 report-api 实现）；**数据模型管理组件** `DataModelListPage`（列表 + 全屏抽屉内置 `DataModelDesigner`，点「设计」/新建触发，`designerService` 注入）、`DataModelDesigner`（数据集 / 数据合集 / 关系 三 tab，`forwardRef` 暴露 `save` + `onModelChange` 上抛模型）。
+- **`report-engine`**：报表设计器 + 数据源管理组件库（纯 UI，不直接调 API；原 `report-datasource` 已并入本包）。核心导出：`ReportEngine`（设计器）、`ReportPreview`（预览能力组件，含参数弹窗+预览抽屉+反查+抽屉内导出）、`useReportPreview` hook；数据源管理组件 `ConnectionForm`/`ExploreTree`/`DatasetManager`/`RelationEditor` + `useDatasource`/`useExplore`（经 `DatasourceService` 注入 report-api 实现）；**数据模型管理组件** `DataModelListPage`（列表 + 全屏抽屉内置 `DataModelDesigner`，点「修改」（**仅草稿态显示**）/新建触发，草稿态可「发布」、已发布态可「转草稿」，`designerService` 注入）、`DataModelDesigner`（数据集 / 数据合集 / 关系 三 tab，`forwardRef` 暴露 `save` + `onModelChange` 上抛模型）。
 
 #### ReportEngine 组件
 
@@ -341,7 +342,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - **Value sealed interface 无 Jackson 注解**：前后端传输使用 DTO record（framework `dto.report.*`）+ framework `core.RenderDtoConverter` 双向转换，而非直接在 Value 上加 `@JsonTypeInfo`。仓库（`ReportRepository`/`DataModelRepository`）以**领域对象**存取（`core.Report`/`data.datamodel.DataModel` 自带 `toDTO/fromDTO`），接口 + 分页类型 `PageQuery`/`PageResult` 均零 Spring 依赖，保持 framework 可独立发布。
 - **模板层样式继承**：`renderLoop` 中后续迭代的合并区域需要显式复制（`seedTemplate` 只载入原始位置的 merge），样式通过 `place()` 从模板源格继承
 - **loadReportConfig sheet ID 重映射**：后端存储的 cellKey 中 sheet ID 可能是 `"sheet1"`，但 Univer 运行时活动工作表 ID 可能是 UUID。`loadReportConfig` 必须先 `getActiveSheetId()` 获取实际 ID，再重映射所有 cellKey/parentCell，最后回写绑定显示文本
-- **数据模型随配置加载**：`GET /configs/{id}` 返回的 `dataModel` 字段由后端从注入的 `DataModel` Bean 实时解析（当前始终返回唯一的全局模型），配置中仅存 `dataModelId` 引用
+- **数据模型随配置加载**：`GET /configs/{id}` 返回的 `dataModel` 字段由 `ReportConfigService.get` 按报表 `dataModelId` 经 `DataModelService.findDataModel` 取对应模型，再由 `DataModelDtoAssembler.assemble` 组装为精简视图（`{id, name, alias, dataSourceType, fields}`——**name 必带**，避免前端把 dataset 内部 id 当名称展示），配置中仅存 `dataModelId` 引用
 - **带扩展的内容下移（renderFree）**：纵向带扩展会把带下方的内容整体下移。下移量 = 输出行数 −（带声明行 + 汇总声明行），**汇总行不重复计入扩展量**（否则带下内容多移一行）。需随带下移的不只单值绑定与模板 merge，还包括**无绑定的静态模板格**（标题/页脚，3c）和**模板行高配置**（3d）；汇总行的 merge/静态格按 `summaryOutputRows` 精确归位
 - **带声明格残留清理（renderFree 3e）**：带统一从 bandBase 起填充，若某绑定声明格未被数据覆盖（如声明在 B12 但带从 row0 展开），其设计期占位文本会残留 → 渲染后清除所有"未被动态写入"的带声明格
 - **模板行高/列宽带出**：`buildWorkbook` 会从模板 sheet 带出 `defaultRowHeight/defaultColumnWidth/columns/rows`（早期版本会丢弃）；行高随带扩展按同一位移规则跟随
@@ -351,3 +352,5 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - **回声判别替代 isLoadingRef（`handleCellValueChange`）**：往单元格写显示文本会触发 `set-range-values` mutation，需区分「程序回写」与「用户手敲」。用 `displayText` 作基准：新文本 `=== displayText` ⇒ 回声，忽略；`=== ''` ⇒ 清空，移除绑定；否则用户手敲 → 纯文本/模板格退化为 `Literal`（**不反解别名、不构造引用洞**），字段/聚合/参数等引用格保护不覆盖（改表达式走属性面板/拖拽）。基于数据基准而非时序标志，不依赖 mutation 是否同步派发
 - **预览能力下沉（report-engine `ReportPreview` 组件）**：参数弹窗→渲染→预览抽屉→反查→抽屉内导出全流程封装为 `ReportPreview`（`components/preview/preview.tsx`），设计器与独立预览页共用。`useReportPreview` hook 只管逻辑/状态，JSX 在组件层渲染（含私有 `WorkbookTable` 画表格，不单独导出）。**纯 UI 不调 API**：通过 `renderService` prop 注入 report-api 的 `previewReport`/`renderReport`/`drillReport`（只导类型，不导函数）。设计器点「预览」→ `setPreviewConfig(newConfig)`（引用变化触发）；预览页加载配置后 `setPreviewConfig(loaded)`。`ReportPreview` 用 `lastPreviewedRef` 去重避免 strict-mode 重复触发；预览页加载 effect 用局部 `active` 标志（**勿用跨渲染 `startedRef`**，否则 strict-mode 双调用会让预览永不执行）。抽屉 `onClose` 回调（`ReportPreview` 的 `onClose` prop）：设计器不传（停在设计器），预览页传 `navigate('/reports')`。
 - **已保存配置即渲染就绪态**：`handleSaveReport` 保存时已对模板应用 `templateToString` 并剥离 `displayText`，故 `loadReportConfig` 返回的配置可直接喂给 `ReportPreview`（无需 `collectRenderArgs` 预处理；`preview` 字段为纯前端展示缓存，后端不再持久化、由前端重建）。
+- **数据集别名来源（表备注/字段备注）**：DB 探查读取 `getTables`/`getColumns` 的 REMARKS（表备注/字段备注）作为数据集别名/字段别名的**默认值**（CSV/Excel 无备注为 null）。`DataSourceService.introspect(id)` 用 `mergeSavedMetadata` 把数据源已保存的表别名 + 字段顺序合并回探查结果（已保存优先，未保存用备注默认），前端 `fromIntrospected`/`tableToDataset` 取 `alias ?? name`、`remark || name`。重新解析时前端 `mergeTables` 以用户已编辑别名为准、不被覆盖，字段顺序也以用户调整为准（新增字段追加末尾）。
+- **数据源解析不落库 + 字段排序跨场景**：数据源向导「解析」走 `POST /api/datasources/introspect`（按 DTO，**不持久化**），只有「保存」才落库——避免解析失败/中途放弃留下半成品数据源（曾因此产生重复数据源）。字段顺序在数据源管理可调（`DatasetEditor` 上移/下移），随数据集保存持久化，并经 `mergeSavedMetadata` 在数据模型添加该表、报表渲染时跨场景保持一致。

@@ -47,6 +47,19 @@ export default function DatasetEditor({
       ),
     );
 
+  /** 字段上移/下移：交换相邻位置，越界忽略。顺序随数据集保存持久化，并在数据模型添加/报表渲染时保持。 */
+  const moveField = (tableName: string, index: number, dir: -1 | 1) =>
+    onChange(
+      tables.map((t) => {
+        if (t.name !== tableName) return t;
+        const target = index + dir;
+        if (target < 0 || target >= t.columns.length) return t;
+        const cols = [...t.columns];
+        [cols[index], cols[target]] = [cols[target], cols[index]];
+        return { ...t, columns: cols };
+      }),
+    );
+
   const renderTable = (t: WizardTable) => (
     <div style={{ padding: '8px 12px' }}>
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
@@ -104,6 +117,34 @@ export default function DatasetEditor({
                 onChange={(e) => updateFieldAlias(t.name, r.name, e.target.value)}
               />
             ),
+          },
+          {
+            title: '排序',
+            key: 'sort',
+            width: 120,
+            render: (_, r) => {
+              const idx = t.columns.findIndex((c) => c.name === r.name);
+              return (
+                <Space size="small">
+                  <Button
+                    size="small"
+                    type="text"
+                    disabled={idx <= 0}
+                    onClick={() => moveField(t.name, idx, -1)}
+                  >
+                    上移
+                  </Button>
+                  <Button
+                    size="small"
+                    type="text"
+                    disabled={idx >= t.columns.length - 1}
+                    onClick={() => moveField(t.name, idx, 1)}
+                  >
+                    下移
+                  </Button>
+                </Space>
+              );
+            },
           },
         ]}
       />

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { App as AntdApp } from 'antd';
 import { DataModelListPage } from '@coding-report/report-engine';
 import type { DataModelService, DataModelDesignerService } from '@coding-report/report-engine';
 import {
@@ -10,6 +9,7 @@ import {
   listDataModelsPage,
   listDataSources,
   publishDataModel,
+  unpublishDataModel,
   updateDataModel,
 } from '@coding-report/report-api';
 
@@ -18,6 +18,7 @@ const service: DataModelService = {
   save: (dto) => createDataModel(dto),
   remove: (id) => deleteDataModel(id),
   publish: (id) => publishDataModel(id),
+  unpublish: (id) => unpublishDataModel(id),
 };
 
 /**
@@ -27,8 +28,6 @@ const service: DataModelService = {
  * saveDataModel 按 id 走 update/create，listDataSources/introspectDatasets 透传 report-api。
  */
 const DataModelsPage = () => {
-  const { message } = AntdApp.useApp();
-
   const designerService = useMemo<DataModelDesignerService>(
     () => ({
       getDataModel: async (modelId) => {
@@ -47,25 +46,20 @@ const DataModelsPage = () => {
         };
       },
       saveDataModel: async (dto) => {
-        try {
-          const payload = {
-            id: dto.id,
-            name: dto.name,
-            status: dto.status,
-            createTime: dto.createTime,
-            updateTime: dto.updateTime,
-            datasets: dto.datasets,
-            relationships: dto.relationships,
-            datasources: dto.datasources,
-          };
-          if (dto.id) {
-            await updateDataModel(dto.id, payload);
-          } else {
-            await createDataModel(payload);
-          }
-          message.success('保存成功');
-        } catch (err: unknown) {
-          message.error(`保存失败：${err instanceof Error ? err.message : String(err)}`);
+        const payload = {
+          id: dto.id,
+          name: dto.name,
+          status: dto.status,
+          createTime: dto.createTime,
+          updateTime: dto.updateTime,
+          datasets: dto.datasets,
+          relationships: dto.relationships,
+          datasources: dto.datasources,
+        };
+        if (dto.id) {
+          await updateDataModel(dto.id, payload);
+        } else {
+          await createDataModel(payload);
         }
       },
       listDataSources: async () => {
@@ -74,7 +68,7 @@ const DataModelsPage = () => {
       },
       introspectDatasets: (sourceId: string) => introspectDatasets(sourceId),
     }),
-    [message],
+    [],
   );
 
   return <DataModelListPage service={service} designerService={designerService} />;

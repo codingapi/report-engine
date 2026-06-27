@@ -72,8 +72,8 @@ export default function RelationTab({
     setEditing(null);
     form.setFieldsValue({
       id: `rel-${Date.now()}`,
-      left: { datasetId: datasets[0]?.id ?? '', field: '' },
-      right: { datasetId: datasets[1]?.id ?? datasets[0]?.id ?? '', field: '' },
+      left: { datasetId: '', field: '' },
+      right: { datasetId: '', field: '' },
       joinType: 'INNER',
     });
     setModalOpen(true);

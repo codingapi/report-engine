@@ -98,6 +98,16 @@ public class DataModelService {
         repository.save(dm);
     }
 
+    /** 撤销发布（已发布 → 草稿）；草稿态保持不变。 */
+    public void unpublish(String id) {
+        DataModel dm = repository.find(id);
+        if (dm == null) {
+            throw new IllegalArgumentException("数据模型不存在: " + id);
+        }
+        dm.setStatus(DataModelStatus.DRAFT);
+        repository.save(dm);
+    }
+
     public void delete(String id) {
         repository.delete(id);
     }

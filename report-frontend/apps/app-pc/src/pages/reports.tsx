@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Table, Space, Popconfirm, Modal, Form, Input, Select, message } from 'antd';
+import { Button, Table, Space, Popconfirm, Modal, Form, Input, Select, Tag, Tooltip, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import {
   listReportConfigs,
@@ -54,10 +54,10 @@ const ReportsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const dataModelOf = (id?: string | null) => dataModels.find((d) => d.id === id);
   const dataModelName = (id?: string | null) => {
-    if (!id) return '-';
-    const dm = dataModels.find((d) => d.id === id);
-    return dm ? dm.name : id;
+    const dm = dataModelOf(id);
+    return dm ? dm.name : id || '-';
   };
 
   const handleCreate = async () => {
@@ -147,7 +147,16 @@ const ReportsPage = () => {
           {
             title: '数据模型',
             key: 'dataModel',
-            render: (_, record) => dataModelName(record.dataModelId),
+            render: (_, record) => {
+              const dm = dataModelOf(record.dataModelId);
+              const unpublished = !dm || dm.status !== 'PUBLISHED';
+              return (
+                <Space size={4}>
+                  <span>{dataModelName(record.dataModelId)}</span>
+                  {unpublished && <Tag color="orange">未发布</Tag>}
+                </Space>
+              );
+            },
           },
           {
             title: '创建时间',
@@ -164,21 +173,33 @@ const ReportsPage = () => {
           {
             title: '操作',
             key: 'actions',
-            width: 200,
-            render: (_, record) => (
-              <Space size="middle">
-                <a onClick={() => navigate(`/engine?id=${record.id}`)}>编辑</a>
-                <a onClick={() => navigate(`/preview?id=${record.id}`)}>预览</a>
-                <Popconfirm
-                  title="确认删除该报表？"
-                  onConfirm={() => handleDelete(record.id)}
-                  okText="删除"
-                  cancelText="取消"
-                >
-                  <a style={{ color: '#ff4d4f' }}>删除</a>
-                </Popconfirm>
-              </Space>
-            ),
+            width: 220,
+            render: (_, record) => {
+              const dm = dataModelOf(record.dataModelId);
+              const blocked = !dm || dm.status !== 'PUBLISHED';
+              const link = (label: string, to: string) =>
+                blocked ? (
+                  <Tooltip title="数据模型未发布，暂不可编辑/预览">
+                    <a style={{ color: 'rgba(0,0,0,0.25)', cursor: 'not-allowed' }}>{label}</a>
+                  </Tooltip>
+                ) : (
+                  <a onClick={() => navigate(to)}>{label}</a>
+                );
+              return (
+                <Space size="middle">
+                  {link('编辑', `/engine?id=${record.id}`)}
+                  {link('预览', `/preview?id=${record.id}`)}
+                  <Popconfirm
+                    title="确认删除该报表？"
+                    onConfirm={() => handleDelete(record.id)}
+                    okText="删除"
+                    cancelText="取消"
+                  >
+                    <a style={{ color: '#ff4d4f' }}>删除</a>
+                  </Popconfirm>
+                </Space>
+              );
+            },
           },
         ]}
       />

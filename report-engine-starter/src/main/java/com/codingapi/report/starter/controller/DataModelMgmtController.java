@@ -77,6 +77,13 @@ public class DataModelMgmtController {
         return SingleResponse.of(null);
     }
 
+    /** 撤销发布（已发布 → 草稿）。 */
+    @PostMapping("/{id}/unpublish")
+    public SingleResponse<Void> unpublish(@PathVariable String id) {
+        dataModelService.unpublish(id);
+        return SingleResponse.of(null);
+    }
+
     @PutMapping("/relationships")
     public SingleResponse<Void> saveRelationships(
             @RequestParam String dataModelId, @RequestBody List<RelationshipDTO> relationships) {

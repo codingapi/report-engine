@@ -53,6 +53,8 @@ export interface DataModelService {
   remove: (id: string) => Promise<void>;
   /** 发布（草稿 → 已发布），发布后可被报表选用 */
   publish: (id: string) => Promise<void>;
+  /** 撤销发布（已发布 → 草稿），转草稿后可继续修改 */
+  unpublish: (id: string) => Promise<void>;
 }
 
 export interface DataModelListPageProps {
@@ -156,6 +158,16 @@ export default function DataModelListPage({
     }
   };
 
+  const handleUnpublish = async (id: string) => {
+    try {
+      await service.unpublish(id);
+      message.success('数据模型已转为草稿，可继续修改');
+      await refresh();
+    } catch (e) {
+      message.error(`撤销发布失败: ${(e as Error).message}`);
+    }
+  };
+
   /** 关闭设计抽屉并刷新列表（反映保存后的名称/时间/数据集变化） */
   const closeDesign = () => {
     setDesignId(null);
@@ -201,8 +213,8 @@ export default function DataModelListPage({
         width: 220,
         render: (_, r) => (
           <Space size="middle">
-            <a onClick={() => setDesignId(r.id)}>设计</a>
-            {r.status !== 'PUBLISHED' && (
+            {r.status !== 'PUBLISHED' && <a onClick={() => setDesignId(r.id)}>修改</a>}
+            {r.status !== 'PUBLISHED' ? (
               <Popconfirm
                 title="确认发布该数据模型？发布后可被报表选用。"
                 onConfirm={() => handlePublish(r.id)}
@@ -210,6 +222,15 @@ export default function DataModelListPage({
                 cancelText="取消"
               >
                 <a>发布</a>
+              </Popconfirm>
+            ) : (
+              <Popconfirm
+                title="确认转为草稿？转草稿后该模型将不能被报表选用。"
+                onConfirm={() => handleUnpublish(r.id)}
+                okText="转草稿"
+                cancelText="取消"
+              >
+                <a>转草稿</a>
               </Popconfirm>
             )}
             <Popconfirm

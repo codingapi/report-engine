@@ -170,9 +170,9 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
     setEditingId(null);
     setName('');
     setAlias('');
-    setLeftId(tables[0].id);
-    setRightId(tables[1].id);
-    setRows([blankRow()]);
+    setLeftId('');
+    setRightId('');
+    setRows([]);
     setDrawerOpen(true);
   };
 

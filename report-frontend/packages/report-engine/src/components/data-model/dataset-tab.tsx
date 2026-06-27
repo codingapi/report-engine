@@ -246,6 +246,7 @@ export default function DatasetTab({
         okText="添加"
         cancelText="取消"
         destroyOnHidden
+        width={680}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
@@ -272,7 +273,6 @@ export default function DatasetTab({
               value={pickedTableNames}
               onChange={setPickedTableNames}
               options={tableOptions}
-              maxTagCount="responsive"
             />
           </div>
         </div>

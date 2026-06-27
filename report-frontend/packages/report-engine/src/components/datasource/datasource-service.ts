@@ -22,6 +22,8 @@ export interface DataSourceService {
   save: (dto: DataSourceDTO) => Promise<string>;
   remove: (id: string) => Promise<void>;
   introspect: (id: string) => Promise<IntrospectedTable[]>;
+  /** 按配置直接解析（不落库），向导「解析」用 */
+  introspectByConfig: (dto: DataSourceDTO) => Promise<IntrospectedTable[]>;
   uploadDataFile: (file: File, type?: DataSourceKind) => Promise<DataFileUploadResult>;
   testConnection: (dto: DataSourceDTO) => Promise<TestResult>;
   /** DB 驱动下拉用：列出已注册的 DB 驱动 */
@@ -95,7 +97,7 @@ export function tablesToDatasetDtos(
   }));
 }
 
-/** 重新解析时按表名/字段名保留已编辑的别名。 */
+/** 重新解析时按表名/字段名保留已编辑的别名与字段顺序（顺序以 prev 为准，新增字段追加末尾）。 */
 export function mergeTables(prev: WizardTable[], fresh: WizardTable[]): WizardTable[] {
   return fresh.map((f) => {
     const p = prev.find((t) => t.name === f.name);
@@ -104,10 +106,28 @@ export function mergeTables(prev: WizardTable[], fresh: WizardTable[]): WizardTa
       ...f,
       id: p.id,
       alias: p.alias,
-      columns: f.columns.map((fc) => {
-        const pc = p.columns.find((c) => c.name === fc.name);
-        return pc ? { ...fc, alias: pc.alias } : fc;
-      }),
+      columns: mergeColumns(p.columns, f.columns),
     };
   });
+}
+
+/**
+ * 字段合并：按 prev（用户已调顺序）排列，alias 用 prev，类型/主键/备注取 fresh 最新探查；
+ * fresh 新增字段按 fresh 顺序追加末尾；prev 有但 fresh 无（表已删字段）的丢弃。
+ */
+function mergeColumns(prev: WizardField[], fresh: WizardField[]): WizardField[] {
+  const freshByName = new Map(fresh.map((c) => [c.name, c]));
+  const merged: WizardField[] = [];
+  const seen = new Set<string>();
+  for (const pc of prev) {
+    const fc = freshByName.get(pc.name);
+    if (fc) {
+      merged.push({ ...fc, alias: pc.alias });
+      seen.add(pc.name);
+    }
+  }
+  for (const fc of fresh) {
+    if (!seen.has(fc.name)) merged.push(fc);
+  }
+  return merged;
 }

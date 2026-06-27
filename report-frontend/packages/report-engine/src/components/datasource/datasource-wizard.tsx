@@ -191,12 +191,10 @@ export default function DataSourceWizard({
   const handleParse = async () => {
     setIntrospecting(true);
     try {
-      // 解析按 id 定位，先暂存连接再 introspect
-      const id = await service.save(buildDTO());
-      const fresh = await service.introspect(id);
+      // 解析不落库（避免半成品数据源），直接按当前配置探查；只有「保存」才落库
+      const fresh = await service.introspectByConfig(buildDTO());
       setWizard((s) => ({
         ...s,
-        savedId: id,
         tables: mergeTables(s.tables, fresh.map(fromIntrospected)),
       }));
       message.success(`解析完成，共 ${fresh.length} 张表`);
@@ -425,9 +423,9 @@ export default function DataSourceWizard({
       destroyOnHidden
       extra={
         <Space>
-          <Button onClick={() => setCurrent((c) => Math.max(c - 1, 0))} disabled={current === 0}>
-            上一步
-          </Button>
+          {current > 0 && (
+            <Button onClick={() => setCurrent((c) => Math.max(c - 1, 0))}>上一步</Button>
+          )}
           {wizard.kind === 'DB' && current === 1 && (
             <Button loading={testing} onClick={handleTest} disabled={!wizard.typeConfigId || !wizard.url}>
               测试连接
