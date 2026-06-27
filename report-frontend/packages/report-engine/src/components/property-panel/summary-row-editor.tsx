@@ -194,7 +194,7 @@ const SummaryRowEditor: React.FC<SummaryRowEditorProps> = ({
                     <Alert
                       type="info"
                       showIcon={false}
-                      message={
+                      title={
                         <>
                           可用 <code>{'${group}'}</code> 代表当前分组值（即「{groupFieldLabel}
                           」的每个取值，渲染时注入）

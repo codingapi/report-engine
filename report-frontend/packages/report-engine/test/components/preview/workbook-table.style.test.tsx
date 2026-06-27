@@ -103,7 +103,7 @@ describe('SheetTable · 反查格样式', () => {
 describe('WorkbookTable · sheet 数量分支', () => {
   it('无有效 sheet → 居中占位(minHeight 240 / flex 居中)', () => {
     const wb: ExcelWorkbook = { sheets: [] };
-    const { container } = render(<WorkbookTable workbook={wb} />);
+    render(<WorkbookTable workbook={wb} />);
     // 外层 flex 容器是 .ant-empty 的父级(closest('div') 会取到 Empty 内层包裹)
     const empty = screen.getByText('无预览数据').closest('.ant-empty')!.parentElement!;
     const cs = window.getComputedStyle(empty);
