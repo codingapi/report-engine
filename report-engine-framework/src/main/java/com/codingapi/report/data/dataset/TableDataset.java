@@ -48,4 +48,10 @@ public final class TableDataset implements Dataset {
      * 引用这里的字段，而非直接写字段名字符串。
      */
     private List<Field> fields;
+
+    /** 英文标识名：TABLE 形态即物理表名（不额外存字段，避免与 {@link #sourceTable} 冗余）。 */
+    @Override
+    public String getName() {
+        return sourceTable;
+    }
 }

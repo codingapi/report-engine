@@ -17,6 +17,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - **跨目录引用（含 `../` 的任何形式）一律用 `@/` 别名**，禁止 `../` 或 `../../` 相对路径。例：`from '@/types'`、`from '@/utils/excel-cell'`、`from '@/components/sheet-panel'`，不要写 `from '../../types'` 或 `from '../sheet-panel'`。
    - **跨包引用**用包名（`@coding-report/report-univer` 等），不走相对路径。
    - 理由：`../` 深度随文件位置变化、重构移文件易断、可读性差；`@/` 以 `src/` 为根、稳定且直观。各包 `rslib.config.ts` 与 `tsconfig.json` 均已配 `@/` → `src/` 的 alias/paths。
+8. **抽屉标题栏操作按钮顺序** — 凡用 antd `Drawer` 的 `extra`（标题栏右侧）承载操作按钮时，统一「主操作在前、取消/关闭在最右」：
+   - 顺序：`[主操作(保存/确定/下一步…), …次操作, 取消/关闭]`，关闭类按钮始终在最右侧。
+   - 例：数据模型设计抽屉 `[保存, 关闭]`、关系/数据合集 `[确定, 取消]`、数据源向导 `[上一步, (测试连接), 下一步/保存, 取消]`、数据集维护 `[保存, 取消]`、报表预览 `[导出报表, 关闭]`。
+   - 理由：与「关闭在最右上」的直觉一致；多个抽屉按钮顺序统一，避免视觉跳跃。`Modal` 底部 footer 沿用 antd 默认（`[取消, 确定]`），不在此约束内。
 
 ## Project Overview
 

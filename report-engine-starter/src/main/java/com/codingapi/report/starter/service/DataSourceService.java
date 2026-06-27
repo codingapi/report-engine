@@ -367,6 +367,7 @@ public class DataSourceService {
             out.add(
                     new DatasetDTO(
                             t.getId(),
+                            t.getName(),
                             t.getAlias(),
                             "TABLE",
                             t.getDatasourceId(),

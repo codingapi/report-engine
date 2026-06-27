@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App as AntdApp, Button, Spin, Tabs, Typography, Space } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { App as AntdApp, Spin, Tabs } from 'antd';
 import type {
   DataModelDataset,
   DataModelSource,
@@ -12,8 +11,6 @@ import type { Relationship } from '@/types';
 import DatasetTab from './dataset-tab';
 import UnionEditor from './union-editor';
 import RelationTab from './relation-tab';
-
-const { Title } = Typography;
 
 /**
  * 数据模型设计页使用的完整 DTO。
@@ -50,9 +47,17 @@ export interface DataModelDesignerService {
   introspectDatasets: (sourceId: string) => Promise<IntrospectedTable[]>;
 }
 
+/** 命令式句柄：容器（如全屏抽屉 header 的保存按钮）通过它触发保存 */
+export interface DataModelDesignerHandle {
+  /** 保存当前模型 */
+  save: () => Promise<void>;
+}
+
 export interface DataModelDesignerProps {
   dataModelId: string;
   service: DataModelDesignerService;
+  /** 模型加载/变更时通知容器（容器据此渲染 header 的标题信息） */
+  onModelChange?: (model: DataModelDTO | null) => void;
 }
 
 /** RelationshipInfo（无 id）→ Relationship（带 id，编辑期稳定 rowKey 用），保存时再剥离 */
@@ -65,152 +70,121 @@ function stripIds(list: Relationship[]): RelationshipInfo[] {
   return list.map(({ id: _id, ...rest }) => rest);
 }
 
-const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
-
 /**
- * 数据模型设计页：顶部标题栏 + 三 tab（数据集 / 数据合集 / 关系）。
- * 数据集 tab 实现二级联动多选；其他 tab 暂为骨架。
+ * 数据模型设计器：加载/编辑/保存模型，三 tab（数据集 / 数据合集 / 关系）。
+ *
+ * 标题栏与保存按钮**不在本组件内渲染**——由容器（如全屏抽屉）通过
+ * {@link DataModelDesignerHandle.save} 与 {@link DataModelDesignerProps.onModelChange}
+ * 自行渲染到 header，避免出现两层标题栏。本组件只负责主体内容。
  */
-const DataModelDesigner: React.FC<DataModelDesignerProps> = ({
-  dataModelId,
-  service,
-}) => {
-  const { message } = AntdApp.useApp();
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [model, setModel] = useState<DataModelDTO | null>(null);
+const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerProps>(
+  ({ dataModelId, service, onModelChange }, ref) => {
+    const { message } = AntdApp.useApp();
+    const [loading, setLoading] = useState(false);
+    const [model, setModel] = useState<DataModelDTO | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    service
-      .getDataModel(dataModelId)
-      .then((dto) => {
-        if (active) setModel(dto);
-      })
-      .catch((err: unknown) => {
-        if (active) {
-          message.error(`加载数据模型失败：${err instanceof Error ? err.message : String(err)}`);
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [dataModelId, service, message]);
+    useEffect(() => {
+      let active = true;
+      setLoading(true);
+      service
+        .getDataModel(dataModelId)
+        .then((dto) => {
+          if (active) setModel(dto);
+        })
+        .catch((err: unknown) => {
+          if (active) {
+            message.error(`加载数据模型失败：${err instanceof Error ? err.message : String(err)}`);
+          }
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, [dataModelId, service, message]);
 
-  const handleDatasetsChange = useCallback((datasets: DataModelDataset[]) => {
-    setModel((prev) => (prev ? { ...prev, datasets } : prev));
-  }, []);
+    // 模型加载/变更 → 通知容器渲染 header 标题
+    useEffect(() => {
+      onModelChange?.(model);
+    }, [model, onModelChange]);
 
-  const editingRelationships = useMemo(
-    () => (model ? withLocalIds(model.relationships) : []),
-    [model?.relationships],
-  );
+    const handleDatasetsChange = useCallback((datasets: DataModelDataset[]) => {
+      setModel((prev) => (prev ? { ...prev, datasets } : prev));
+    }, []);
 
-  const handleRelationshipsChange = useCallback(
-    (next: Relationship[]) => {
-      setModel((prev) => (prev ? { ...prev, relationships: stripIds(next) } : prev));
-    },
-    [],
-  );
+    const editingRelationships = useMemo(
+      () => (model ? withLocalIds(model.relationships) : []),
+      [model?.relationships],
+    );
 
-  const handleSave = useCallback(async () => {
-    if (!model) return;
-    setSaving(true);
-    try {
-      await service.saveDataModel(model);
-      message.success('保存成功');
-    } catch (err: unknown) {
-      message.error(`保存失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSaving(false);
+    const handleRelationshipsChange = useCallback(
+      (next: Relationship[]) => {
+        setModel((prev) => (prev ? { ...prev, relationships: stripIds(next) } : prev));
+      },
+      [],
+    );
+
+    const handleSave = useCallback(async () => {
+      if (!model) return;
+      try {
+        await service.saveDataModel(model);
+        message.success('保存成功');
+      } catch (err: unknown) {
+        message.error(`保存失败：${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, [model, service, message]);
+
+    useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
+
+    if (loading || !model) {
+      return (
+        <div style={{ padding: 48, textAlign: 'center' }}>
+          <Spin tip="加载中…" />
+        </div>
+      );
     }
-  }, [model, service, message]);
 
-  if (loading || !model) {
     return (
-      <div style={{ padding: 48, textAlign: 'center' }}>
-        <Spin tip="加载中…" />
+      <div style={{ padding: 16 }}>
+        <Tabs
+          items={[
+            {
+              key: 'datasets',
+              label: '数据集',
+              children: (
+                <DatasetTab
+                  datasets={model.datasets}
+                  onChange={handleDatasetsChange}
+                  service={service}
+                />
+              ),
+            },
+            {
+              key: 'unions',
+              label: '数据合集',
+              children: (
+                <UnionEditor datasets={model.datasets} onChange={handleDatasetsChange} />
+              ),
+            },
+            {
+              key: 'relations',
+              label: '关系',
+              children: (
+                <RelationTab
+                  datasets={model.datasets}
+                  relationships={editingRelationships}
+                  onChange={handleRelationshipsChange}
+                />
+              ),
+            },
+          ]}
+        />
       </div>
     );
-  }
+  },
+);
 
-  return (
-    <div style={{ padding: 16 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16,
-        }}
-      >
-        <Title level={4} style={{ margin: 0 }}>
-          {model.name}
-          <span
-            style={{
-              marginLeft: 12,
-              fontSize: 12,
-              color: 'rgba(0,0,0,0.45)',
-              fontWeight: 'normal',
-            }}
-          >
-            {model.status ? `（${model.status}）` : ''} 最后更新{' '}
-            {formatTime(model.updateTime)}
-          </span>
-        </Title>
-        <Space>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            loading={saving}
-            onClick={handleSave}
-          >
-            保存
-          </Button>
-        </Space>
-      </div>
-      <Tabs
-        items={[
-          {
-            key: 'datasets',
-            label: '数据集',
-            children: (
-              <DatasetTab
-                datasets={model.datasets}
-                onChange={handleDatasetsChange}
-                service={service}
-              />
-            ),
-          },
-          {
-            key: 'unions',
-            label: '数据合集',
-            children: (
-              <UnionEditor
-                datasets={model.datasets}
-                onChange={handleDatasetsChange}
-              />
-            ),
-          },
-          {
-            key: 'relations',
-            label: '关系',
-            children: (
-              <RelationTab
-                datasets={model.datasets}
-                relationships={editingRelationships}
-                onChange={handleRelationshipsChange}
-              />
-            ),
-          },
-        ]}
-      />
-    </div>
-  );
-};
+DataModelDesigner.displayName = 'DataModelDesigner';
 
 export default DataModelDesigner;

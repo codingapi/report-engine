@@ -136,7 +136,7 @@ const AppReport = () => {
         </Button>
       }
       extraActions={
-        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports')}>
+        <Button icon={<CloseOutlined />} onClick={() => navigate('/reports', { replace: true })}>
           关闭
         </Button>
       }

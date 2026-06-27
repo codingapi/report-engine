@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   App as AntdApp,
   Button,
+  Drawer,
   Empty,
   Form,
   Input,
@@ -12,16 +13,28 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataModelBrief, DataModelSaveDTO } from '@coding-report/report-api';
+import DataModelDesigner from './data-model-designer';
+import type {
+  DataModelDTO,
+  DataModelDesignerHandle,
+  DataModelDesignerService,
+} from './data-model-designer';
+import { STATUS_LABELS, statusText } from './status';
 
 const { Title } = Typography;
 
 const PAGE_SIZE = 10;
 
-const STATUS_LABELS: Record<string, { text: string; color: string }> = {
-  DRAFT: { text: '草稿', color: 'default' },
+const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
+
+const renderStatus = (status?: string) => {
+  if (!status) return <Tag>未知</Tag>;
+  const cfg = STATUS_LABELS[status];
+  if (cfg) return <Tag color={cfg.color}>{cfg.text}</Tag>;
+  return <Tag>{status}</Tag>;
 };
 
 /**
@@ -42,8 +55,8 @@ export interface DataModelService {
 
 export interface DataModelListPageProps {
   service: DataModelService;
-  /** 进入设计页的回调（行内「设计」与新建成功后触发），由消费方注入路由跳转 */
-  onOpenDesign: (id: string) => void;
+  /** 设计器依赖的服务（加载/保存模型、数据源与表探查），由消费方注入 */
+  designerService: DataModelDesignerService;
   pageSize?: number;
 }
 
@@ -51,18 +64,9 @@ interface CreateForm {
   name: string;
 }
 
-const formatTime = (t?: number) => (t ? new Date(t).toLocaleString() : '-');
-
-const renderStatus = (status?: string) => {
-  if (!status) return <Tag>未知</Tag>;
-  const cfg = STATUS_LABELS[status];
-  if (cfg) return <Tag color={cfg.color}>{cfg.text}</Tag>;
-  return <Tag>{status}</Tag>;
-};
-
 export default function DataModelListPage({
   service,
-  onOpenDesign,
+  designerService,
   pageSize = PAGE_SIZE,
 }: DataModelListPageProps) {
   const { message } = AntdApp.useApp();
@@ -72,6 +76,10 @@ export default function DataModelListPage({
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [designId, setDesignId] = useState<string | null>(null);
+  const [designerModel, setDesignerModel] = useState<DataModelDTO | null>(null);
+  const [saving, setSaving] = useState(false);
+  const designerRef = useRef<DataModelDesignerHandle>(null);
   const [form] = Form.useForm<CreateForm>();
 
   const refresh = useCallback(
@@ -113,7 +121,7 @@ export default function DataModelListPage({
       message.success('数据模型已创建');
       setCreateOpen(false);
       form.resetFields();
-      onOpenDesign(id);
+      setDesignId(id);
     } catch (e) {
       if (e instanceof Error) {
         message.error(`创建数据模型失败: ${e.message}`);
@@ -133,6 +141,24 @@ export default function DataModelListPage({
       await refresh(targetPage);
     } catch (e) {
       message.error(`删除数据模型失败: ${(e as Error).message}`);
+    }
+  };
+
+  /** 关闭设计抽屉并刷新列表（反映保存后的名称/时间/数据集变化） */
+  const closeDesign = () => {
+    setDesignId(null);
+    setDesignerModel(null);
+    setSaving(false);
+    refresh();
+  };
+
+  /** 触发设计器保存（按钮在抽屉 header） */
+  const handleDesignerSave = async () => {
+    setSaving(true);
+    try {
+      await designerRef.current?.save();
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -163,7 +189,7 @@ export default function DataModelListPage({
         width: 180,
         render: (_, r) => (
           <Space size="middle">
-            <a onClick={() => onOpenDesign(r.id)}>设计</a>
+            <a onClick={() => setDesignId(r.id)}>设计</a>
             <Popconfirm
               title="确认删除该数据模型？"
               onConfirm={() => handleDelete(r.id)}
@@ -177,7 +203,7 @@ export default function DataModelListPage({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [list, page, onOpenDesign],
+    [list, page],
   );
 
   return (
@@ -236,6 +262,57 @@ export default function DataModelListPage({
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        open={designId !== null}
+        onClose={closeDesign}
+        closable={false}
+        width="100vw"
+        destroyOnHidden
+        styles={{ body: { padding: 0, overflow: 'auto' } }}
+        title={
+          designerModel ? (
+            <span>
+              {designerModel.name}
+              <span
+                style={{
+                  marginLeft: 12,
+                  fontSize: 12,
+                  color: 'rgba(0,0,0,0.45)',
+                  fontWeight: 'normal',
+                }}
+              >
+                {statusText(designerModel.status) ? `（${statusText(designerModel.status)}）` : ''}{' '}
+                最后更新 {formatTime(designerModel.updateTime)}
+              </span>
+            </span>
+          ) : (
+            '数据模型设计'
+          )
+        }
+        extra={
+          <Space>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              onClick={handleDesignerSave}
+            >
+              保存
+            </Button>
+            <Button onClick={closeDesign}>关闭</Button>
+          </Space>
+        }
+      >
+        {designId && (
+          <DataModelDesigner
+            ref={designerRef}
+            dataModelId={designId}
+            service={designerService}
+            onModelChange={(m) => setDesignerModel(m)}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }

@@ -425,7 +425,6 @@ export default function DataSourceWizard({
       destroyOnHidden
       extra={
         <Space>
-          <Button onClick={onClose}>取消</Button>
           <Button onClick={() => setCurrent((c) => Math.max(c - 1, 0))} disabled={current === 0}>
             上一步
           </Button>
@@ -447,6 +446,7 @@ export default function DataSourceWizard({
               保存
             </Button>
           )}
+          <Button onClick={onClose}>取消</Button>
         </Space>
       }
     >

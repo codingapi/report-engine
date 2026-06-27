@@ -95,10 +95,10 @@ export default function DatasetDrawer({
       destroyOnHidden
       extra={
         <Space>
-          <Button onClick={onClose}>取消</Button>
           <Button type="primary" loading={saving} onClick={handleSave}>
             保存
           </Button>
+          <Button onClick={onClose}>取消</Button>
         </Space>
       }
     >

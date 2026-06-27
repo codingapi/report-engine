@@ -4,7 +4,6 @@ import ReportsPage from '@/pages/reports';
 import AppReport from '@/pages/engine';
 import AppPreview from '@/pages/preview';
 import DataModelsPage from '@/pages/datamodels';
-import DatamodelDesignPage from '@/pages/datamodel-design';
 import DataSourceTypesPage from '@/pages/datasource-types';
 import DataSourcesPage from '@/pages/datasources';
 import React from 'react';
@@ -34,12 +33,6 @@ const routes: RouteConfig[] = [
     name: '数据模型',
     icon: <DatabaseOutlined />,
     element: <DataModelsPage />,
-  },
-  {
-    path: '/datamodels/:id',
-    name: '数据模型设计',
-    icon: <DatabaseOutlined />,
-    element: <DatamodelDesignPage />,
   },
   {
     path: '/datasource-types',

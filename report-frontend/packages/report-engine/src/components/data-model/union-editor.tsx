@@ -1,16 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   App as AntdApp,
   Button,
+  Col,
+  Drawer,
   Empty,
+  Form,
   Input,
   Popconfirm,
+  Row,
   Select,
   Space,
   Table,
   Typography,
 } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataModelDataset, UnionMember } from '@coding-report/report-api';
 import type { DataType } from '@/types';
@@ -66,9 +70,15 @@ function toFieldRows(union: DataModelDataset): UnionFieldRow[] {
   }));
 }
 
-/** 把编辑行+左右 datasetId 组装回 DataModelDataset（kind=UNION） */
+/**
+ * 把编辑草稿组装回 UNION 数据集。
+ *
+ * <p>左/右成员各自用自己的字段映射（左用 {@code leftField}、右用 {@code rightField}）——
+ * 修正旧实现"左右成员都用 leftField"的 bug。
+ */
 function buildUnion(
   id: string,
+  name: string,
   alias: string,
   rows: UnionFieldRow[],
   leftDatasetId: string,
@@ -82,17 +92,20 @@ function buildUnion(
       dataType: r.dataType,
       primaryKey: false,
     }));
-  const mapping = (rows: UnionFieldRow[]) =>
+  const mappingBy = (pick: (r: UnionFieldRow) => string) =>
     rows.reduce<Record<string, string>>((acc, r) => {
-      if (r.name.trim() && r.leftField) acc[r.name.trim()] = r.leftField;
+      const n = r.name.trim();
+      const v = pick(r);
+      if (n && v) acc[n] = v;
       return acc;
     }, {});
   const members: UnionMember[] = [
-    { datasetId: leftDatasetId, mapping: mapping(rows) },
-    { datasetId: rightDatasetId, mapping: mapping(rows) },
+    { datasetId: leftDatasetId, mapping: mappingBy((r) => r.leftField) },
+    { datasetId: rightDatasetId, mapping: mappingBy((r) => r.rightField) },
   ];
   return {
     id,
+    name: name.trim() || undefined,
     alias: alias.trim() || '新合集',
     kind: 'UNION',
     fields,
@@ -112,46 +125,25 @@ function blankRow(): UnionFieldRow {
 }
 
 /**
- * 数据合集编辑器（UNION 派生数据集）：
- * - 上：合集名称/别名 + 合集字段定义（统一字段名/别名/数据类型）
- * - 下：左右两表选择 + 字段映射（每个统一字段 → 左表字段 + 右表字段）
+ * 数据合集（UNION 派生数据集）编辑器：外层合集列表 Table + 新建/编辑抽屉。
  *
- * 合集本身存储为 kind=UNION 的 DataModelDataset，与 TABLE 同列；
- * 后端 UnionMember.mapping 为「统一字段名 → 成员实际字段名」。
+ * - 默认展示合集列表（kind=UNION），行内「编辑/删除」。
+ * - 「新建合集」/「编辑」打开 60% 抽屉：合集名称(英文)+合集别名(中文)+字段定义+左右表字段映射。
+ * - 草稿模式：抽屉内编辑不即时写回，点「确定」才 buildUnion 写入 datasets。
  */
 export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
   const { message } = AntdApp.useApp();
   const unions = useMemo(() => datasets.filter(isUnion), [datasets]);
   const tables = useMemo(() => datasets.filter(isTable), [datasets]);
 
-  const [activeId, setActiveId] = useState<string | undefined>(
-    () => unions[0]?.id,
-  );
-  const active = useMemo(
-    () => unions.find((u) => u.id === activeId) ?? unions[0],
-    [unions, activeId],
-  );
-
-  // 编辑态：直接展开 active 到 row + name/alias + 左右 id，便于即时编辑
-  const [alias, setAlias] = useState<string>(active?.alias ?? '');
-  const [leftId, setLeftId] = useState<string>(active?.members?.[0]?.datasetId ?? '');
-  const [rightId, setRightId] = useState<string>(active?.members?.[1]?.datasetId ?? '');
-  const [rows, setRows] = useState<UnionFieldRow[]>(() =>
-    active ? toFieldRows(active) : [],
-  );
-
-  // active 切换时重新展开
-  const switchTo = useCallback(
-    (id: string | undefined) => {
-      const next = id ? datasets.find((d) => d.id === id && isUnion(d)) : undefined;
-      setActiveId(next?.id);
-      setAlias(next?.alias ?? '');
-      setLeftId(next?.members?.[0]?.datasetId ?? '');
-      setRightId(next?.members?.[1]?.datasetId ?? '');
-      setRows(next ? toFieldRows(next) : []);
-    },
-    [datasets],
-  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // 抽屉草稿（确定时才写回 datasets）
+  const [name, setName] = useState('');
+  const [alias, setAlias] = useState('');
+  const [leftId, setLeftId] = useState('');
+  const [rightId, setRightId] = useState('');
+  const [rows, setRows] = useState<UnionFieldRow[]>([]);
 
   const tableOptions = useMemo(
     () =>
@@ -161,97 +153,107 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
       })),
     [tables],
   );
-
-  const leftTable = useMemo(
-    () => tables.find((t) => t.id === leftId),
-    [tables, leftId],
-  );
-  const rightTable = useMemo(
-    () => tables.find((t) => t.id === rightId),
-    [tables, rightId],
-  );
-
+  const leftTable = useMemo(() => tables.find((t) => t.id === leftId), [tables, leftId]);
+  const rightTable = useMemo(() => tables.find((t) => t.id === rightId), [tables, rightId]);
   const fieldOptions = (table: DataModelDataset | undefined) =>
     (table?.fields ?? []).map((f) => ({
       label: f.alias || f.name,
       value: f.name,
     }));
 
-  const commit = useCallback(
-    (nextRows: UnionFieldRow[], nextAlias: string, nextLeft: string, nextRight: string) => {
-      if (!active) return;
-      const rebuilt = buildUnion(active.id, nextAlias, nextRows, nextLeft, nextRight);
-      onChange(datasets.map((d) => (d.id === active.id ? rebuilt : d)));
-    },
-    [active, datasets, onChange],
-  );
-
-  const handleAddUnion = () => {
+  const openCreate = () => {
     if (tables.length < 2) {
       message.warning('至少需要 2 个 TABLE 数据集才能创建合集');
       return;
     }
-    const id = genId();
-    const initialRows = [blankRow()];
-    const created = buildUnion(id, '新合集', initialRows, tables[0].id, tables[1].id);
-    onChange([...datasets, created]);
-    switchTo(id);
+    setEditingId(null);
+    setName('');
+    setAlias('');
+    setLeftId(tables[0].id);
+    setRightId(tables[1].id);
+    setRows([blankRow()]);
+    setDrawerOpen(true);
   };
 
-  const handleRemoveUnion = (id: string) => {
-    const remaining = datasets.filter((d) => d.id !== id);
-    onChange(remaining);
-    if (activeId === id) {
-      const nextUnion = remaining.find(isUnion);
-      switchTo(nextUnion?.id);
+  const openEdit = (union: DataModelDataset) => {
+    setEditingId(union.id);
+    setName(union.name ?? '');
+    setAlias(union.alias ?? '');
+    setLeftId(union.members?.[0]?.datasetId ?? '');
+    setRightId(union.members?.[1]?.datasetId ?? '');
+    setRows(toFieldRows(union));
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditingId(null);
+  };
+
+  const handleConfirm = () => {
+    if (!name.trim()) {
+      message.warning('请输入合集名称（英文名）');
+      return;
     }
+    const id = editingId ?? genId();
+    const built = buildUnion(id, name, alias, rows, leftId, rightId);
+    if (editingId) {
+      onChange(datasets.map((d) => (d.id === editingId ? built : d)));
+    } else {
+      onChange([...datasets, built]);
+    }
+    message.success(editingId ? '合集已更新' : '合集已创建');
+    closeDrawer();
+  };
+
+  const handleDelete = (id: string) => {
+    onChange(datasets.filter((d) => d.id !== id));
   };
 
   const updateRow = (key: string, patch: Partial<UnionFieldRow>) => {
-    const next = rows.map((r) => (r.key === key ? { ...r, ...patch } : r));
-    setRows(next);
-    commit(next, alias, leftId, rightId);
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
-
-  const addRow = () => {
-    const next = [...rows, blankRow()];
-    setRows(next);
-    commit(next, alias, leftId, rightId);
-  };
-
-  const removeRow = (key: string) => {
-    const next = rows.filter((r) => r.key !== key);
-    setRows(next);
-    commit(next, alias, leftId, rightId);
-  };
-
-  const handleAliasChange = (v: string) => {
-    setAlias(v);
-    commit(rows, v, leftId, rightId);
-  };
+  const addRow = () => setRows((rs) => [...rs, blankRow()]);
+  const removeRow = (key: string) => setRows((rs) => rs.filter((r) => r.key !== key));
 
   const handleLeftChange = (v: string) => {
     setLeftId(v);
     // 切换左表时清空失效的左字段映射
     const allowed = new Set((tables.find((t) => t.id === v)?.fields ?? []).map((f) => f.name));
-    const next = rows.map((r) => ({
-      ...r,
-      leftField: allowed.has(r.leftField) ? r.leftField : '',
-    }));
-    setRows(next);
-    commit(next, alias, v, rightId);
+    setRows((rs) =>
+      rs.map((r) => ({ ...r, leftField: allowed.has(r.leftField) ? r.leftField : '' })),
+    );
   };
-
   const handleRightChange = (v: string) => {
     setRightId(v);
     const allowed = new Set((tables.find((t) => t.id === v)?.fields ?? []).map((f) => f.name));
-    const next = rows.map((r) => ({
-      ...r,
-      rightField: allowed.has(r.rightField) ? r.rightField : '',
-    }));
-    setRows(next);
-    commit(next, alias, leftId, v);
+    setRows((rs) =>
+      rs.map((r) => ({ ...r, rightField: allowed.has(r.rightField) ? r.rightField : '' })),
+    );
   };
+
+  const listColumns: ColumnsType<DataModelDataset> = [
+    { title: '合集名称', key: 'name', render: (_, r) => r.name || '-' },
+    { title: '合集别名', key: 'alias', render: (_, r) => r.alias || '-' },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 120,
+      render: (_, r) => (
+        <Space>
+          <a onClick={() => openEdit(r)}>编辑</a>
+          <Popconfirm
+            title="确认删除该合集？"
+            onConfirm={() => handleDelete(r.id)}
+            okText="删除"
+            cancelText="取消"
+          >
+            <a style={{ color: '#ff4d4f' }}>删除</a>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   const fieldColumns: ColumnsType<UnionFieldRow> = [
     {
@@ -269,7 +271,6 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
     {
       title: '别名',
       dataIndex: 'alias',
-      width: 140,
       render: (_v, r) => (
         <Input
           size="small"
@@ -354,111 +355,129 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
     },
   ];
 
-  const unionSelectOptions = useMemo(
-    () => unions.map((u) => ({ label: u.alias || u.id, value: u.id })),
-    [unions],
-  );
+  const canCreate = tables.length >= 2;
 
   return (
     <div>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-        <Space>
-          <Select
-            style={{ width: 240 }}
-            placeholder="选择合集"
-            value={active?.id}
-            options={unionSelectOptions}
-            onChange={switchTo}
-            disabled={unions.length === 0}
-          />
-          <Button icon={<PlusOutlined />} type="primary" onClick={handleAddUnion}>
-            新建合集
-          </Button>
-        </Space>
-        {active && (
-          <Popconfirm
-            title="确认删除该合集？"
-            onConfirm={() => handleRemoveUnion(active.id)}
-            okText="删除"
-            cancelText="取消"
-          >
-            <Button danger icon={<DeleteOutlined />}>
-              删除合集
-            </Button>
-          </Popconfirm>
-        )}
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button icon={<PlusOutlined />} type="primary" onClick={openCreate} disabled={!canCreate}>
+          新建合集
+        </Button>
       </div>
-
-      {!active ? (
-        <Empty description="暂无合集，点上方「新建合集」" />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <Title level={5}>合集定义</Title>
-            <Space style={{ marginBottom: 8 }} wrap>
-              <span>合集名称：</span>
-              <Input
-                style={{ width: 200 }}
-                value={alias}
-                placeholder="合集别名"
-                onChange={(e) => handleAliasChange(e.target.value)}
-              />
-            </Space>
-            <Table<UnionFieldRow>
-              rowKey="key"
-              size="small"
-              columns={fieldColumns}
-              dataSource={rows}
-              pagination={false}
+      <Table<DataModelDataset>
+        rowKey="id"
+        size="small"
+        columns={listColumns}
+        dataSource={unions}
+        pagination={{
+          pageSize: 10,
+          size: 'small',
+          showSizeChanger: false,
+          showTotal: (t) => `共 ${t} 个合集`,
+        }}
+        locale={{
+          emptyText: (
+            <Empty
+              description={
+                canCreate ? '暂无合集，点上方「新建合集」' : '至少需要 2 个 TABLE 数据集才能创建合集'
+              }
             />
-            <Button
-              size="small"
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={addRow}
-              style={{ marginTop: 8, width: '100%' }}
-            >
-              添加字段
+          ),
+        }}
+      />
+
+      <Drawer
+        title={editingId ? '编辑合集' : '新建合集'}
+        open={drawerOpen}
+        onClose={closeDrawer}
+        width="60%"
+        destroyOnHidden
+        extra={
+          <Space>
+            <Button type="primary" onClick={handleConfirm}>
+              确定
             </Button>
-          </div>
+            <Button onClick={closeDrawer}>取消</Button>
+          </Space>
+        }
+      >
+        <Form layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="合集名称（英文名）">
+                <Input
+                  value={name}
+                  placeholder="如 all_employees"
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="合集别名（中文名）">
+                <Input
+                  value={alias}
+                  placeholder="如 全部员工"
+                  onChange={(e) => setAlias(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
 
-          <div>
-            <Title level={5}>成员映射</Title>
-            <Space style={{ marginBottom: 8 }} wrap>
-              <span>左表：</span>
-              <Select
-                style={{ width: 200 }}
-                value={leftId || undefined}
-                placeholder="选择左表"
-                options={tableOptions}
-                onChange={handleLeftChange}
-                showSearch
-                optionFilterProp="label"
-              />
-              <span>右表：</span>
-              <Select
-                style={{ width: 200 }}
-                value={rightId || undefined}
-                placeholder="选择右表"
-                options={tableOptions}
-                onChange={handleRightChange}
-                showSearch
-                optionFilterProp="label"
-              />
-            </Space>
-            <Table<UnionFieldRow>
-              rowKey="key"
-              size="small"
-              columns={mappingColumns}
-              dataSource={rows}
-              pagination={false}
-              locale={{
-                emptyText: <Empty description="先添加合集字段" />,
-              }}
-            />
-          </div>
-        </div>
-      )}
+        <Title level={5}>合集字段定义</Title>
+        <Table<UnionFieldRow>
+          rowKey="key"
+          size="small"
+          columns={fieldColumns}
+          dataSource={rows}
+          pagination={false}
+        />
+        <Button
+          size="small"
+          type="dashed"
+          icon={<PlusOutlined />}
+          onClick={addRow}
+          style={{ marginTop: 8, width: '100%' }}
+        >
+          添加字段
+        </Button>
+
+        <Title level={5} style={{ marginTop: 24 }}>
+          成员映射
+        </Title>
+        <Space style={{ marginBottom: 8 }} wrap>
+          <span>左表：</span>
+          <Select
+            style={{ width: 200 }}
+            value={leftId || undefined}
+            placeholder="选择左表"
+            options={tableOptions}
+            onChange={handleLeftChange}
+            showSearch
+            optionFilterProp="label"
+          />
+          <span>右表：</span>
+          <Select
+            style={{ width: 200 }}
+            value={rightId || undefined}
+            placeholder="选择右表"
+            options={tableOptions}
+            onChange={handleRightChange}
+            showSearch
+            optionFilterProp="label"
+          />
+        </Space>
+        <Table<UnionFieldRow>
+          rowKey="key"
+          size="small"
+          columns={mappingColumns}
+          dataSource={rows}
+          pagination={false}
+          locale={{
+            emptyText: <Empty description="先添加合集字段" />,
+          }}
+        />
+      </Drawer>
     </div>
   );
 }

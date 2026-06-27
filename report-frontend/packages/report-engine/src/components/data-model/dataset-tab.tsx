@@ -166,6 +166,11 @@ export default function DatasetTab({
   const columns: ColumnsType<DataModelDataset> = useMemo(
     () => [
       {
+        title: '数据集名',
+        key: 'alias',
+        render: (_v, r) => r.alias || r.sourceTable || '-',
+      },
+      {
         title: '数据源',
         key: 'datasource',
         render: (_v, r) => {
@@ -174,11 +179,6 @@ export default function DatasetTab({
           if (!ds) return r.datasourceId;
           return `${ds.name} (${ds.type})`;
         },
-      },
-      {
-        title: '数据集名',
-        key: 'alias',
-        render: (_v, r) => r.alias || r.sourceTable || '-',
       },
       {
         title: '操作',
@@ -210,7 +210,7 @@ export default function DatasetTab({
 
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
         <Space>
           <Button
             icon={<PlusOutlined />}
@@ -226,7 +226,12 @@ export default function DatasetTab({
         size="small"
         columns={columns}
         dataSource={datasets}
-        pagination={false}
+        pagination={{
+          pageSize: 10,
+          size: 'small',
+          showSizeChanger: false,
+          showTotal: (t) => `共 ${t} 个数据集`,
+        }}
         locale={{
           emptyText: <Empty description="暂无数据集，点上方「添加数据集」" />,
         }}

@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { Button, Empty, Form, Modal, Popconfirm, Select, Space, Table } from 'antd';
+import { Button, Drawer, Empty, Form, Popconfirm, Select, Space, Table } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataModelDataset } from '@coding-report/report-api';
 import type { JoinType, Relationship } from '@/types';
 
+const JOIN_LABELS: Record<JoinType, string> = {
+  INNER: '内连接',
+  LEFT: '左连接',
+  RIGHT: '右连接',
+  FULL: '全连接',
+};
+
 const JOIN_OPTIONS: Array<{ label: string; value: JoinType }> = [
-  { label: 'INNER', value: 'INNER' },
-  { label: 'LEFT', value: 'LEFT' },
-  { label: 'RIGHT', value: 'RIGHT' },
-  { label: 'FULL', value: 'FULL' },
+  { label: '内连接', value: 'INNER' },
+  { label: '左连接', value: 'LEFT' },
+  { label: '右连接', value: 'RIGHT' },
+  { label: '全连接', value: 'FULL' },
 ];
 
 const PAGE_SIZE = 10;
@@ -98,7 +105,13 @@ export default function RelationTab({
       render: (_, r) =>
         fieldLabel(datasets.find((d) => d.id === r.left.datasetId), r.left.field),
     },
-    { title: '连接类型', dataIndex: 'joinType', key: 'joinType', width: 100 },
+    {
+      title: '连接类型',
+      dataIndex: 'joinType',
+      key: 'joinType',
+      width: 100,
+      render: (v: JoinType) => JOIN_LABELS[v] ?? v,
+    },
     {
       title: '右数据集',
       key: 'rightDataset',
@@ -129,7 +142,7 @@ export default function RelationTab({
 
   return (
     <>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           icon={<PlusOutlined />}
           type="primary"
@@ -144,11 +157,12 @@ export default function RelationTab({
         columns={columns}
         dataSource={relationships}
         size="small"
-        pagination={
-          relationships.length <= PAGE_SIZE
-            ? false
-            : { pageSize: PAGE_SIZE, size: 'small', showSizeChanger: false }
-        }
+        pagination={{
+          pageSize: PAGE_SIZE,
+          size: 'small',
+          showSizeChanger: false,
+          showTotal: (t) => `共 ${t} 个关系`,
+        }}
         locale={{
           emptyText: (
             <Empty
@@ -159,12 +173,20 @@ export default function RelationTab({
           ),
         }}
       />
-      <Modal
+      <Drawer
         title={editing ? '编辑关系' : '新建关系'}
         open={modalOpen}
-        onOk={handleOk}
-        onCancel={() => setModalOpen(false)}
+        onClose={() => setModalOpen(false)}
+        width="60%"
         destroyOnHidden
+        extra={
+          <Space>
+            <Button type="primary" onClick={handleOk}>
+              确定
+            </Button>
+            <Button onClick={() => setModalOpen(false)}>取消</Button>
+          </Space>
+        }
       >
         <Form form={form} layout="vertical">
           <Form.Item name="id" hidden>
@@ -194,7 +216,7 @@ export default function RelationTab({
             <Select options={fieldOptionsOf(rightDatasetId)} />
           </Form.Item>
         </Form>
-      </Modal>
+      </Drawer>
     </>
   );
 }
