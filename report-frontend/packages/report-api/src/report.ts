@@ -139,7 +139,7 @@ export async function loadReportConfig<T = Record<string, unknown>>(id: string):
 
 /** 删除指定报表配置 */
 export async function deleteReportConfig(id: string): Promise<void> {
-  await http.delete(`/report/configs/${id}`);
+  await http.post(`/report/configs/${id}/delete`);
 }
 
 /** 报表列表分页结果（对齐后端 MultiResponse） */

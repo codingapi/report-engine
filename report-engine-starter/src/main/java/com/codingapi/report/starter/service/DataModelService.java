@@ -27,8 +27,8 @@ import lombok.extern.slf4j.Slf4j;
  * <p>仓库以领域 {@link DataModel} 存取（{@code config} 明文，落盘加密交仓库实现）。出入站用 {@link DataModelDTO}： {@link
  * DataModel#toDTO()} / {@link DataModel#fromDTO} 互转，敏感字段仅在出口 {@link #getMasked} 脱敏。
  *
- * <p>连接解析：{@link DataModel} 持久化时仅存 {@code datasourceId} 引用，加载时由 {@link DataSourceRepository}
- * 解析为真实 {@link DataSource} 注入到 {@link TableDataset} 中，使全局连接（{@code /api/datasources} 管理）成为唯一权威来源。
+ * <p>连接解析：{@link DataModel} 持久化时仅存 {@code datasourceId} 引用，加载时由 {@link DataSourceRepository} 解析为真实
+ * {@link DataSource} 注入到 {@link TableDataset} 中，使全局连接（{@code /api/datasources} 管理）成为唯一权威来源。
  */
 @Slf4j
 public class DataModelService {
@@ -59,7 +59,8 @@ public class DataModelService {
     }
 
     /**
-     * 加载时按 {@code datasourceId} 解析全局 {@link DataSource} 注入到 {@link TableDataset}。 已有嵌入连接（旧数据/演示）保持不变，仅补齐缺失。
+     * 加载时按 {@code datasourceId} 解析全局 {@link DataSource} 注入到 {@link TableDataset}。
+     * 已有嵌入连接（旧数据/演示）保持不变，仅补齐缺失。
      */
     private void resolveDatasources(DataModel dm) {
         if (dm == null || dm.getDatasets() == null) return;
@@ -73,7 +74,8 @@ public class DataModelService {
             }
             DataSource src = dataSourceRepository.find(refId);
             if (src == null) {
-                log.warn("数据集 {} 引用的连接 {} 不存在（DataSourceRepository.find 返回 null）", t.getId(), refId);
+                log.warn(
+                        "数据集 {} 引用的连接 {} 不存在（DataSourceRepository.find 返回 null）", t.getId(), refId);
                 continue;
             }
             t.setDatasource(src);

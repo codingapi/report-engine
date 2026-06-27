@@ -26,7 +26,6 @@ import com.codingapi.report.starter.service.DriverLoader;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -227,7 +226,9 @@ class DataSourceControllerTest {
         assertEquals("staff", table.name());
         List<String> colNames = table.columns().stream().map(c -> c.name()).toList();
         assertEquals(List.of("id", "name", "age"), colNames);
-        assertTrue(table.columns().stream().allMatch(c -> "STRING".equals(c.dataType()) && !c.primaryKey()));
+        assertTrue(
+                table.columns().stream()
+                        .allMatch(c -> "STRING".equals(c.dataType()) && !c.primaryKey()));
     }
 
     @Test
@@ -250,7 +251,8 @@ class DataSourceControllerTest {
         assertEquals(1, result.tables().size());
         IntrospectedTable table = result.tables().get(0);
         assertEquals("fruits", table.name());
-        assertEquals(List.of("code", "label"), table.columns().stream().map(c -> c.name()).toList());
+        assertEquals(
+                List.of("code", "label"), table.columns().stream().map(c -> c.name()).toList());
     }
 
     @Test
@@ -258,7 +260,11 @@ class DataSourceControllerTest {
         Workbook wb = buildWorkbookWithSheets(List.of("Staff", "Depts"));
         byte[] bytes = new ExcelExporter().export(wb);
         MockMultipartFile file =
-                new MockMultipartFile("file", "book.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes);
+                new MockMultipartFile(
+                        "file",
+                        "book.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        bytes);
 
         SingleResponse<UploadResult> resp = controller.upload(file, "EXCEL");
         assertTrue(resp.isSuccess());
@@ -266,7 +272,9 @@ class DataSourceControllerTest {
         assertEquals("EXCEL", result.type());
         assertTrue(Files.exists(Path.of(result.savedPath())));
         assertEquals(2, result.tables().size(), "应解析出两个 sheet");
-        assertEquals(List.of("Staff", "Depts"), result.tables().stream().map(IntrospectedTable::name).toList());
+        assertEquals(
+                List.of("Staff", "Depts"),
+                result.tables().stream().map(IntrospectedTable::name).toList());
         // 每个 sheet 表头应有 id/name 两列
         for (IntrospectedTable t : result.tables()) {
             assertEquals(List.of("id", "name"), t.columns().stream().map(c -> c.name()).toList());
@@ -283,7 +291,9 @@ class DataSourceControllerTest {
 
     @Test
     void uploadRejectsUnknownExtension() {
-        MockMultipartFile file = new MockMultipartFile("file", "data.bin", "application/octet-stream", new byte[] {1});
+        MockMultipartFile file =
+                new MockMultipartFile(
+                        "file", "data.bin", "application/octet-stream", new byte[] {1});
         assertThrows(IllegalArgumentException.class, () -> controller.upload(file, null));
     }
 

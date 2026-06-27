@@ -66,7 +66,7 @@ export async function saveDataSourceType(dto: DataSourceTypeDTO): Promise<string
 
 /** 删除 */
 export async function deleteDataSourceType(id: string): Promise<void> {
-  await http.delete(`/datasource-types/${id}`);
+  await http.post(`/datasource-types/${id}/delete`);
 }
 
 /** 上传驱动 jar（multipart），返回 jar 文件名 + 候选驱动类名列表 */

@@ -13,7 +13,6 @@ import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,7 +71,7 @@ public class DataSourceController {
         return SingleResponse.of(dataSourceService.save(dto));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/delete")
     public SingleResponse<Void> delete(@PathVariable String id) {
         dataSourceService.delete(id);
         return SingleResponse.of(null);
@@ -83,9 +82,7 @@ public class DataSourceController {
         return SingleResponse.of(dataSourceService.testConnection(dto));
     }
 
-    /**
-     * 元数据探查：按已保存的连接 id 解析所有表/sheet + 列定义。 DB 返回物理表列表；EXCEL 每个 sheet 一张表；CSV 单张表。
-     */
+    /** 元数据探查：按已保存的连接 id 解析所有表/sheet + 列定义。 DB 返回物理表列表；EXCEL 每个 sheet 一张表；CSV 单张表。 */
     @PostMapping("/{id}/introspect")
     public MultiResponse<IntrospectedTable> introspect(@PathVariable String id) {
         return MultiResponse.of(dataSourceService.introspect(id));

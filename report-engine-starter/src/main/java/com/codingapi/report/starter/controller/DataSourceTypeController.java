@@ -11,7 +11,6 @@ import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,7 +63,7 @@ public class DataSourceTypeController {
         return SingleResponse.of(dataSourceTypeService.save(dto));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/delete")
     public SingleResponse<Void> delete(@PathVariable String id) {
         dataSourceTypeService.delete(id);
         return SingleResponse.of(null);

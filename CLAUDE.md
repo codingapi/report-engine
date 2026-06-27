@@ -21,6 +21,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - 顺序：`[主操作(保存/确定/下一步…), …次操作, 取消/关闭]`，关闭类按钮始终在最右侧。
    - 例：数据模型设计抽屉 `[保存, 关闭]`、关系/数据合集 `[确定, 取消]`、数据源向导 `[上一步, (测试连接), 下一步/保存, 取消]`、数据集维护 `[保存, 取消]`、报表预览 `[导出报表, 关闭]`。
    - 理由：与「关闭在最右上」的直觉一致；多个抽屉按钮顺序统一，避免视觉跳跃。`Modal` 底部 footer 沿用 antd 默认（`[取消, 确定]`），不在此约束内。
+9. **HTTP 接口方法规范** — 后端 REST 接口**只允许 `GET`（查询）与 `POST`（新建/更新/删除/动作）**，**禁止 `@DeleteMapping` / `@PutMapping`**。
+   - 删除用 `POST /{id}/delete`；状态/动作用 `POST /{id}/<action>`（如 `publish`/`unpublish`）；整体替换用 `POST`（如 `POST /relationships`）。新建与更新共用 `POST`（upsert，靠请求体是否带 id 区分），不单独用 PUT。
+   - 理由：统一方法集降低前端联调与网关/防火墙配置成本（部分环境禁用 DELETE/PUT），`/delete` 显式路径语义更清晰。前端 `report-api` 对应**只用 `http.get` / `http.post`**，禁止 `http.delete` / `http.put`。
 
 ## Project Overview
 

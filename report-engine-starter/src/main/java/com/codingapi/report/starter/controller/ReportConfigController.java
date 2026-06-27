@@ -9,7 +9,6 @@ import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,7 +43,7 @@ public class ReportConfigController {
         return SingleResponse.of(reportConfigService.get(id));
     }
 
-    @DeleteMapping("/configs/{id}")
+    @PostMapping("/configs/{id}/delete")
     public SingleResponse<Void> delete(@PathVariable String id) {
         reportConfigService.delete(id);
         return SingleResponse.of(null);

@@ -180,7 +180,7 @@ export async function unpublishDataModel(id: string): Promise<void> {
 
 /** 删除指定数据模型 */
 export async function deleteDataModel(id: string): Promise<void> {
-  await http.delete(`/datamodels/${id}`);
+  await http.post(`/datamodels/${id}/delete`);
 }
 
 /** 测试数据源连通性（传入 sourceId 或完整 config） */
@@ -229,7 +229,7 @@ export async function saveDataSource(dto: DataSourceDTO): Promise<string> {
 
 /** 删除 */
 export async function deleteDataSource(id: string): Promise<void> {
-  await http.delete(`/datasources/${id}`);
+  await http.post(`/datasources/${id}/delete`);
 }
 
 /** 元数据解析：返回所有表/sheet + 列定义 */

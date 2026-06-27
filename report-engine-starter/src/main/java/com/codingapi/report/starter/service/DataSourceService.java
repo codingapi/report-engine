@@ -123,7 +123,8 @@ public class DataSourceService {
      * 元数据探查：按已保存的连接 id 解析所有可用表/sheet 及列定义。
      *
      * <p>从仓库取出的 {@code config} 若含 {@code enc:} 加密值（落盘加密由仓库实现）， 先用 {@link
-     * CredentialService#decryptConfig} 解密；DB 类型还会触发外部驱动注册。 之后派发到对应 {@link DataExtractor#introspect}。
+     * CredentialService#decryptConfig} 解密；DB 类型还会触发外部驱动注册。 之后派发到对应 {@link
+     * DataExtractor#introspect}。
      */
     public List<IntrospectedTable> introspect(String id) {
         DataSource ds = repository.find(id);
@@ -140,7 +141,8 @@ public class DataSourceService {
     /**
      * 元数据探查：按 DTO 配置直接解析（不落库），供数据源向导「解析」使用。
      *
-     * <p>与 {@link #introspect(String)} 的区别：不读仓库、不落库、不合并已保存元数据（dto.datasets 是向导编辑态，非权威）。 只有最终「保存」才落库，避免解析阶段产生半成品数据源。DB 类型先注册外部驱动。
+     * <p>与 {@link #introspect(String)} 的区别：不读仓库、不落库、不合并已保存元数据（dto.datasets 是向导编辑态，非权威）。
+     * 只有最终「保存」才落库，避免解析阶段产生半成品数据源。DB 类型先注册外部驱动。
      */
     public List<IntrospectedTable> introspect(DataSourceDTO dto) {
         DataSource ds = fromDto(dto);
@@ -172,8 +174,9 @@ public class DataSourceService {
     /**
      * 把数据源下已保存的元数据（表别名 + 字段顺序）合并回探查结果，供数据模型管理添加数据集时沿用用户在数据源管理里的维护。
      *
-     * <p>探查层（extractor）只知物理表名与数据库原始字段顺序；此处从聚合根已持有的 {@link TableDataset} 按 {@code
-     * sourceTable == table.name} 匹配：① 回填表别名；② 按已保存字段顺序重排列（{@link #reorderColumns}）。 字段别名仍以探查 remark 为默认（前端按需覆盖），重新解析时前端 {@code mergeTables} 以用户已编辑值为准。
+     * <p>探查层（extractor）只知物理表名与数据库原始字段顺序；此处从聚合根已持有的 {@link TableDataset} 按 {@code sourceTable ==
+     * table.name} 匹配：① 回填表别名；② 按已保存字段顺序重排列（{@link #reorderColumns}）。 字段别名仍以探查 remark
+     * 为默认（前端按需覆盖），重新解析时前端 {@code mergeTables} 以用户已编辑值为准。
      */
     private static List<IntrospectedTable> mergeSavedMetadata(
             DataSource ds, List<IntrospectedTable> tables) {
@@ -201,9 +204,7 @@ public class DataSourceService {
                                             ? reorderColumns(t.columns(), savedOrder)
                                             : t.columns();
                             return new IntrospectedTable(
-                                    t.name(),
-                                    columns,
-                                    savedAlias != null ? savedAlias : t.alias());
+                                    t.name(), columns, savedAlias != null ? savedAlias : t.alias());
                         })
                 .toList();
     }
@@ -260,7 +261,10 @@ public class DataSourceService {
         if (file == null || file.isEmpty()) {
             throw new IOException("上传文件为空");
         }
-        String kind = (type == null || type.isBlank()) ? detectKind(file.getOriginalFilename()) : type.toUpperCase();
+        String kind =
+                (type == null || type.isBlank())
+                        ? detectKind(file.getOriginalFilename())
+                        : type.toUpperCase();
         String dir =
                 switch (kind) {
                     case "EXCEL" -> properties.getExcel().getDir();
@@ -284,7 +288,8 @@ public class DataSourceService {
                         .type(DataSourceType.of(kind, Map.of("path", savedPath)))
                         .config(Map.of("path", savedPath))
                         .build();
-        List<IntrospectedTable> tables = toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
+        List<IntrospectedTable> tables =
+                toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
         return new UploadResult(savedPath, kind, tables);
     }
 
