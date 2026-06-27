@@ -70,6 +70,13 @@ public class DataModelMgmtController {
         return SingleResponse.of(null);
     }
 
+    /** 发布数据模型（草稿 → 已发布），已发布的保持不变。 */
+    @PostMapping("/{id}/publish")
+    public SingleResponse<Void> publish(@PathVariable String id) {
+        dataModelService.publish(id);
+        return SingleResponse.of(null);
+    }
+
     @PutMapping("/relationships")
     public SingleResponse<Void> saveRelationships(
             @RequestParam String dataModelId, @RequestBody List<RelationshipDTO> relationships) {

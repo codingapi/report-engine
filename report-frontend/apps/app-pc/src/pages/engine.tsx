@@ -63,6 +63,7 @@ const AppReport = () => {
             dm.datasets.map((d) => ({
               id: d.id,
               alias: d.alias || d.id,
+              name: d.sourceTable ?? d.name,
               sourceType: d.dataSourceType || 'CSV',
               fields: d.fields.map((f) => ({
                 name: f.name,

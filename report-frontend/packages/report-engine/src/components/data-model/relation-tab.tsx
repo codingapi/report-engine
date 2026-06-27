@@ -4,6 +4,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataModelDataset } from '@coding-report/report-api';
 import type { JoinType, Relationship } from '@/types';
+import { formatDatasetLabel } from '@/utils/dataset-label';
 
 const JOIN_LABELS: Record<JoinType, string> = {
   INNER: '内连接',
@@ -26,7 +27,8 @@ function rowKey(r: Relationship): string {
 }
 
 function datasetLabel(datasets: DataModelDataset[], datasetId: string): string {
-  return datasets.find((d) => d.id === datasetId)?.alias ?? datasetId;
+  const d = datasets.find((x) => x.id === datasetId);
+  return formatDatasetLabel(d?.alias, (d?.sourceTable ?? d?.name) || datasetId);
 }
 
 function fieldLabel(ds: DataModelDataset | undefined, fieldName: string): string {
@@ -56,7 +58,10 @@ export default function RelationTab({
   const leftDatasetId = Form.useWatch(['left', 'datasetId'], form);
   const rightDatasetId = Form.useWatch(['right', 'datasetId'], form);
 
-  const datasetOptions = datasets.map((d) => ({ label: d.alias ?? d.id, value: d.id }));
+  const datasetOptions = datasets.map((d) => ({
+    label: formatDatasetLabel(d.alias, (d.sourceTable ?? d.name) || d.id),
+    value: d.id,
+  }));
   const fieldOptionsOf = (datasetId?: string) => {
     if (!datasetId) return [];
     const ds = datasets.find((d) => d.id === datasetId);

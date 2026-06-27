@@ -1,6 +1,7 @@
 package com.codingapi.report.starter.service;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.datamodel.DataModelStatus;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.TableDataset;
 import com.codingapi.report.data.datasource.DataSource;
@@ -85,6 +86,16 @@ public class DataModelService {
         DataModel old = dto.id() != null && !dto.id().isBlank() ? repository.find(dto.id()) : null;
         mergeMaskedCredentials(incoming, old);
         return repository.save(incoming);
+    }
+
+    /** 发布数据模型（草稿 → 已发布）；已发布的保持不变。load 出完整对象回写，数据集/关系不丢失。 */
+    public void publish(String id) {
+        DataModel dm = repository.find(id);
+        if (dm == null) {
+            throw new IllegalArgumentException("数据模型不存在: " + id);
+        }
+        dm.setStatus(DataModelStatus.PUBLISHED);
+        repository.save(dm);
     }
 
     public void delete(String id) {

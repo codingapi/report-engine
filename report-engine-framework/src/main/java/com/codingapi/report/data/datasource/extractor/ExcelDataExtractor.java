@@ -93,7 +93,7 @@ public class ExcelDataExtractor implements DataExtractor {
             }
             List<IntrospectedTable> tables = new ArrayList<>();
             for (Sheet sheet : sheets) {
-                tables.add(new IntrospectedTable(sheet.getName(), readHeaderColumns(sheet, config.headerRow())));
+                tables.add(new IntrospectedTable(sheet.getName(), readHeaderColumns(sheet, config.headerRow()), null));
             }
             return tables;
         } catch (IOException e) {
@@ -114,7 +114,7 @@ public class ExcelDataExtractor implements DataExtractor {
         for (Map.Entry<Integer, Cell> e : headerRowCells.entrySet()) {
             String name = textOf(e.getValue().getValue());
             if (name != null && !name.isBlank()) {
-                columns.add(new ColumnMeta(name.trim(), "STRING", false));
+                columns.add(new ColumnMeta(name.trim(), "STRING", false, null));
             }
         }
         return columns;

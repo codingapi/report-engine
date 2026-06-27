@@ -44,6 +44,7 @@ export {
   createDataModel,
   updateDataModel,
   deleteDataModel,
+  publishDataModel,
   testDataSource,
   exploreTables,
   exploreColumns,

@@ -51,6 +51,8 @@ export interface DataModelService {
   save: (dto: DataModelSaveDTO) => Promise<string>;
   /** 删除 */
   remove: (id: string) => Promise<void>;
+  /** 发布（草稿 → 已发布），发布后可被报表选用 */
+  publish: (id: string) => Promise<void>;
 }
 
 export interface DataModelListPageProps {
@@ -144,6 +146,16 @@ export default function DataModelListPage({
     }
   };
 
+  const handlePublish = async (id: string) => {
+    try {
+      await service.publish(id);
+      message.success('数据模型已发布，现可被报表选用');
+      await refresh();
+    } catch (e) {
+      message.error(`发布数据模型失败: ${(e as Error).message}`);
+    }
+  };
+
   /** 关闭设计抽屉并刷新列表（反映保存后的名称/时间/数据集变化） */
   const closeDesign = () => {
     setDesignId(null);
@@ -186,10 +198,20 @@ export default function DataModelListPage({
       {
         title: '操作',
         key: 'actions',
-        width: 180,
+        width: 220,
         render: (_, r) => (
           <Space size="middle">
             <a onClick={() => setDesignId(r.id)}>设计</a>
+            {r.status !== 'PUBLISHED' && (
+              <Popconfirm
+                title="确认发布该数据模型？发布后可被报表选用。"
+                onConfirm={() => handlePublish(r.id)}
+                okText="发布"
+                cancelText="取消"
+              >
+                <a>发布</a>
+              </Popconfirm>
+            )}
             <Popconfirm
               title="确认删除该数据模型？"
               onConfirm={() => handleDelete(r.id)}

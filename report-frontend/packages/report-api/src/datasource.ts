@@ -82,11 +82,15 @@ export interface IntrospectedColumn {
   name: string;
   dataType: string;
   primaryKey: boolean;
+  /** 字段备注（DB 类型来自 JDBC REMARKS），用作字段别名默认值；CSV/Excel 无 */
+  remark?: string;
 }
 
 export interface IntrospectedTable {
   name: string;
   columns: IntrospectedColumn[];
+  /** 数据源下已保存的数据集别名（后端合并回填），供添加数据集时展示「别名（表名）」 */
+  alias?: string;
 }
 
 /** 文件上传响应：保存路径 + 解析出的表列表（前端据此构造 DataSourceDTO.config.path） */
@@ -155,13 +159,18 @@ export async function createDataModel(data: DataModelSaveDTO): Promise<string> {
   return res.data as string;
 }
 
-/** 更新数据模型，返回数据模型 id */
+/** 更新数据模型，返回数据模型 id（后端 POST /datamodels 为 upsert，靠 id 区分新建/更新） */
 export async function updateDataModel(
   id: string,
   data: DataModelSaveDTO,
 ): Promise<string> {
-  const res = await http.put(`/datamodels/${id}`, data);
+  const res = await http.post('/datamodels', { ...data, id });
   return res.data as string;
+}
+
+/** 发布数据模型（草稿 → 已发布） */
+export async function publishDataModel(id: string): Promise<void> {
+  await http.post(`/datamodels/${id}/publish`);
 }
 
 /** 删除指定数据模型 */

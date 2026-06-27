@@ -18,6 +18,7 @@ import type {
 } from '@coding-report/report-api';
 import type { DataType } from '@/types';
 import { genId } from '@/types';
+import { formatDatasetLabel } from '@/utils/dataset-label';
 import type { DataModelDesignerService } from './data-model-designer';
 
 const DATA_TYPES: DataType[] = [
@@ -41,12 +42,13 @@ function tableToDataset(
 ): DataModelDataset {
   return {
     id: genId(),
-    alias: table.name,
+    alias: table.alias ?? table.name,
     kind: 'TABLE',
     datasourceId: source.id,
     sourceTable: table.name,
     fields: table.columns.map((c) => ({
       name: c.name,
+      alias: c.remark || c.name,
       dataType: normalizeDataType(c.dataType),
       primaryKey: c.primaryKey,
     })),
@@ -168,7 +170,7 @@ export default function DatasetTab({
       {
         title: '数据集名',
         key: 'alias',
-        render: (_v, r) => r.alias || r.sourceTable || '-',
+        render: (_v, r) => formatDatasetLabel(r.alias, r.sourceTable),
       },
       {
         title: '数据源',
@@ -204,7 +206,7 @@ export default function DatasetTab({
     [sources],
   );
   const tableOptions = useMemo(
-    () => tables.map((t) => ({ label: t.name, value: t.name })),
+    () => tables.map((t) => ({ label: formatDatasetLabel(t.alias, t.name), value: t.name })),
     [tables],
   );
 

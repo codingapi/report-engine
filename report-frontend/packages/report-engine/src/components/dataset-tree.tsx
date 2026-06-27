@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Tree, Tag } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
 import type { Dataset, DatasetField, Relationship, DataSourceType } from '@/types';
+import { formatDatasetLabel } from '@/utils/dataset-label';
 import { dataTypeLabel } from '@/types';
 
 interface DatasetTreeProps {
@@ -135,7 +136,7 @@ function buildDatasetNode(ds: Dataset, fieldRelationMap: Map<string, FieldRelati
     title: (
       <span>
         {getSourceTag(ds.sourceType)}
-        {ds.alias || ds.id}
+        {formatDatasetLabel(ds.alias, ds.name ?? ds.id)}
       </span>
     ),
     selectable: false,

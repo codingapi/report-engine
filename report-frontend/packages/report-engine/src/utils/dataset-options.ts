@@ -1,14 +1,15 @@
 import type { Dataset } from '@/types';
 import { findDataset } from '@/types';
+import { formatDatasetLabel } from './dataset-label';
 
 export interface SelectOption {
   value: string;
   label: string;
 }
 
-/** 数据集下拉选项：value=数据集 id，label=别名。 */
+/** 数据集下拉选项：value=数据集 id，label=别名（名称）。 */
 export function datasetOptions(datasets: Dataset[]): SelectOption[] {
-  return datasets.map((ds) => ({ value: ds.id, label: ds.alias || ds.id }));
+  return datasets.map((ds) => ({ value: ds.id, label: formatDatasetLabel(ds.alias, ds.name ?? ds.id) }));
 }
 
 /**

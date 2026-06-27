@@ -45,14 +45,14 @@ export interface WizardTable {
   columns: WizardField[];
 }
 
-/** IntrospectedTable → 维护表（别名默认取名）。 */
+/** IntrospectedTable → 维护表（表别名取数据源已配置别名、字段别名默认取 DB 备注 remark）。 */
 export function fromIntrospected(t: IntrospectedTable): WizardTable {
   return {
     name: t.name,
-    alias: t.name,
+    alias: t.alias ?? t.name,
     columns: t.columns.map((c) => ({
       name: c.name,
-      alias: c.name,
+      alias: c.remark || c.name,
       dataType: c.dataType,
       primaryKey: c.primaryKey,
     })),

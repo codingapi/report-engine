@@ -9,6 +9,7 @@ import {
   introspectDatasets,
   listDataModelsPage,
   listDataSources,
+  publishDataModel,
   updateDataModel,
 } from '@coding-report/report-api';
 
@@ -16,6 +17,7 @@ const service: DataModelService = {
   list: (current, pageSize) => listDataModelsPage(current, pageSize),
   save: (dto) => createDataModel(dto),
   remove: (id) => deleteDataModel(id),
+  publish: (id) => publishDataModel(id),
 };
 
 /**

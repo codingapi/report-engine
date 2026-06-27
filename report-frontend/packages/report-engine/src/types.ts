@@ -118,6 +118,8 @@ export type DataSourceType = 'CSV' | 'EXCEL' | 'DB';
 export interface Dataset {
   id: string;
   alias: string;
+  /** 物理表名/合集名（展示「别名（名称）」用；精简视图可能不带） */
+  name?: string;
   sourceType?: DataSourceType;
   fields: DatasetField[];
 }

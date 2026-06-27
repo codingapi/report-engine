@@ -19,6 +19,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { DataModelDataset, UnionMember } from '@coding-report/report-api';
 import type { DataType } from '@/types';
 import { genId } from '@/types';
+import { formatDatasetLabel } from '@/utils/dataset-label';
 
 const { Title } = Typography;
 
@@ -148,7 +149,7 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
   const tableOptions = useMemo(
     () =>
       tables.map((t) => ({
-        label: t.alias || t.sourceTable || t.id,
+        label: formatDatasetLabel(t.alias, (t.sourceTable ?? t.name) || t.id),
         value: t.id,
       })),
     [tables],
@@ -318,7 +319,7 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
       render: (_v, r) => r.name || <span style={{ color: 'rgba(0,0,0,0.35)' }}>未命名</span>,
     },
     {
-      title: `左表字段${leftTable ? `（${leftTable.alias || leftTable.sourceTable}）` : ''}`,
+      title: `左表字段${leftTable ? `（${formatDatasetLabel(leftTable.alias, leftTable.sourceTable ?? leftTable.name)}）` : ''}`,
       key: 'leftField',
       render: (_v, r) => (
         <Select
@@ -336,7 +337,7 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
       ),
     },
     {
-      title: `右表字段${rightTable ? `（${rightTable.alias || rightTable.sourceTable}）` : ''}`,
+      title: `右表字段${rightTable ? `（${formatDatasetLabel(rightTable.alias, rightTable.sourceTable ?? rightTable.name)}）` : ''}`,
       key: 'rightField',
       render: (_v, r) => (
         <Select

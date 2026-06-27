@@ -132,10 +132,10 @@ public class DataSourceService {
             ds.setConfig(credentials.decryptConfig(ds.getConfig()));
         }
         registerDriverIfNeeded(ds);
-        return toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
+        return mergeSavedAliases(ds, toBusinessTypes(findExtractor(ds.getType()).introspect(ds)));
     }
 
-    /** 探查列的原生类型统一映射成报表业务 {@link DataType} 名（前端/数据集只认业务类型）。 */
+    /** 探查列的原生类型统一映射成报表业务 {@link DataType} 名（前端/数据集只认业务类型），并透传字段备注/表别名。 */
     private static List<IntrospectedTable> toBusinessTypes(List<IntrospectedTable> tables) {
         return tables.stream()
                 .map(
@@ -149,8 +149,37 @@ public class DataSourceService {
                                                                         c.name(),
                                                                         mapDataType(c.dataType())
                                                                                 .name(),
-                                                                        c.primaryKey()))
-                                                .toList()))
+                                                                        c.primaryKey(),
+                                                                        c.remark()))
+                                                .toList(),
+                                        t.alias()))
+                .toList();
+    }
+
+    /**
+     * 把数据源下已保存的数据集别名按表名回填到探查结果，供数据模型管理添加数据集时展示「别名（表名）」。
+     *
+     * <p>探查层（extractor）只知物理表名，不知用户在数据源管理里维护的别名；此处从聚合根已持有的 {@link
+     * TableDataset} 取 alias 按 {@code sourceTable == table.name} 匹配回填。重新解析时前端 {@code mergeTables} 仍以用户已编辑的别名为准，不会被覆盖。
+     */
+    private static List<IntrospectedTable> mergeSavedAliases(
+            DataSource ds, List<IntrospectedTable> tables) {
+        if (ds.getDatasets() == null || ds.getDatasets().isEmpty()) return tables;
+        Map<String, String> aliasByTable = new LinkedHashMap<>();
+        for (Dataset d : ds.getDatasets()) {
+            if (d instanceof TableDataset t && t.getSourceTable() != null) {
+                aliasByTable.put(t.getSourceTable(), t.getAlias());
+            }
+        }
+        if (aliasByTable.isEmpty()) return tables;
+        return tables.stream()
+                .map(
+                        t -> {
+                            String saved = aliasByTable.get(t.name());
+                            return saved != null
+                                    ? new IntrospectedTable(t.name(), t.columns(), saved)
+                                    : t;
+                        })
                 .toList();
     }
 

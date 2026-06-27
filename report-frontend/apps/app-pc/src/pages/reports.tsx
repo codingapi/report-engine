@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Table, Space, Popconfirm, Modal, Form, Input, Select, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -18,6 +18,10 @@ const ReportsPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [dataModels, setDataModels] = useState<DataModelBrief[]>([]);
+  const publishedDataModels = useMemo(
+    () => dataModels.filter((dm) => dm.status === 'PUBLISHED'),
+    [dataModels],
+  );
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -95,8 +99,8 @@ const ReportsPage = () => {
 
   const openCreate = () => {
     form.resetFields();
-    if (dataModels.length > 0) {
-      form.setFieldsValue({ dataModelId: dataModels[0].id });
+    if (publishedDataModels.length > 0) {
+      form.setFieldsValue({ dataModelId: publishedDataModels[0].id });
     }
     setCreateOpen(true);
   };
@@ -204,7 +208,7 @@ const ReportsPage = () => {
           >
             <Select
               placeholder="请选择数据模型"
-              options={dataModels.map((dm) => ({ value: dm.id, label: dm.name }))}
+              options={publishedDataModels.map((dm) => ({ value: dm.id, label: dm.name }))}
             />
           </Form.Item>
         </Form>

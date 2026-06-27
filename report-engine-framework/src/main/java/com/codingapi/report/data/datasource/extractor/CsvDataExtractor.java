@@ -115,11 +115,11 @@ public class CsvDataExtractor implements DataExtractor {
                 for (String h : header.split(",", -1)) {
                     String name = h.trim();
                     if (!name.isEmpty()) {
-                        columns.add(new ColumnMeta(name, "STRING", false));
+                        columns.add(new ColumnMeta(name, "STRING", false, null));
                     }
                 }
             }
-            return List.of(new IntrospectedTable(deriveTableName(path), columns));
+            return List.of(new IntrospectedTable(deriveTableName(path), columns, null));
         } catch (IOException e) {
             throw new IllegalStateException("CSV 元数据探查失败: " + path, e);
         }

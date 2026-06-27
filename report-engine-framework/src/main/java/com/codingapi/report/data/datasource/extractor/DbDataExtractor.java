@@ -78,18 +78,23 @@ public class DbDataExtractor implements DataExtractor {
 
     @Override
     public List<String> listTables(DataSource source) {
-        List<String> tables = new ArrayList<>();
+        return new ArrayList<>(tableRemarks(source).keySet());
+    }
+
+    /** 表名 → 表备注（JDBC {@code getTables} 的 REMARKS 列），无备注为 null。listTables 与 introspect 共用，避免重复建连。 */
+    private Map<String, String> tableRemarks(DataSource source) {
+        Map<String, String> remarks = new LinkedHashMap<>();
         try (Connection conn = openConnection(source)) {
             DatabaseMetaData md = conn.getMetaData();
             try (ResultSet rs = md.getTables(null, null, "%", new String[] {"TABLE"})) {
                 while (rs.next()) {
-                    tables.add(rs.getString("TABLE_NAME"));
+                    remarks.put(rs.getString("TABLE_NAME"), rs.getString("REMARKS"));
                 }
             }
         } catch (SQLException e) {
             throw new IllegalStateException("表探查失败", e);
         }
-        return tables;
+        return remarks;
     }
 
     @Override
@@ -107,7 +112,8 @@ public class DbDataExtractor implements DataExtractor {
                 while (rs.next()) {
                     String name = rs.getString("COLUMN_NAME");
                     String type = rs.getString("TYPE_NAME");
-                    columns.add(new ColumnMeta(name, type, pk.contains(name)));
+                    String remark = rs.getString("REMARKS");
+                    columns.add(new ColumnMeta(name, type, pk.contains(name), remark));
                 }
             }
         } catch (SQLException e) {
@@ -119,8 +125,8 @@ public class DbDataExtractor implements DataExtractor {
     @Override
     public List<IntrospectedTable> introspect(DataSource source) {
         List<IntrospectedTable> tables = new ArrayList<>();
-        for (String t : listTables(source)) {
-            tables.add(new IntrospectedTable(t, listColumns(source, t)));
+        for (Map.Entry<String, String> e : tableRemarks(source).entrySet()) {
+            tables.add(new IntrospectedTable(e.getKey(), listColumns(source, e.getKey()), e.getValue()));
         }
         return tables;
     }
