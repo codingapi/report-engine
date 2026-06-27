@@ -62,10 +62,11 @@ Univer 电子表格的 React 封装层，提供：
 - **`ReportPreview`**：预览能力组件（参数弹窗 → 渲染 → 预览抽屉 → 反查 → 抽屉内导出），设计器与独立预览页共用。声明式 `config`（引用变化触发预览）+ `onClose` 回调 + ref `exportXlsx` 命令式导出。
 - **`useReportPreview`** hook：预览流程逻辑/状态（纯逻辑，JSX 在组件层渲染）。
 - **数据源管理组件**（原 `report-datasource` 已并入本包）：`ConnectionForm`（连接配置）/ `DatasetManager`（数据集增删）/ `RelationEditor`（关系编辑）/ `ExploreTree`（表/列探查）+ `useDatasource`/`useExplore` hook，经 `DatasourceService` prop 注入 report-api 实现。数据源类型对齐后端：`DB`/`EXCEL`/`CSV`。
+- **数据模型管理组件**：`DataModelListPage`（列表 + 全屏抽屉内置设计器，`designerService` 注入加载/保存）、`DataModelDesigner`（数据集 / 数据合集 / 关系 三 tab，`forwardRef` 暴露 `save` + `onModelChange`）。
 
 ### app-pc
 
-演示应用（基于 Rsbuild）。路由：`/`（首页）+ `/reports`（报表管理，antd Table 分页 + 新建/编辑/预览/删除）+ `/engine`（`AppReport` 设计器）+ `/preview`（`AppPreview` 独立预览页）。仅首页/报表管理在菜单。
+演示应用（基于 Rsbuild）。路由：`/`（首页）+ `/datasource-types`（驱动管理）+ `/datasources`（数据源管理）+ `/datamodels`（数据模型管理）+ `/reports`（报表管理，antd Table 分页 + 新建/编辑/预览/删除）+ `/engine`（`AppReport` 设计器）+ `/preview`（`AppPreview` 独立预览页）。菜单 5 项：首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理。
 
 ## 技术栈
 

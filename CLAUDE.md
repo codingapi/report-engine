@@ -276,7 +276,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 
 - **`report-univer`**：Univer 电子表格 React 封装。提供 `UniverSheet` 组件 + `UniverSheetHandle` 命令式句柄（`getSnapshot` / `loadSnapshot` / `setCellValue` / `getActiveSheetId`）。三层属性存储（cellProps / mergeProps / loopBlockProps）通过泛型自定义。
 - **`report-api`**：后端 API 客户端。axios 实例（`baseURL: '/api'`）+ 响应拦截器自动解包 `SingleResponse` / `MultiResponse`。暴露 `saveReportConfig` / `loadReportConfig` / `deleteReportConfig` / `listReportConfigs(current,pageSize)` / `listDataModels` / `renderReport` / `previewReport` / `drillReport` / `exportExcel` / `importExcel` / `fetchFonts`。
-- **`report-engine`**：报表设计器 + 数据源管理组件库（纯 UI，不直接调 API；原 `report-datasource` 已并入本包）。核心导出：`ReportEngine`（设计器）、`ReportPreview`（预览能力组件，含参数弹窗+预览抽屉+反查+抽屉内导出）、`useReportPreview` hook；数据源管理组件 `ConnectionForm`/`ExploreTree`/`DatasetManager`/`RelationEditor` + `useDatasource`/`useExplore`（经 `DatasourceService` 注入 report-api 实现）。
+- **`report-engine`**：报表设计器 + 数据源管理组件库（纯 UI，不直接调 API；原 `report-datasource` 已并入本包）。核心导出：`ReportEngine`（设计器）、`ReportPreview`（预览能力组件，含参数弹窗+预览抽屉+反查+抽屉内导出）、`useReportPreview` hook；数据源管理组件 `ConnectionForm`/`ExploreTree`/`DatasetManager`/`RelationEditor` + `useDatasource`/`useExplore`（经 `DatasourceService` 注入 report-api 实现）；**数据模型管理组件** `DataModelListPage`（列表 + 全屏抽屉内置 `DataModelDesigner`，点「设计」/新建触发，`designerService` 注入）、`DataModelDesigner`（数据集 / 数据合集 / 关系 三 tab，`forwardRef` 暴露 `save` + `onModelChange` 上抛模型）。
 
 #### ReportEngine 组件
 
@@ -289,7 +289,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 - 布局：`[customActions] | 导入模板 | 循环块 | 报表预览 | 导出报表 | 保存报表 | [extraActions]`
 
 **三栏式布局**：
-- 左面板 `DataModelPanel`：数据集 / 数据关系 / 报表参数 三 tab
+- 左面板 `DataModelPanel`：数据集 / 数据关系 两 tab
 - 中面板 `SheetPanel`：`forwardRef` 封装 UniverSheet，暴露 `getActiveSheetId()` 获取实际 sheet ID
 - 右面板 `PropertyPanel`：选中单元格的绑定编辑器
 
@@ -305,7 +305,7 @@ Spring Boot 自动配置 + **全部通用 REST API**。API 是 Spring Bean（不
 #### Excel 数据流
 
 `report-univer` 提供双向快照能力，与后端共享同一 JSON 结构（`ExcelWorkbook`）。
-- **app-pc 路由**：`/`（首页）+ `/reports`（报表管理，antd Table 分页）+ `/engine`（设计器 `AppReport`）+ `/preview`（预览页 `AppPreview`），仅首页/报表管理在菜单。
+- **app-pc 路由**：`/`（首页）+ `/datasource-types`（驱动管理）+ `/datasources`（数据源管理）+ `/datamodels`（数据模型管理）+ `/reports`（报表管理，antd Table 分页）+ `/engine`（设计器 `AppReport`）+ `/preview`（预览页 `AppPreview`）。菜单 5 项（首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理），`/engine`、`/preview` 由报表管理跳入。
 - **报表管理流程**：`/reports` 表格列全部报表（`listReportConfigs(current,pageSize)`，按 `SearchRequest` 分页）→ 新建弹窗（名称 + 数据模型，`listDataModels`）→ 操作列「编辑/预览/删除」（a 标签）。
 - **报表配置流程**：`/engine?id=xxx`（`AppReport`）→ `loadReportConfig(GET /configs/{id})` → 设计编辑 → `saveReportConfig(POST /configs)` 持久化。
 - **独立预览流程**：`/preview?id=xxx`（`AppPreview`）→ `loadReportConfig` → 挂 `ReportPreview` 组件（`config` 触发预览，`onClose` 返回报表管理）。
