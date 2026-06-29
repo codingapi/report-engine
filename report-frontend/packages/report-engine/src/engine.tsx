@@ -901,6 +901,8 @@ export const ReportEngine: React.FC<
                 <DataModelPanel
                   datasets={datasets}
                   relationships={relationships}
+                  params={params}
+                  onParamsChange={setParams}
                 />
               </div>
             )}

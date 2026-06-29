@@ -28,7 +28,8 @@ function fieldLabel(ref: string | undefined, datasets: Dataset[]): string {
     const dot = ref.indexOf('.');
     const dsId = dot === -1 ? '' : ref.slice(0, dot);
     const ds = findDataset(datasets, dsId);
-    const dsLabel = ds?.alias || dsId;
+    // 别名缺省时回退表名（ds.name），最后才回退 id，避免展示随机串
+    const dsLabel = ds?.alias || ds?.name || dsId;
     const fLabel = f.alias || f.name;
     return `${dsLabel}.${fLabel}`;
   }

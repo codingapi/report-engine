@@ -201,6 +201,7 @@ const ConditionEditor: React.FC<ConditionEditorProps> = ({
         editingCondition={editingCondition}
         datasets={datasets}
         loopBlocks={loopBlocks}
+        params={params}
         onClose={() => {
           setModalOpen(false);
           setEditingCondition(null);

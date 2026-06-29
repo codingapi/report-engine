@@ -100,8 +100,22 @@ public class DataSourceService {
             incoming.setDatasets(old.getDatasets());
         }
         String id = repository.save(incoming);
+        backfillDatasourceId(incoming, id);
         registerDriverIfNeeded(incoming);
         return id;
+    }
+
+    /**
+     * 新建数据源时，{@link #toTableDataset} 在数据源 id 生成前执行，{@code datasourceId} 为 null； save 后 id 已就绪（仓库存的是同一引用），用真实 id 补齐冗余字段，使持久化数据正确。
+     */
+    private static void backfillDatasourceId(DataSource ds, String id) {
+        if (ds.getDatasets() == null) return;
+        for (Dataset d : ds.getDatasets()) {
+            if (d instanceof TableDataset t
+                    && (t.getDatasourceId() == null || t.getDatasourceId().isBlank())) {
+                t.setDatasourceId(id);
+            }
+        }
     }
 
     public void delete(String id) {
@@ -402,10 +416,9 @@ public class DataSourceService {
                                                         .build())
                                 .toList();
         return TableDataset.builder()
-                .id(
-                        d.id() != null && !d.id().isBlank()
-                                ? d.id()
-                                : owner.getId() + "::" + d.sourceTable())
+                // id 兜底用 sourceTable（单数据源内表名唯一且稳定），不用 owner.getId()：
+                // 数据源首次保存时自身 id 尚为 null，拼成 "null::表名" 会污染持久化数据。
+                .id(d.id() != null && !d.id().isBlank() ? d.id() : d.sourceTable())
                 .datasource(owner)
                 .datasourceId(owner.getId())
                 .sourceTable(d.sourceTable())

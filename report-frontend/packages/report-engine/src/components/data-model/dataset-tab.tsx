@@ -17,7 +17,6 @@ import type {
   IntrospectedTable,
 } from '@coding-report/report-api';
 import type { DataType } from '@/types';
-import { genId } from '@/types';
 import { formatDatasetLabel } from '@/utils/dataset-label';
 import type { DataModelDesignerService } from './data-model-designer';
 
@@ -41,7 +40,9 @@ function tableToDataset(
   table: IntrospectedTable,
 ): DataModelDataset {
   return {
-    id: genId(),
+    // 表名即 id（稳定标识，与后端 DataSourceService.toTableDataset 兜底一致）：
+    // 字段引用 payload = `${id}.field`，用表名才能渲染出「数据集名.字段名」而非随机串。
+    id: table.name,
     alias: table.alias ?? table.name,
     kind: 'TABLE',
     datasourceId: source.id,
@@ -155,9 +156,21 @@ export default function DatasetTab({
       message.warning('请至少选择一个数据集');
       return;
     }
-    const picked = tables.filter((t) => pickedTableNames.includes(t.name));
+    // 表名即 id，已存在的表不重复添加（同表不可添加两次）
+    const existingIds = new Set(datasets.map((d) => d.id));
+    const picked = tables.filter(
+      (t) => pickedTableNames.includes(t.name) && !existingIds.has(t.name),
+    );
+    if (picked.length === 0) {
+      message.warning('所选数据集均已添加');
+      return;
+    }
+    const skipped = pickedTableNames.length - picked.length;
     const newDatasets = picked.map((t) => tableToDataset(source, t));
     onChange([...datasets, ...newDatasets]);
+    if (skipped > 0) {
+      message.info(`已跳过 ${skipped} 个已添加的数据集`);
+    }
     closeModal();
   };
 

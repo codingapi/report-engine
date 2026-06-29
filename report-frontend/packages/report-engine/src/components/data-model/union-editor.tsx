@@ -18,7 +18,6 @@ import { PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { DataModelDataset, UnionMember } from '@coding-report/report-api';
 import type { DataType } from '@/types';
-import { genId } from '@/types';
 import { formatDatasetLabel } from '@/utils/dataset-label';
 
 const { Title } = Typography;
@@ -192,11 +191,17 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
   };
 
   const handleConfirm = () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       message.warning('请输入合集名称（英文名）');
       return;
     }
-    const id = editingId ?? genId();
+    // 合集名即 id（稳定标识）。新建时校验唯一；编辑时保持原 id 不变，避免改名断引用。
+    if (!editingId && datasets.some((d) => d.id === trimmedName)) {
+      message.warning('已存在同名数据集/合集，请换一个合集名称');
+      return;
+    }
+    const id = editingId ?? trimmedName;
     const built = buildUnion(id, name, alias, rows, leftId, rightId);
     if (editingId) {
       onChange(datasets.map((d) => (d.id === editingId ? built : d)));

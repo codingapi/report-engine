@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Modal, Form, Select } from 'antd';
-import type { Condition, CompareOperator, Dataset, LoopBlock, ReportValue } from '@/types';
+import type {
+  Condition,
+  CompareOperator,
+  Dataset,
+  LoopBlock,
+  ParamDTO,
+  ReportValue,
+} from '@/types';
 import { OPERATOR_LABELS, genId } from '@/types';
 import ValueEditor from './value-editor';
 
@@ -12,6 +19,7 @@ interface ConditionModalProps {
   editingCondition: Condition | null;
   datasets: Dataset[];
   loopBlocks?: LoopBlock[];
+  params?: ParamDTO[];
   onClose: () => void;
   onConfirm: (condition: Condition) => void;
 }
@@ -22,6 +30,7 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
   editingCondition,
   datasets,
   loopBlocks = [],
+  params = [],
   onClose,
   onConfirm,
 }) => {
@@ -82,6 +91,7 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
             value={left}
             datasets={datasets}
             loopBlocks={loopBlocks}
+            params={params}
             onChange={setLeft}
             bare
             types={['FieldValue', 'LoopFieldValue', 'ParamValue', 'Literal', 'Aggregate']}
@@ -112,6 +122,7 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
               value={right || { type: 'Literal', payload: '' }}
               datasets={datasets}
               loopBlocks={loopBlocks}
+              params={params}
               onChange={setRight}
               bare
               types={['FieldValue', 'LoopFieldValue', 'ParamValue', 'Literal', 'Aggregate']}
