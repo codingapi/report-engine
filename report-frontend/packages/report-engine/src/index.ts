@@ -70,6 +70,9 @@ export type {
   // 数据域
   Dataset,
   DatasetField,
+  // 转换项域
+  TransformItem,
+  TransformEntry,
   // 表达式域
   ReportValue,
   // 算子域

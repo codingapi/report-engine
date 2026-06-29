@@ -7,6 +7,7 @@ import type {
   LoopBlock,
   Dataset,
   ParamDTO,
+  TransformItem,
   ExpressionCatalog,
 } from '@/types';
 import type { SheetCellSelectInfo } from '@/components/sheet-panel';
@@ -26,6 +27,7 @@ interface PropertyPanelProps {
   loopBlocks: LoopBlock[];
   datasets: Dataset[];
   params: ParamDTO[];
+  transforms?: TransformItem[];
   functions?: ExpressionCatalog;
   onBindingChange: (cellKey: string, binding: CellBinding) => void;
   onBindingCreate: (cellKey: string) => void;
@@ -42,6 +44,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
   loopBlocks,
   datasets,
   params,
+  transforms = [],
   functions,
   onBindingChange,
   onBindingCreate,
@@ -148,6 +151,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     datasets={datasets}
                     loopBlocks={loopBlocks}
                     params={params}
+                    transforms={transforms}
                     functions={functions}
                     onChange={(value) => updateBinding({ value })}
                   />

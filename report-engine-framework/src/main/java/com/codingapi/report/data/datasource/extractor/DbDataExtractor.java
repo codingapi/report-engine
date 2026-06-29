@@ -13,6 +13,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -124,11 +125,51 @@ public class DbDataExtractor implements DataExtractor {
 
     @Override
     public List<IntrospectedTable> introspect(DataSource source) {
+        return introspect(source, null);
+    }
+
+    @Override
+    public List<IntrospectedTable> introspect(DataSource source, List<String> tableNames) {
+        // 指定表名时只解析这些表（不区分大小写）；为空则解析全部
+        Set<String> wanted =
+                tableNames == null
+                        ? null
+                        : tableNames.stream()
+                                .filter(t -> t != null && !t.isBlank())
+                                .map(t -> t.trim().toLowerCase())
+                                .collect(java.util.stream.Collectors.toSet());
         List<IntrospectedTable> tables = new ArrayList<>();
         for (Map.Entry<String, String> e : tableRemarks(source).entrySet()) {
+            if (wanted != null && !wanted.isEmpty() && !wanted.contains(e.getKey().toLowerCase())) {
+                continue;
+            }
             tables.add(new IntrospectedTable(e.getKey(), listColumns(source, e.getKey()), e.getValue()));
         }
         return tables;
+    }
+
+    @Override
+    public List<ColumnMeta> introspectSql(DataSource source, String sql) {
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("SQL 不能为空");
+        }
+        List<ColumnMeta> columns = new ArrayList<>();
+        try (Connection conn = openConnection(source);
+                Statement stmt = conn.createStatement()) {
+            // 仅取元数据：限制 1 行，减少探查开销（结果集列定义不依赖行数）
+            stmt.setMaxRows(1);
+            try (ResultSet rs = stmt.executeQuery(sql.trim())) {
+                ResultSetMetaData md = rs.getMetaData();
+                for (int i = 1; i <= md.getColumnCount(); i++) {
+                    String name = md.getColumnLabel(i); // 优先列别名（SQL 里 AS 的名字）
+                    if (name == null || name.isBlank()) name = md.getColumnName(i);
+                    columns.add(new ColumnMeta(name, md.getColumnTypeName(i), false, null));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("SQL 探查失败: " + e.getMessage(), e);
+        }
+        return columns;
     }
 
     // ============================================================

@@ -218,7 +218,7 @@ class DataSourceControllerTest {
         Map<String, Object> config = Map.of("path", csv.toString());
         String id = controller.save(new DataSourceDTO(null, "csv", "CSV", null, config)).getData();
 
-        MultiResponse<IntrospectedTable> resp = controller.introspect(id);
+        MultiResponse<IntrospectedTable> resp = controller.introspect(id, null);
         assertTrue(resp.isSuccess());
         List<IntrospectedTable> tables = new java.util.ArrayList<>(resp.getData().getList());
         assertEquals(1, tables.size(), "CSV 探查应返回单张表");
@@ -233,7 +233,7 @@ class DataSourceControllerTest {
 
     @Test
     void introspectMissingDataSourceThrows() {
-        assertThrows(IllegalArgumentException.class, () -> controller.introspect("nope"));
+        assertThrows(IllegalArgumentException.class, () -> controller.introspect("nope", null));
     }
 
     @Test

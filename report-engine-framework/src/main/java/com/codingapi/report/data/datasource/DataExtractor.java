@@ -104,4 +104,28 @@ public interface DataExtractor {
     default List<IntrospectedTable> introspect(DataSource source) {
         throw new UnsupportedOperationException("提取器不支持元数据探查");
     }
+
+    /**
+     * 按指定表名探查（DB 类）：仅解析 {@code tableNames} 列出的表；为空/null 时等价 {@link
+     * #introspect(DataSource)}（全部）。用于「指定表名解析」与「单表同步结构」。
+     *
+     * <p>默认忽略表名过滤，回退全量 {@link #introspect(DataSource)}，保持其它提取器行为不变。
+     */
+    default List<IntrospectedTable> introspect(DataSource source, List<String> tableNames) {
+        return introspect(source);
+    }
+
+    /**
+     * 执行一段查询 SQL，按结果集元数据推断列定义（自定义 SQL 数据集建模用）。
+     *
+     * <p>仅 DB 类提取器实现：执行 SQL（不取数或只取极少行）拿 {@code ResultSetMetaData} 推列名/类型。 默认抛 {@link
+     * UnsupportedOperationException}。
+     *
+     * @param source 连接
+     * @param sql 查询 SQL（应为 SELECT）
+     * @return 单个 {@link IntrospectedTable}，name 为空（SQL 无表名），columns 为推断字段
+     */
+    default List<ColumnMeta> introspectSql(DataSource source, String sql) {
+        throw new UnsupportedOperationException("提取器不支持 SQL 探查");
+    }
 }

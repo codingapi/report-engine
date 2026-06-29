@@ -322,6 +322,25 @@ export interface RelationEditorProps {
   disabled?: boolean;
 }
 
+// ─── 转换项域 ──────────────────────────────────
+
+/** 转换项条目（编码 → 呈现，可带父级构成树形） */
+export interface TransformEntry {
+  code: string;
+  label: string;
+  parent?: string;
+}
+
+/** 数据转换项（数据模型下配置，报表中由 map(字段, 转换项id) 引用） */
+export interface TransformItem {
+  id: string;
+  /** 标识名（引用名） */
+  name: string;
+  /** 别名（中文名，展示用） */
+  alias?: string;
+  entries: TransformEntry[];
+}
+
 // ─── 参数域 ────────────────────────────────────
 
 /** 报表参数（报表级，设计时定义，可在表达式中以 ${name} 引用） */
@@ -518,6 +537,8 @@ export interface ReportEngineProps {
   datasets: Dataset[];
   /** 数据关系列表（由父组件从 API 获取后传入，只读展示） */
   relationships?: Relationship[];
+  /** 转换项列表（数据模型下配置，字段绑定时可选「转换」） */
+  transforms?: TransformItem[];
   /** 数据模型 ID（保存时写入配置） */
   dataModelId?: string;
   /** 可用公式目录（聚合 + 函数，由父组件从 API 获取后传入；缺省时构建器用内置聚合） */

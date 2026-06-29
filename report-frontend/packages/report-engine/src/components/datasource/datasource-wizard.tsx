@@ -22,6 +22,7 @@ import {
   fromDatasetDto,
   fromIntrospected,
   mergeTables,
+  splitTableNames,
   tablesToDatasetDtos,
 } from './datasource-service';
 import type { DataSourceService, WizardTable } from './datasource-service';
@@ -76,6 +77,8 @@ export default function DataSourceWizard({
   const [uploading, setUploading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [introspecting, setIntrospecting] = useState(false);
+  // 指定解析的表名（逗号/空格分隔，空=全部）
+  const [parseTableNames, setParseTableNames] = useState('');
 
   const loadDrivers = useCallback(async () => {
     if (!service.listDriverTypes) return;
@@ -192,7 +195,9 @@ export default function DataSourceWizard({
     setIntrospecting(true);
     try {
       // 解析不落库（避免半成品数据源），直接按当前配置探查；只有「保存」才落库
-      const fresh = await service.introspectByConfig(buildDTO());
+      // 指定表名时只解析这些表（空=全部）
+      const names = splitTableNames(parseTableNames);
+      const fresh = await service.introspectByConfig(buildDTO(), names);
       setWizard((s) => ({
         ...s,
         tables: mergeTables(s.tables, fresh.map(fromIntrospected)),
@@ -352,7 +357,14 @@ export default function DataSourceWizard({
       onChange={(tables) => setWizard((s) => ({ ...s, tables }))}
       toolbar={
         wizard.kind === 'DB' ? (
-          <Space>
+          <Space wrap>
+            <Input
+              style={{ width: 280 }}
+              placeholder="指定表名（多个用逗号分隔，空=全部）"
+              value={parseTableNames}
+              onChange={(e) => setParseTableNames(e.target.value)}
+              allowClear
+            />
             <Button type="primary" loading={introspecting} onClick={handleParse} disabled={!canConfig}>
               {wizard.tables.length ? '重新解析' : '解析元数据'}
             </Button>

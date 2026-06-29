@@ -82,21 +82,42 @@ public class DataSourceController {
         return SingleResponse.of(dataSourceService.testConnection(dto));
     }
 
-    /** 元数据探查：按已保存的连接 id 解析所有表/sheet + 列定义。 DB 返回物理表列表；EXCEL 每个 sheet 一张表；CSV 单张表。 */
+    /**
+     * 元数据探查：按已保存的连接 id 解析表/sheet + 列定义。可选请求体 {@code tableNames} 指定只解析哪些表（空=全部），
+     * 供「指定表名解析」与「单表同步结构」。DB 返回物理表列表；EXCEL 每个 sheet 一张表；CSV 单张表。
+     */
     @PostMapping("/{id}/introspect")
-    public MultiResponse<IntrospectedTable> introspect(@PathVariable String id) {
-        return MultiResponse.of(dataSourceService.introspect(id));
+    public MultiResponse<IntrospectedTable> introspect(
+            @PathVariable String id,
+            @RequestBody(required = false) IntrospectTablesRequest req) {
+        List<String> tableNames = req != null ? req.tableNames() : null;
+        return MultiResponse.of(dataSourceService.introspect(id, tableNames));
     }
 
     /**
-     * 元数据探查：按 DTO 配置直接解析（不落库），供数据源向导「解析」使用。
+     * 元数据探查：按 DTO 配置直接解析（不落库），供数据源向导「解析」使用。 DTO 的 {@code tableNames} 可指定只解析哪些表（空=全部）。
      *
      * <p>与 {@code /{id}/introspect} 的区别：不读仓库、不落库、不合并已保存元数据；只有最终「保存」才落库，避免解析阶段产生半成品数据源。
      */
     @PostMapping("/introspect")
     public MultiResponse<IntrospectedTable> introspectByConfig(@RequestBody DataSourceDTO dto) {
-        return MultiResponse.of(dataSourceService.introspect(dto));
+        return MultiResponse.of(dataSourceService.introspect(dto, dto.tableNames()));
     }
+
+    /** 指定表名探查请求体（空/不传 = 全部表）。 */
+    public record IntrospectTablesRequest(List<String> tableNames) {}
+
+    /**
+     * 自定义 SQL 数据集探查：按连接 id 执行 SQL 推断列定义（不落库），供「新建 SQL 数据集」解析字段。
+     */
+    @PostMapping("/{id}/introspect-sql")
+    public MultiResponse<ColumnMeta> introspectSql(
+            @PathVariable String id, @RequestBody SqlIntrospectRequest req) {
+        return MultiResponse.of(dataSourceService.introspectSql(id, req.sql()));
+    }
+
+    /** SQL 探查请求体。 */
+    public record SqlIntrospectRequest(String sql) {}
 
     /**
      * 上传 Excel/CSV 文件到配置目录并返回解析出的表/列元数据。 EXCEL 落到 {@code codingapi.report.excel.dir}，CSV 落到 {@code

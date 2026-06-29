@@ -35,7 +35,12 @@ public final class TableDataset implements Dataset {
     /** 来自哪个连接，冗余存连接 id（= {@code datasource.getId()}），便于 DTO/展示。 */
     private String datasourceId;
 
-    /** 对应库里的表名（或一段 SQL 查询）。 */
+    /**
+     * 数据集标识名（面向引用）：物理表数据集即表名；SQL 数据集由用户自定义。 与 {@link #sourceTable} 解耦——后者是"怎么取数"（表名或 SQL），name 是"叫什么"。
+     */
+    private String name;
+
+    /** 取数来源：物理表名，或一段 SELECT SQL（SQL 数据集）。 */
     private String sourceTable;
 
     /** 显示名/别名（面向用户）。 */
@@ -49,9 +54,9 @@ public final class TableDataset implements Dataset {
      */
     private List<Field> fields;
 
-    /** 英文标识名：TABLE 形态即物理表名（不额外存字段，避免与 {@link #sourceTable} 冗余）。 */
+    /** 标识名：优先用显式 name；旧数据无 name 时回退 sourceTable（向后兼容）。 */
     @Override
     public String getName() {
-        return sourceTable;
+        return name != null && !name.isBlank() ? name : sourceTable;
     }
 }

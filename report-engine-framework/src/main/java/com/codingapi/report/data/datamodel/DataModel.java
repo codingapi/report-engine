@@ -6,6 +6,7 @@ import com.codingapi.report.dto.datamodel.DataSourceDTO;
 import com.codingapi.report.dto.datamodel.DatasetDTO;
 import com.codingapi.report.dto.datamodel.FieldDTO;
 import com.codingapi.report.dto.datamodel.RelationshipDTO;
+import com.codingapi.report.dto.datamodel.TransformItemDTO;
 import com.codingapi.report.dto.datamodel.UnionMemberDTO;
 import com.codingapi.report.data.dataset.DataType;
 import com.codingapi.report.data.dataset.Dataset;
@@ -67,6 +68,9 @@ public class DataModel {
     /** 跨数据集关联关系，所有引用本模型的报表共享（{@code RelationOrigin.AUTO} 自动扫描 / {@code MANUAL} 手动连线）。 */
     private List<Relationship> relationships;
 
+    /** 用户自定义转换项（字典）：报表配置时由 {@code map(字段, 转换项id)} 引用，把编码映射为呈现文本。 */
+    private List<TransformItem> transforms;
+
     // ============================================================
     // 派生视图
     // ============================================================
@@ -97,7 +101,23 @@ public class DataModel {
                 updateTime,
                 toDatasourceDtos(),
                 toDatasetDtos(),
-                toRelationshipDtos());
+                toRelationshipDtos(),
+                toTransformDtos());
+    }
+
+    private List<TransformItemDTO> toTransformDtos() {
+        List<TransformItemDTO> out = new ArrayList<>();
+        if (transforms == null) return out;
+        for (TransformItem t : transforms) {
+            List<TransformItemDTO.EntryDTO> entries = new ArrayList<>();
+            if (t.entries() != null) {
+                for (TransformItem.TransformEntry e : t.entries()) {
+                    entries.add(new TransformItemDTO.EntryDTO(e.code(), e.label(), e.parent()));
+                }
+            }
+            out.add(new TransformItemDTO(t.id(), t.name(), t.alias(), entries));
+        }
+        return out;
     }
 
     private List<DataSourceDTO> toDatasourceDtos() {
@@ -204,7 +224,23 @@ public class DataModel {
                 .updateTime(dto.updateTime())
                 .datasets(datasets)
                 .relationships(buildRelationships(dto.relationships()))
+                .transforms(buildTransforms(dto.transforms()))
                 .build();
+    }
+
+    private static List<TransformItem> buildTransforms(List<TransformItemDTO> transforms) {
+        List<TransformItem> out = new ArrayList<>();
+        if (transforms == null) return out;
+        for (TransformItemDTO t : transforms) {
+            List<TransformItem.TransformEntry> entries = new ArrayList<>();
+            if (t.entries() != null) {
+                for (TransformItemDTO.EntryDTO e : t.entries()) {
+                    entries.add(new TransformItem.TransformEntry(e.code(), e.label(), e.parent()));
+                }
+            }
+            out.add(new TransformItem(t.id(), t.name(), t.alias(), entries));
+        }
+        return out;
     }
 
     private static Map<String, DataSource> buildSources(List<DataSourceDTO> sources) {
@@ -244,6 +280,7 @@ public class DataModel {
                 out.add(
                         TableDataset.builder()
                                 .id(d.id())
+                                .name(d.name())
                                 .alias(d.alias())
                                 .datasource(sources.get(d.datasourceId()))
                                 .datasourceId(d.datasourceId())

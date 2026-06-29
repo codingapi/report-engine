@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import { DataModelListPage } from '@coding-report/report-engine';
 import type { DataModelService, DataModelDesignerService } from '@coding-report/report-engine';
+import type { DataModelField } from '@coding-report/report-api';
 import {
   createDataModel,
   deleteDataModel,
   getDataModel,
+  getDataSource,
   introspectDatasets,
   listDataModelsPage,
   listDataSources,
@@ -43,6 +45,7 @@ const DataModelsPage = () => {
           datasets: info.datasets ?? [],
           relationships: info.relationships ?? [],
           datasources: info.datasources,
+          transforms: info.transforms ?? [],
         };
       },
       saveDataModel: async (dto) => {
@@ -55,6 +58,7 @@ const DataModelsPage = () => {
           datasets: dto.datasets,
           relationships: dto.relationships,
           datasources: dto.datasources,
+          transforms: dto.transforms,
         };
         if (dto.id) {
           await updateDataModel(dto.id, payload);
@@ -67,6 +71,24 @@ const DataModelsPage = () => {
         return page.list;
       },
       introspectDatasets: (sourceId: string) => introspectDatasets(sourceId),
+      // 列出数据源已保存数据集（物理表 + SQL 一视同仁），映射为数据模型可消费形态
+      listDatasourceDatasets: async (sourceId: string) => {
+        const ds = await getDataSource(sourceId);
+        return (ds.datasets ?? []).map((d) => ({
+          id: d.id ?? d.name ?? d.sourceTable,
+          name: d.name ?? d.sourceTable,
+          alias: d.alias,
+          kind: 'TABLE' as const,
+          datasourceId: sourceId,
+          sourceTable: d.sourceTable,
+          fields: (d.fields ?? []).map((f) => ({
+            name: f.name,
+            alias: f.alias,
+            dataType: f.dataType as DataModelField['dataType'],
+            primaryKey: f.primaryKey,
+          })),
+        }));
+      },
     }),
     [],
   );

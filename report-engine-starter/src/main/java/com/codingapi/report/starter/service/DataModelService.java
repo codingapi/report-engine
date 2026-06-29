@@ -195,7 +195,8 @@ public class DataModelService {
                 dto.updateTime(),
                 masked,
                 dto.datasets(),
-                dto.relationships());
+                dto.relationships(),
+                dto.transforms());
     }
 
     /** 前端回传的 {@code ***} 占位用旧连接的真实值回填（按连接 id 匹配），避免覆盖真实凭证。 */

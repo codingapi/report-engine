@@ -14,4 +14,5 @@ public record DataModelDTO(
         long updateTime,
         List<DataSourceDTO> datasources,
         List<DatasetDTO> datasets,
-        List<RelationshipDTO> relationships) {}
+        List<RelationshipDTO> relationships,
+        List<TransformItemDTO> transforms) {}

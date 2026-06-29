@@ -203,6 +203,7 @@ export const ReportEngine: React.FC<
 > = ({
   datasets,
   relationships = [],
+  transforms = [],
   dataModelId,
   functions,
   title,
@@ -1156,6 +1157,7 @@ export const ReportEngine: React.FC<
                 loopBlocks={loopBlocks}
                 datasets={datasets}
                 params={params}
+                transforms={transforms}
                 functions={functions}
                 onBindingChange={handleBindingChange}
                 onBindingCreate={handleBindingCreate}

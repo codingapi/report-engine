@@ -19,7 +19,8 @@ public final class Functions {
                     new DateFunction(),
                     new RoundFunction(),
                     new ConcatFunction(),
-                    new IfFunction());
+                    new IfFunction(),
+                    new MapFunction());
 
     private Functions() {}
 

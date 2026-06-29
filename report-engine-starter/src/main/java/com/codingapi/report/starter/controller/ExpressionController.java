@@ -26,7 +26,10 @@ public class ExpressionController {
         // NONE 是内部"不聚合"占位，不暴露给前端选择
         List<FunctionMeta> aggregations =
                 Aggregators.list().stream().filter(m -> !"NONE".equals(m.name())).toList();
-        return SingleResponse.of(new ExpressionCatalog(aggregations, Functions.list()));
+        // map 在前端「数据转换」独立分类提供，不在通用函数列表重复展示
+        List<FunctionMeta> functions =
+                Functions.list().stream().filter(m -> !"map".equals(m.name())).toList();
+        return SingleResponse.of(new ExpressionCatalog(aggregations, functions));
     }
 
     /**

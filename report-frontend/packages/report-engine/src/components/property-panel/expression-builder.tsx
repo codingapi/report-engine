@@ -7,6 +7,7 @@ import type {
   Dataset,
   LoopBlock,
   ParamDTO,
+  TransformItem,
   ExpressionCatalog,
   FunctionMeta,
 } from '@/types';
@@ -19,11 +20,12 @@ interface ExpressionBuilderProps {
   datasets: Dataset[];
   loopBlocks: LoopBlock[];
   params?: ParamDTO[];
+  transforms?: TransformItem[];
   functions?: ExpressionCatalog;
   onChange: (value: ReportValue) => void;
 }
 
-type Category = 'field' | 'loop' | 'param' | 'agg' | 'func';
+type Category = 'field' | 'loop' | 'param' | 'agg' | 'func' | 'transform';
 
 /** 内置聚合（后端未提供时的兜底） */
 const FALLBACK_AGGS: FunctionMeta[] = [
@@ -60,6 +62,7 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
   datasets,
   loopBlocks,
   params = [],
+  transforms = [],
   functions,
   onChange,
 }) => {
@@ -111,8 +114,11 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
     if (functions?.functions && functions.functions.length > 0) {
       cats.push({ key: 'func', label: '通用函数' });
     }
+    if (transforms.length > 0) {
+      cats.push({ key: 'transform', label: '数据转换' });
+    }
     return cats;
-  }, [datasets, loopBlocks, params, functions]);
+  }, [datasets, loopBlocks, params, functions, transforms]);
 
   const aggs = functions?.aggregations ?? FALLBACK_AGGS;
   const funcs = functions?.functions ?? [];
@@ -215,8 +221,24 @@ const ExpressionBuilder: React.FC<ExpressionBuilderProps> = ({
         }));
     }
 
+    if (category === 'transform') {
+      return transforms
+        .filter((t) => {
+          if (!keyword) return true;
+          const label = t.alias || t.name;
+          return matchWithPinyin(label, keyword) || matchWithPinyin(t.name, keyword);
+        })
+        .map((t) => ({
+          // 插入 map(字段, "转换项id")，光标停在第一个参数（字段）位置
+          expr: `map(, "${t.id}")`,
+          label: t.alias ? `${t.alias}（${t.name}）` : t.name,
+          desc: `数据转换 · map(字段, "${t.id}")`,
+          caretFromEnd: `, "${t.id}")`.length,
+        }));
+    }
+
     return [];
-  }, [category, search, datasets, loopBlocks, params, aggs, funcs]);
+  }, [category, search, datasets, loopBlocks, params, aggs, funcs, transforms]);
 
   return (
     <div className="re-expr-builder">

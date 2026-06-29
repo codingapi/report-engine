@@ -141,12 +141,22 @@ function exprToSource(v: ReportValue | undefined): string {
     case 'Literal':
       return v.payload || '';
     case 'Aggregate':
-      return `${v.aggregation || 'SUM'}(${exprToSource(v.operand)})`;
+      return `${v.aggregation || 'SUM'}(${exprToSourceArg(v.operand)})`;
     case 'FunctionCall':
-      return `${v.funcName || ''}(${(v.args || []).map(exprToSource).join(', ')})`;
+      return `${v.funcName || ''}(${(v.args || []).map(exprToSourceArg).join(', ')})`;
     default:
       return '';
   }
+}
+
+/**
+ * 函数/聚合参数位的源码：Literal 必须带引号，否则 reparse 会被当成 NameRef（如 map(d.sex, "gender")
+ * 的 "gender" 不加引号会变成 NameRef，渲染求值为 null → 转换失效）。其余节点同 exprToSource。
+ */
+function exprToSourceArg(v: ReportValue | undefined): string {
+  if (!v) return '';
+  if (v.type === 'Literal') return `"${v.payload ?? ''}"`;
+  return exprToSource(v);
 }
 
 const HOLE_RE = /\$\{([^}]*)\}/g;

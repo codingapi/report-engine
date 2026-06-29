@@ -13,6 +13,15 @@ export interface DatasetEditorProps {
   toolbar?: ReactNode;
   /** 无数据集时的占位说明 */
   emptyHint?: ReactNode;
+  /** 单表重新解析（同步该表最新结构）；不传则不显示该按钮 */
+  onReparseTable?: (table: WizardTable) => void;
+  /** 编辑 SQL 数据集（仅对 SQL 数据集显示）；不传则不显示该按钮 */
+  onEditSql?: (table: WizardTable) => void;
+}
+
+/** 是否为 SQL 数据集：sourceTable 是一段 SQL（与 name 不同且非纯表名）。 */
+function isSqlDataset(t: WizardTable): boolean {
+  return !!t.sourceTable && t.sourceTable !== t.name && /^\s*select\b/i.test(t.sourceTable);
 }
 
 /**
@@ -20,12 +29,15 @@ export interface DatasetEditorProps {
  * - 表别名编辑
  * - 字段别名编辑
  * - 删除不需要的表
+ * - 单表重新解析（同步结构）/ SQL 数据集编辑
  */
 export default function DatasetEditor({
   tables,
   onChange,
   toolbar,
   emptyHint,
+  onReparseTable,
+  onEditSql,
 }: DatasetEditorProps) {
   const [active, setActive] = useState<string>();
 
@@ -60,7 +72,9 @@ export default function DatasetEditor({
       }),
     );
 
-  const renderTable = (t: WizardTable) => (
+  const renderTable = (t: WizardTable) => {
+    const sql = isSqlDataset(t);
+    return (
     <div style={{ padding: '8px 12px' }}>
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <Space>
@@ -73,19 +87,31 @@ export default function DatasetEditor({
             onChange={(e) => updateTableAlias(t.name, e.target.value)}
           />
           <Text type="secondary">
-            源表 <Text code>{t.name}</Text>
+            {sql ? 'SQL 数据集' : '源表'} <Text code>{t.name}</Text>
           </Text>
         </Space>
-        <Popconfirm
-          title="从该数据源移除此表？"
-          onConfirm={() => removeTable(t.name)}
-          okText="移除"
-          cancelText="取消"
-        >
-          <Button size="small" danger type="text" icon={<DeleteOutlined />}>
-            删除此表
-          </Button>
-        </Popconfirm>
+        <Space>
+          {sql && onEditSql && (
+            <Button size="small" type="link" onClick={() => onEditSql(t)}>
+              编辑 SQL
+            </Button>
+          )}
+          {!sql && onReparseTable && t.sourceTable && (
+            <Button size="small" type="link" onClick={() => onReparseTable(t)}>
+              重新解析
+            </Button>
+          )}
+          <Popconfirm
+            title="从该数据源移除此表？"
+            onConfirm={() => removeTable(t.name)}
+            okText="移除"
+            cancelText="取消"
+          >
+            <Button size="small" danger type="text" icon={<DeleteOutlined />}>
+              删除此表
+            </Button>
+          </Popconfirm>
+        </Space>
       </Space>
       <Table<WizardField>
         size="small"
@@ -149,7 +175,8 @@ export default function DatasetEditor({
         ]}
       />
     </div>
-  );
+    );
+  };
 
   const activeKey = tables.some((t) => t.name === active) ? active : tables[0]?.name;
 

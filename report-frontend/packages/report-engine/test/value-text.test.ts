@@ -156,6 +156,22 @@ describe('templateToString — 可逆性', () => {
   test('Literal 直接返回文本', () => {
     expect(templateToString({ type: 'Literal', payload: '纯文本' })).toBe('纯文本');
   });
+
+  test('map(字段, 转换项id) 的 id 作为函数参数必须带引号往返（修复转换失效 bug）', () => {
+    const v: ReportValue = {
+      type: 'FunctionCall',
+      funcName: 'map',
+      args: [
+        { type: 'FieldValue', payload: 'ds.sex' },
+        { type: 'Literal', payload: 'gender' },
+      ],
+    };
+    // 函数参数位的 Literal 带引号输出，避免 reparse 成 NameRef
+    const src = templateToString(v);
+    expect(src).toBe('${map(ds.sex, "gender")}');
+    // 往返后转换项 id 仍是 Literal，而非 NameRef
+    expect(parseTemplate(src)).toEqual(v);
+  });
 });
 
 describe('valueDisplayText — 别名友好展示', () => {
