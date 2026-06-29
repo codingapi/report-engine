@@ -123,6 +123,7 @@ export {
   AGG_LABELS,
   EXPANSION_LABELS,
   OPERATOR_LABELS,
+  operatorsForDataType,
   VALUE_TYPE_LABELS,
   genId,
   findDataset,

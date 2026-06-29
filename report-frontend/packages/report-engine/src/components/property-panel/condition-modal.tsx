@@ -1,18 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Form, Select } from 'antd';
 import type {
   Condition,
   CompareOperator,
+  DataType,
   Dataset,
   LoopBlock,
   ParamDTO,
   ReportValue,
 } from '@/types';
-import { OPERATOR_LABELS, genId } from '@/types';
+import { OPERATOR_LABELS, genId, findField, findDataset, operatorsForDataType } from '@/types';
 import ValueEditor from './value-editor';
 
 /** 不需要右值的运算符 */
 const NO_RIGHT_OPS: CompareOperator[] = ['IS_NULL', 'IS_NOT_NULL'];
+
+/**
+ * 解析左值表达式的数据类型，用于按类型过滤可用算子。
+ * - FieldValue（datasetId.field）：查字段 dataType
+ * - LoopFieldValue（loopId.field）：查循环驱动数据集字段 dataType
+ * - ParamValue：查参数 dataType
+ * - 其它（Literal/Aggregate/…）：未知 → undefined（放开全部算子）
+ */
+function resolveLeftDataType(
+  value: ReportValue,
+  datasets: Dataset[],
+  loopBlocks: LoopBlock[],
+  params: ParamDTO[],
+): DataType | undefined {
+  if (value.type === 'FieldValue') {
+    return findField(datasets, value.payload ?? '')?.dataType;
+  }
+  if (value.type === 'LoopFieldValue') {
+    const ref = value.payload ?? '';
+    const dot = ref.indexOf('.');
+    if (dot === -1) return undefined;
+    const loop = loopBlocks.find((l) => l.id === ref.slice(0, dot));
+    if (!loop) return undefined;
+    const ds = findDataset(datasets, loop.source.datasetId);
+    return ds?.fields.find((f) => f.name === ref.slice(dot + 1))?.dataType;
+  }
+  if (value.type === 'ParamValue') {
+    return params.find((p) => p.name === value.payload)?.dataType;
+  }
+  return undefined;
+}
 
 interface ConditionModalProps {
   open: boolean;
@@ -56,6 +88,22 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
   }, [open, editingCondition]);
 
   const hideRight = NO_RIGHT_OPS.includes(operator);
+
+  // 按左值字段类型过滤可用算子（类型未知则放开全部）
+  const availableOps = useMemo(
+    () => operatorsForDataType(resolveLeftDataType(left, datasets, loopBlocks, params)),
+    [left, datasets, loopBlocks, params],
+  );
+
+  // 左值类型变化导致当前算子不再可用时，回退到第一个可用算子（默认 EQ）
+  useEffect(() => {
+    if (!availableOps.includes(operator)) {
+      const next = availableOps[0] ?? 'EQ';
+      setOperator(next);
+      if (NO_RIGHT_OPS.includes(next)) setRight(null);
+      else setRight((r) => r ?? { type: 'Literal', payload: '' });
+    }
+  }, [availableOps, operator]);
 
   const handleOperatorChange = (op: CompareOperator) => {
     setOperator(op);
@@ -102,9 +150,9 @@ const ConditionModal: React.FC<ConditionModalProps> = ({
           <Select
             value={operator}
             onChange={handleOperatorChange}
-            options={Object.entries(OPERATOR_LABELS).map(([v, l]) => ({
-              value: v,
-              label: l,
+            options={availableOps.map((op) => ({
+              value: op,
+              label: OPERATOR_LABELS[op],
             }))}
           />
         </Form.Item>

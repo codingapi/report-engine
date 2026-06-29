@@ -92,6 +92,34 @@ export const OPERATOR_LABELS: Record<CompareOperator, string> = {
   BETWEEN: '介于',
 };
 
+/**
+ * 按数据类型可用的比较算子（对齐后端 CompareOperator 的类型可用性表）。
+ * - 大小比较 GT/GE/LT/LE/BETWEEN 仅数值/日期（STRING 无自然排序，BOOLEAN 无区间）
+ * - CONTAINS/NOT_CONTAINS 仅 STRING（子串匹配）
+ * - IN/NOT_IN 排除 BOOLEAN
+ * - EQ/NE/IS_NULL/IS_NOT_NULL 全类型可用
+ * JSON 无明确规则，按 STRING 处理（仅等值/包含/空判定）。
+ */
+const ORDERABLE_OPS: CompareOperator[] = ['GT', 'GE', 'LT', 'LE', 'BETWEEN'];
+const COMMON_OPS: CompareOperator[] = ['EQ', 'NE', 'IS_NULL', 'IS_NOT_NULL'];
+
+export function operatorsForDataType(dataType?: DataType): CompareOperator[] {
+  switch (dataType) {
+    case 'NUMBER':
+    case 'DATE':
+    case 'DATETIME':
+      return ['EQ', 'NE', ...ORDERABLE_OPS, 'IN', 'NOT_IN', 'IS_NULL', 'IS_NOT_NULL'];
+    case 'BOOLEAN':
+      return [...COMMON_OPS];
+    case 'STRING':
+    case 'JSON':
+      return ['EQ', 'NE', 'CONTAINS', 'NOT_CONTAINS', 'IN', 'NOT_IN', 'IS_NULL', 'IS_NOT_NULL'];
+    default:
+      // 类型未知（如左值非字段引用）：放开全部，不误伤
+      return Object.keys(OPERATOR_LABELS) as CompareOperator[];
+  }
+}
+
 export const VALUE_TYPE_LABELS: Record<ValueType, string> = {
   Literal: '文本',
   FieldValue: '字段',

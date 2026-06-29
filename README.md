@@ -68,7 +68,8 @@
 - [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（DB/EXCEL/CSV）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
-- [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
+- [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值、数据转换，实时预览
+- [x] **条件算子按类型过滤**：条件面板根据左值字段的 `DataType` 收敛可用算子（`operatorsForDataType`，对齐后端 `CompareOperator` 类型可用性表）——STRING 不显示大小比较/BETWEEN、仅 STRING 显示 CONTAINS、BOOLEAN 仅等值与空判定；左值类型变化时自动回退失效算子
 - [x] **报表领域实体化**：`core.Report` 领域实体（framework，含 id/name/dataModelId/createTime/updateTime/cellBindings/loopBlocks/summaries/parameters/template + 运行时 dataModel 引用），DTO record 在 framework `dto.report.*`（前端 JSON 契约），经 `Report.toDTO()`/`fromDTO()` 互转；仓库以领域对象存取，`ReportRepository.page(PageQuery):PageResult<Report>` 分页（接口在 framework）
 - [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
 - [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `dto.report.*`）+ framework `core.RenderDtoConverter` 匹配前端 JSON 格式
@@ -91,10 +92,6 @@
 
 - [ ] **报表权限与共享**：报表配置的权限控制、多人协作、版本管理
 - [ ] **打印与分页**：报表分页设置、打印预览、页眉页脚配置
-
-#### 已知限制
-
-- [ ] **条件面板未按类型过滤算子**：`CompareOperator` 注释定义了按 `DataType` 过滤的可用算子表，但前端 `condition-modal` 当前全量展示 13 个算子（后端均已支持），未按字段类型收敛
 
 ## 快速开始
 
