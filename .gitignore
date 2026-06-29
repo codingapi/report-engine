@@ -36,3 +36,5 @@ build/
 .fonts
 .DS_Store
 .codegraph
+.hermes
+/data
