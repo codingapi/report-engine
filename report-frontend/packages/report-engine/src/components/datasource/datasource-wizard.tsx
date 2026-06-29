@@ -357,19 +357,29 @@ export default function DataSourceWizard({
       onChange={(tables) => setWizard((s) => ({ ...s, tables }))}
       toolbar={
         wizard.kind === 'DB' ? (
-          <Space wrap>
-            <Input
-              style={{ width: 280 }}
-              placeholder="指定表名（多个用逗号分隔，空=全部）"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Text type="secondary">指定表名（多个用逗号或换行分隔，留空解析全部）</Text>
+            <Input.TextArea
+              autoSize={{ minRows: 2, maxRows: 6 }}
+              placeholder={'如：\nt_student\nt_student_class'}
               value={parseTableNames}
               onChange={(e) => setParseTableNames(e.target.value)}
               allowClear
             />
-            <Button type="primary" loading={introspecting} onClick={handleParse} disabled={!canConfig}>
-              {wizard.tables.length ? '重新解析' : '解析元数据'}
-            </Button>
-            {wizard.tables.length > 0 && <Text type="secondary">共 {wizard.tables.length} 张表</Text>}
-          </Space>
+            <Space>
+              <Button
+                type="primary"
+                loading={introspecting}
+                onClick={handleParse}
+                disabled={!canConfig}
+              >
+                {wizard.tables.length ? '重新解析表结构' : '解析表结构'}
+              </Button>
+              {wizard.tables.length > 0 && (
+                <Text type="secondary">共 {wizard.tables.length} 张表</Text>
+              )}
+            </Space>
+          </div>
         ) : (
           <Text type="secondary">
             上传文件后已自动解析，可在下方维护表/字段别名或删除不需要的表

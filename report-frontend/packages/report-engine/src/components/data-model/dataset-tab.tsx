@@ -19,6 +19,8 @@ export interface DatasetTabProps {
   datasets: DataModelDataset[];
   onChange: (datasets: DataModelDataset[]) => void;
   service: DataModelDesignerService;
+  /** 只读模式：隐藏添加/移除操作 */
+  readOnly?: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export default function DatasetTab({
   datasets,
   onChange,
   service,
+  readOnly = false,
 }: DatasetTabProps) {
   const { message } = AntdApp.useApp();
   const [sources, setSources] = useState<DataSourceBrief[]>([]);
@@ -151,23 +154,27 @@ export default function DatasetTab({
           return `${ds.name} (${ds.type})`;
         },
       },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 80,
-        render: (_v, r) => (
-          <Popconfirm
-            title="确认移除该数据集？"
-            onConfirm={() => handleRemove(r.id)}
-            okText="移除"
-            cancelText="取消"
-          >
-            <a style={{ color: '#ff4d4f' }}>移除</a>
-          </Popconfirm>
-        ),
-      },
+      ...(readOnly
+        ? []
+        : [
+            {
+              title: '操作',
+              key: 'actions',
+              width: 80,
+              render: (_v: unknown, r: DataModelDataset) => (
+                <Popconfirm
+                  title="确认移除该数据集？"
+                  onConfirm={() => handleRemove(r.id)}
+                  okText="移除"
+                  cancelText="取消"
+                >
+                  <a style={{ color: '#ff4d4f' }}>移除</a>
+                </Popconfirm>
+              ),
+            },
+          ]),
     ],
-    [datasets, sourceMap],
+    [datasets, sourceMap, readOnly],
   );
 
   const sourceOptions = useMemo(
@@ -181,6 +188,7 @@ export default function DatasetTab({
 
   return (
     <div>
+      {!readOnly && (
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
         <Space>
           <Button
@@ -192,6 +200,7 @@ export default function DatasetTab({
           </Button>
         </Space>
       </div>
+      )}
       <Table<DataModelDataset>
         rowKey="id"
         size="small"

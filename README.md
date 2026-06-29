@@ -57,14 +57,15 @@
   - 表达式域：Value（sealed，8 种节点：Literal / FieldValue / ParamValue / LoopFieldValue / NameRef / Template / Aggregate / FunctionCall）/ ExpressionEngine 注册表分发 / ValueFunction SPI
   - 参数域：ParamSource（External / Cell / Constant）
   - 渲染域：CellBinding（值层 Value + 控制层 expansion/merge/conditions）/ LoopBlock / SummaryRow
-- [x] **表达式引擎**：统一 `${...}` 文本语法（`Templates.parse()`），支持字段引用、聚合函数、文本插值、函数调用；内置函数 format / date / round / concat / if（`ValueFunction` SPI 可扩展）；`splitArgs` 支持嵌套括号与字符串字面量
+- [x] **表达式引擎**：统一 `${...}` 文本语法（`Templates.parse()`），支持字段引用、聚合函数、文本插值、函数调用；内置函数 format / date / round / concat / if / **map**（`ValueFunction` SPI 可扩展）；`splitArgs` 支持嵌套括号与字符串字面量
+- [x] **数据转换（转换项 + map 函数）**：转换项（name/alias + 树形 code/label/parent 字典）在数据模型下配置，报表配置用 `map(字段, "转换项id")` 把字段编码映射为呈现文本（如 0/1 → 女/男）；渲染期注入、查不到回退原值，数值编码自动归一
 - [x] **内存渲染引擎**：ReportRenderer 支持 7 种报表场景（列表/合并/多级统计/循环块/主从/小计/UNION）+ 独立数据带并列渲染；汇总支持交叉区间作用域（并列报表各带独立汇总互不串扰）
 - [x] **双向汇总（纵向 + 横向）**：`SummaryRow` 以 `Axis` 抽象统一两轴——纵向汇总在数据带**下方追加合计行**、横向汇总在数据带**右侧追加合计列**（互为转置，共用 `renderBand`/`summaryOut`）。坐标按轴表达（`mainPos` 主轴位置 / `crossFrom~crossTo` 交叉区间 / `crossPos` 交叉坐标）；前端右键按选区形状自动判轴（横选→纵向合计行、竖选→横向合计列）
 - [x] **横向扩展与交叉表**（`Expansion.HORIZONTAL`）：引擎以 `Axis` 抽象统一纵/横两轴——纵向带（一记录一行）的转置即横向带（一记录一列，向右铺开 + 列位移/横向 GROUP 合并）；进一步支持 **VERTICAL×HORIZONTAL 交叉表（矩阵/透视）**：行维 × 列维 → 交叉格聚合，并按"紧邻交叉格"几何约定自动补出行合计/列合计/总计（零持久化契约变更，现有设计器直接可配）
 - [x] **独立纵向带**（`CellBinding.independent`）：显式配置某列从自身声明行独立向下展开（交错/错位排版），默认仍按"一条记录一行"对齐同源列
 - [x] **样式/布局适配**：模板静态内容（标题/页脚）随带扩展下移、汇总行继承模板样式、合并区边框铺满整个区域、模板行高/列宽随渲染带出
 - [x] **跨数据源 JOIN**：所有计算在 Java 内存完成，支持异构数据源关联；JOIN 类型 INNER/LEFT/RIGHT/FULL（hash join，LEFT/RIGHT 保留侧相对 join 参数位置，无匹配侧补 null）
-- [x] **数据模型面板**（`DataModelPanel`）：两 tab 布局（数据集 / 数据关系），始终显示数量徽标
+- [x] **数据模型面板**（`DataModelPanel`）：三 tab 布局（数据集 / 数据关系 / 报表参数），始终显示数量徽标
 - [x] **数据集树**（`DatasetTree`）：数据源类型彩色标签（DB/EXCEL/CSV）、字段拖拽、字段级关系双侧标注（→ FK / ← PK）
 - [x] **数据关系与分组**：上半区关系列表 + 下半区数据分组树（union-find 连通分量，仅展示有关系的数据集）
 - [x] **表达式构建器**（`ExpressionBuilder`）：计算器式统一值编辑，支持字段插入、聚合、函数调用、模板插值，实时预览
@@ -72,7 +73,7 @@
 - [x] **报表配置持久化**：`ReportConfigController`（starter）保存/加载/分页列表/删除 API，数据模型随配置加载附带返回；example 用 `ReportConfigBuilder` 链式预存 10 个示例报表（含交叉表「区域季度销售交叉表」、横向汇总「商品横向汇总表」，写死稳定 id，重启不变）
 - [x] **报表渲染导出**：`POST /api/report/render`（starter）→ 填充数据的 .xlsx 下载，DTO record（framework `dto.report.*`）+ framework `core.RenderDtoConverter` 匹配前端 JSON 格式
 - [x] **网页预览能力**：`ReportPreview` 组件（report-engine，参数弹窗→渲染→预览抽屉→反查→抽屉内导出），设计器与独立预览页共用；报表参数运行时输入表单（必填参数弹窗）
-- [x] **管理界面**：app-pc 五个菜单（首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理）；数据源管理为 4 步向导（类型 / 配置 / 解析 / 预览，解析不落库、保存才落库）；数据模型管理为列表 + 全屏抽屉设计器（`DataModelListPage` 内置 `DataModelDesigner`，三 tab：数据集 / 数据合集 / 关系），含**发布状态机**（草稿可修改/发布，已发布屏蔽修改、可转草稿；仅已发布模型可被报表选用）；报表管理页 antd Table 分页、新建/编辑/预览/删除，引用未发布模型的报表标「未发布」并禁用编辑/预览
+- [x] **管理界面**：app-pc 五个菜单（首页 / 驱动管理 / 数据源管理 / 数据模型管理 / 报表管理）；数据源管理为 4 步向导（类型 / 配置 / 解析 / 预览，解析不落库、保存才落库），支持**指定表名解析**（textarea 多表，空=全部）、**单表重新解析**同步结构、**自定义 SQL 数据集**（写 SELECT 解析字段，与物理表一视同仁）；数据模型管理为列表 + 全屏抽屉设计器（`DataModelListPage` 内置 `DataModelDesigner`，四 tab：数据集 / 数据合集 / 关系 / 转换项），含**发布状态机**（草稿可修改/发布，已发布屏蔽修改、可「查看」只读 / 转草稿；仅已发布模型可被报表选用）；报表管理页 antd Table 分页、新建/编辑/预览/删除，引用未发布模型的报表标「未发布」并禁用编辑/预览
 - [x] **动态报表标题**：标题栏显示当前报表名称（从配置加载），保存时同步更新
 
 ### 待开发

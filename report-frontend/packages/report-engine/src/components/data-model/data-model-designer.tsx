@@ -178,6 +178,7 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
                   datasets={model.datasets}
                   onChange={handleDatasetsChange}
                   service={service}
+                  readOnly={readOnly}
                 />
               ),
             },
@@ -185,7 +186,11 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
               key: 'unions',
               label: '数据合集',
               children: (
-                <UnionEditor datasets={model.datasets} onChange={handleDatasetsChange} />
+                <UnionEditor
+                  datasets={model.datasets}
+                  onChange={handleDatasetsChange}
+                  readOnly={readOnly}
+                />
               ),
             },
             {
@@ -196,6 +201,7 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
                   datasets={model.datasets}
                   relationships={editingRelationships}
                   onChange={handleRelationshipsChange}
+                  readOnly={readOnly}
                 />
               ),
             },
@@ -206,6 +212,7 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
                 <TransformTab
                   transforms={model.transforms ?? []}
                   onChange={handleTransformsChange}
+                  readOnly={readOnly}
                 />
               ),
             },

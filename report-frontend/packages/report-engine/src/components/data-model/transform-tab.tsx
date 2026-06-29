@@ -21,6 +21,8 @@ const { Title } = Typography;
 export interface TransformTabProps {
   transforms: TransformItemInfo[];
   onChange: (transforms: TransformItemInfo[]) => void;
+  /** 只读模式：隐藏新建/编辑/删除操作 */
+  readOnly?: boolean;
 }
 
 interface EntryRow extends TransformEntryInfo {
@@ -53,7 +55,11 @@ function blankRow(): EntryRow {
  * - 报表配置时由 map(字段, 转换项id) 引用，把字段编码渲染为呈现文本。
  * - 草稿模式：抽屉内编辑不即时写回，点「确定」才写入。
  */
-export default function TransformTab({ transforms, onChange }: TransformTabProps) {
+export default function TransformTab({
+  transforms,
+  onChange,
+  readOnly = false,
+}: TransformTabProps) {
   const { message } = AntdApp.useApp();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -143,24 +149,28 @@ export default function TransformTab({ transforms, onChange }: TransformTabProps
     { title: '标识名', dataIndex: 'name', key: 'name', render: (_, r) => r.name || r.id },
     { title: '别名', dataIndex: 'alias', key: 'alias', render: (_, r) => r.alias || '-' },
     { title: '映射条目数', key: 'count', render: (_, r) => r.entries?.length ?? 0 },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 120,
-      render: (_, r) => (
-        <Space>
-          <a onClick={() => openEdit(r)}>编辑</a>
-          <Popconfirm
-            title="确认删除该转换项？"
-            onConfirm={() => handleDelete(r.id)}
-            okText="删除"
-            cancelText="取消"
-          >
-            <a style={{ color: '#ff4d4f' }}>删除</a>
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    ...(readOnly
+      ? []
+      : [
+          {
+            title: '操作',
+            key: 'actions',
+            width: 120,
+            render: (_: unknown, r: TransformItemInfo) => (
+              <Space>
+                <a onClick={() => openEdit(r)}>编辑</a>
+                <Popconfirm
+                  title="确认删除该转换项？"
+                  onConfirm={() => handleDelete(r.id)}
+                  okText="删除"
+                  cancelText="取消"
+                >
+                  <a style={{ color: '#ff4d4f' }}>删除</a>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]),
   ];
 
   const entryColumns: ColumnsType<EntryRow> = [
@@ -225,11 +235,13 @@ export default function TransformTab({ transforms, onChange }: TransformTabProps
 
   return (
     <div>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button icon={<PlusOutlined />} type="primary" onClick={openCreate}>
-          新建转换项
-        </Button>
-      </div>
+      {!readOnly && (
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button icon={<PlusOutlined />} type="primary" onClick={openCreate}>
+            新建转换项
+          </Button>
+        </div>
+      )}
       <Table<TransformItemInfo>
         rowKey="id"
         size="small"

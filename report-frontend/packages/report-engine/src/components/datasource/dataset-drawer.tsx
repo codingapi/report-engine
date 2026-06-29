@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { App as AntdApp, Button, Drawer, Input, Space, Spin, Typography } from 'antd';
+import { App as AntdApp, Button, Drawer, Input, Modal, Space, Spin, Typography } from 'antd';
 import type { DataSourceDTO } from '@coding-report/report-api';
 import DatasetEditor from './dataset-editor';
 import SqlDatasetModal from './sql-dataset-modal';
@@ -44,7 +44,8 @@ export default function DatasetDrawer({
   const [sqlModalOpen, setSqlModalOpen] = useState(false);
   // SQL 编辑模式：非空时弹窗为编辑该数据集；null 为新建
   const [editingSql, setEditingSql] = useState<WizardTable | null>(null);
-  // 指定解析的表名（空=全部）
+  // 重新解析弹窗 + 指定解析的表名（空=全部）
+  const [reparseOpen, setReparseOpen] = useState(false);
   const [parseTableNames, setParseTableNames] = useState('');
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function DatasetDrawer({
       const fresh = await service.introspect(datasourceId, names);
       setTables((prev) => mergeTables(prev, fresh.map(fromIntrospected)));
       message.success(`解析完成，共 ${fresh.length} 张表`);
+      setReparseOpen(false);
     } catch (e) {
       message.error(`重新解析失败: ${(e as Error).message}`);
     } finally {
@@ -164,35 +166,57 @@ export default function DatasetDrawer({
               : undefined
           }
           toolbar={
-            <Space wrap>
-              {dto?.type === 'DB' && (
-                <Input
-                  style={{ width: 260 }}
-                  placeholder="指定表名（多个逗号分隔，空=全部）"
-                  value={parseTableNames}
-                  onChange={(e) => setParseTableNames(e.target.value)}
-                  allowClear
-                />
-              )}
-              <Button loading={parsing} onClick={handleReparse}>
-                重新解析
-              </Button>
-              {dto?.type === 'DB' && service.introspectSql && (
-                <Button
-                  onClick={() => {
-                    setEditingSql(null);
-                    setSqlModalOpen(true);
-                  }}
-                >
-                  新建 SQL 数据集
-                </Button>
-              )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
               <Text type="secondary">维护表别名、字段别名或删除不需要的表</Text>
-            </Space>
+              <Space>
+                {dto?.type === 'DB' && (
+                  <Button onClick={() => setReparseOpen(true)}>重新解析</Button>
+                )}
+                {dto?.type === 'DB' && service.introspectSql && (
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setEditingSql(null);
+                      setSqlModalOpen(true);
+                    }}
+                  >
+                    新建 SQL 数据集
+                  </Button>
+                )}
+              </Space>
+            </div>
           }
           emptyHint="该数据源暂无数据集，可点击「重新解析」获取"
         />
       </Spin>
+      <Modal
+        title="重新解析表结构"
+        open={reparseOpen}
+        onOk={handleReparse}
+        onCancel={() => setReparseOpen(false)}
+        okText="解析"
+        cancelText="取消"
+        confirmLoading={parsing}
+        destroyOnHidden
+      >
+        <div style={{ marginBottom: 8 }}>
+          <Text type="secondary">指定表名（多个用逗号或换行分隔，留空解析全部）</Text>
+        </div>
+        <Input.TextArea
+          autoSize={{ minRows: 3, maxRows: 8 }}
+          placeholder={'如：\nt_student\nt_student_class'}
+          value={parseTableNames}
+          onChange={(e) => setParseTableNames(e.target.value)}
+          allowClear
+        />
+      </Modal>
       {datasourceId && (
         <SqlDatasetModal
           open={sqlModalOpen}

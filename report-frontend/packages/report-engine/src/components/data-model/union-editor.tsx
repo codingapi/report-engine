@@ -47,6 +47,8 @@ export interface UnionEditorProps {
   /** 已选数据集列表（含 TABLE 与 UNION；UNION 仅取 TABLE 作为成员来源） */
   datasets: DataModelDataset[];
   onChange: (datasets: DataModelDataset[]) => void;
+  /** 只读模式：隐藏新建/编辑/删除操作 */
+  readOnly?: boolean;
 }
 
 function isTable(d: DataModelDataset): boolean {
@@ -131,7 +133,7 @@ function blankRow(): UnionFieldRow {
  * - 「新建合集」/「编辑」打开 60% 抽屉：合集名称(英文)+合集别名(中文)+字段定义+左右表字段映射。
  * - 草稿模式：抽屉内编辑不即时写回，点「确定」才 buildUnion 写入 datasets。
  */
-export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
+export default function UnionEditor({ datasets, onChange, readOnly = false }: UnionEditorProps) {
   const { message } = AntdApp.useApp();
   const unions = useMemo(() => datasets.filter(isUnion), [datasets]);
   const tables = useMemo(() => datasets.filter(isTable), [datasets]);
@@ -241,24 +243,28 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
   const listColumns: ColumnsType<DataModelDataset> = [
     { title: '合集名称', key: 'name', render: (_, r) => r.name || '-' },
     { title: '合集别名', key: 'alias', render: (_, r) => r.alias || '-' },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 120,
-      render: (_, r) => (
-        <Space>
-          <a onClick={() => openEdit(r)}>编辑</a>
-          <Popconfirm
-            title="确认删除该合集？"
-            onConfirm={() => handleDelete(r.id)}
-            okText="删除"
-            cancelText="取消"
-          >
-            <a style={{ color: '#ff4d4f' }}>删除</a>
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    ...(readOnly
+      ? []
+      : [
+          {
+            title: '操作',
+            key: 'actions',
+            width: 120,
+            render: (_: unknown, r: DataModelDataset) => (
+              <Space>
+                <a onClick={() => openEdit(r)}>编辑</a>
+                <Popconfirm
+                  title="确认删除该合集？"
+                  onConfirm={() => handleDelete(r.id)}
+                  okText="删除"
+                  cancelText="取消"
+                >
+                  <a style={{ color: '#ff4d4f' }}>删除</a>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]),
   ];
 
   const fieldColumns: ColumnsType<UnionFieldRow> = [
@@ -365,11 +371,13 @@ export default function UnionEditor({ datasets, onChange }: UnionEditorProps) {
 
   return (
     <div>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button icon={<PlusOutlined />} type="primary" onClick={openCreate} disabled={!canCreate}>
-          新建合集
-        </Button>
-      </div>
+      {!readOnly && (
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button icon={<PlusOutlined />} type="primary" onClick={openCreate} disabled={!canCreate}>
+            新建合集
+          </Button>
+        </div>
+      )}
       <Table<DataModelDataset>
         rowKey="id"
         size="small"
