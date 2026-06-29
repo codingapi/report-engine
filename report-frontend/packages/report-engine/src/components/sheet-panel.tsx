@@ -12,6 +12,8 @@ import {
   type MenuGroupDef,
   type FontItem,
   type ExcelWorkbook,
+  type RowsColsChange,
+  type UndoRedoPhase,
 } from '@coding-report/report-univer';
 
 export interface SheetPanelHandle {
@@ -36,6 +38,8 @@ interface SheetPanelProps {
   onFieldDrop?: (info: FieldDropInfo, handle: CellHandle) => void;
   onCellValueChange?: UniverSheetProps['onCellValueChange'];
   onSelectionClear?: (cellKeys: string[]) => void;
+  onRowsColsChanged?: (change: RowsColsChange) => void;
+  onUndoRedoStateChange?: (phase: UndoRedoPhase) => void;
   onFontRequest?: () => Promise<FontItem[]>;
   onReady?: () => void;
 }
@@ -54,6 +58,8 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
       onFieldDrop,
       onCellValueChange,
       onSelectionClear,
+      onRowsColsChanged,
+      onUndoRedoStateChange,
       onFontRequest,
       onReady,
     },
@@ -92,6 +98,8 @@ const SheetPanel = forwardRef<SheetPanelHandle, SheetPanelProps>(
         onFieldDrop={onFieldDrop}
         onCellValueChange={onCellValueChange}
         onSelectionClear={onSelectionClear}
+        onRowsColsChanged={onRowsColsChanged}
+        onUndoRedoStateChange={onUndoRedoStateChange}
         onFontRequest={onFontRequest}
         onReady={onReady}
       />
