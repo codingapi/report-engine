@@ -93,6 +93,14 @@
 - [ ] **报表权限与共享**：报表配置的权限控制、多人协作、版本管理
 - [ ] **打印与分页**：报表分页设置、打印预览、页眉页脚配置
 
+## 集成文档
+
+把本框架引入自己的工程，请参考 `docs/integration/` 下的详细教程（`report-engine-example` 与
+`apps/app-pc` 即官方集成示例工程）：
+
+- [后端集成指南](docs/integration/backend-integration.md) — Maven 依赖、自动配置、需实现的存储扩展点、配置项、扩展 SPI
+- [前端集成指南](docs/integration/frontend-integration.md) — 三个 npm 包、API 客户端代理、服务注入模式、`ReportEngine`/`ReportPreview` 接入
+
 ## 快速开始
 
 ### 后端
