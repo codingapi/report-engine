@@ -75,6 +75,21 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
    */
   onSelectionClear?: (cellKeys: string[]) => void;
 
+  /**
+   * 行/列结构变更回调 — 用户删除/插入整行整列时触发。
+   * 父组件据此对按坐标记录的属性（cellBindings/loopBlocks/summaries）做删除 + 位移同步。
+   * - `dimension`: 'row' 删/插行；'col' 删/插列
+   * - `action`: 'remove' 删除；'insert' 插入
+   * - `start`/`count`: 起始索引（0-based）与数量
+   */
+  onRowsColsChanged?: (change: RowsColsChange) => void;
+
+  /**
+   * 撤销/重做阶段变更回调 — Univer 执行 undo/redo 前置为 'undo'/'redo'，重放结束后复位 'normal'。
+   * 父组件据此在 undo/redo 重放期间从快照栈恢复属性，而非按当前表格内容重新推导。
+   */
+  onUndoRedoStateChange?: (phase: UndoRedoPhase) => void;
+
   // ─── 消息 ───
 
   // ─── 只读模式 ───
@@ -98,6 +113,22 @@ export interface UniverSheetProps<TCellProp = CellProp, TLoopProp = CellProp> {
   /** 循环块属性: key = blockId */
   loopBlockProps?: Record<string, TLoopProp[]>;
 }
+
+/** 行/列结构变更描述（删除/插入整行整列） */
+export interface RowsColsChange {
+  sheetId: string;
+  dimension: 'row' | 'col';
+  action: 'remove' | 'insert';
+  /** 起始索引（0-based） */
+  start: number;
+  /** 行/列数量 */
+  count: number;
+  /** 触发阶段：正常操作 / 撤销重放 / 重做重放 */
+  phase: UndoRedoPhase;
+}
+
+/** 撤销/重做阶段 */
+export type UndoRedoPhase = 'normal' | 'undo' | 'redo';
 
 /** 字体文件信息（由父组件通过 onFontRequest 返回） */
 export interface FontItem {

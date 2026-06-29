@@ -100,8 +100,22 @@ public class DataSourceService {
             incoming.setDatasets(old.getDatasets());
         }
         String id = repository.save(incoming);
+        backfillDatasourceId(incoming, id);
         registerDriverIfNeeded(incoming);
         return id;
+    }
+
+    /**
+     * 新建数据源时，{@link #toTableDataset} 在数据源 id 生成前执行，{@code datasourceId} 为 null； save 后 id 已就绪（仓库存的是同一引用），用真实 id 补齐冗余字段，使持久化数据正确。
+     */
+    private static void backfillDatasourceId(DataSource ds, String id) {
+        if (ds.getDatasets() == null) return;
+        for (Dataset d : ds.getDatasets()) {
+            if (d instanceof TableDataset t
+                    && (t.getDatasourceId() == null || t.getDatasourceId().isBlank())) {
+                t.setDatasourceId(id);
+            }
+        }
     }
 
     public void delete(String id) {
@@ -127,6 +141,11 @@ public class DataSourceService {
      * DataExtractor#introspect}。
      */
     public List<IntrospectedTable> introspect(String id) {
+        return introspect(id, null);
+    }
+
+    /** 按已保存连接 id 探查，可指定表名列表（空=全部）。 */
+    public List<IntrospectedTable> introspect(String id, List<String> tableNames) {
         DataSource ds = repository.find(id);
         if (ds == null) {
             throw new IllegalArgumentException("数据源不存在: " + id);
@@ -135,7 +154,8 @@ public class DataSourceService {
             ds.setConfig(credentials.decryptConfig(ds.getConfig()));
         }
         registerDriverIfNeeded(ds);
-        return mergeSavedMetadata(ds, toBusinessTypes(findExtractor(ds.getType()).introspect(ds)));
+        return mergeSavedMetadata(
+                ds, toBusinessTypes(findExtractor(ds.getType()).introspect(ds, tableNames)));
     }
 
     /**
@@ -145,9 +165,37 @@ public class DataSourceService {
      * 只有最终「保存」才落库，避免解析阶段产生半成品数据源。DB 类型先注册外部驱动。
      */
     public List<IntrospectedTable> introspect(DataSourceDTO dto) {
+        return introspect(dto, null);
+    }
+
+    /** 按 DTO 配置探查（不落库），可指定表名列表（空=全部）。 */
+    public List<IntrospectedTable> introspect(DataSourceDTO dto, List<String> tableNames) {
         DataSource ds = fromDto(dto);
         registerDriverIfNeeded(ds);
-        return toBusinessTypes(findExtractor(ds.getType()).introspect(ds));
+        return toBusinessTypes(findExtractor(ds.getType()).introspect(ds, tableNames));
+    }
+
+    /**
+     * 自定义 SQL 数据集探查：按已保存连接 id 执行 SQL，推断列定义（不落库）。
+     *
+     * <p>供数据源管理「新建 SQL 数据集」录入 SQL 后解析字段。列原生类型映射为业务类型，字段名按 SQL 列别名。
+     */
+    public List<ColumnMeta> introspectSql(String dataSourceId, String sql) {
+        DataSource ds = repository.find(dataSourceId);
+        if (ds == null) {
+            throw new IllegalArgumentException("数据源不存在: " + dataSourceId);
+        }
+        if (ds.getConfig() != null && credentials != null) {
+            ds.setConfig(credentials.decryptConfig(ds.getConfig()));
+        }
+        registerDriverIfNeeded(ds);
+        return findExtractor(ds.getType()).introspectSql(ds, sql).stream()
+                .map(
+                        c ->
+                                new ColumnMeta(
+                                        c.name(), mapDataType(c.dataType()).name(), c.primaryKey(),
+                                        c.remark()))
+                .toList();
     }
 
     /** 探查列的原生类型统一映射成报表业务 {@link DataType} 名（前端/数据集只认业务类型），并透传字段备注/表别名。 */
@@ -401,15 +449,17 @@ public class DataSourceService {
                                                         .primaryKey(f.primaryKey())
                                                         .build())
                                 .toList();
+        // 数据集标识名：优先 DTO 的 name；缺省回退 sourceTable（物理表场景，旧数据兼容）
+        String name = d.name() != null && !d.name().isBlank() ? d.name() : d.sourceTable();
         return TableDataset.builder()
-                .id(
-                        d.id() != null && !d.id().isBlank()
-                                ? d.id()
-                                : owner.getId() + "::" + d.sourceTable())
+                // id 兜底用 name（数据集标识名，单数据源内唯一且稳定），不用 owner.getId()：
+                // 数据源首次保存时自身 id 尚为 null，拼成 "null::名称" 会污染持久化数据。
+                .id(d.id() != null && !d.id().isBlank() ? d.id() : name)
+                .name(name)
                 .datasource(owner)
                 .datasourceId(owner.getId())
                 .sourceTable(d.sourceTable())
-                .alias(d.alias() != null ? d.alias() : d.sourceTable())
+                .alias(d.alias() != null ? d.alias() : name)
                 .fields(fields)
                 .build();
     }

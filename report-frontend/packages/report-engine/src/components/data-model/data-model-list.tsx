@@ -81,6 +81,8 @@ export default function DataModelListPage({
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [designId, setDesignId] = useState<string | null>(null);
+  // 只读查看模式（已发布模型「查看」入口）：禁用编辑、隐藏保存
+  const [designReadOnly, setDesignReadOnly] = useState(false);
   const [designerModel, setDesignerModel] = useState<DataModelDTO | null>(null);
   const [saving, setSaving] = useState(false);
   const designerRef = useRef<DataModelDesignerHandle>(null);
@@ -171,6 +173,7 @@ export default function DataModelListPage({
   /** 关闭设计抽屉并刷新列表（反映保存后的名称/时间/数据集变化） */
   const closeDesign = () => {
     setDesignId(null);
+    setDesignReadOnly(false);
     setDesignerModel(null);
     setSaving(false);
     refresh();
@@ -213,7 +216,25 @@ export default function DataModelListPage({
         width: 220,
         render: (_, r) => (
           <Space size="middle">
-            {r.status !== 'PUBLISHED' && <a onClick={() => setDesignId(r.id)}>修改</a>}
+            {r.status !== 'PUBLISHED' ? (
+              <a
+                onClick={() => {
+                  setDesignReadOnly(false);
+                  setDesignId(r.id);
+                }}
+              >
+                修改
+              </a>
+            ) : (
+              <a
+                onClick={() => {
+                  setDesignReadOnly(true);
+                  setDesignId(r.id);
+                }}
+              >
+                查看
+              </a>
+            )}
             {r.status !== 'PUBLISHED' ? (
               <Popconfirm
                 title="确认发布该数据模型？发布后可被报表选用。"
@@ -335,14 +356,16 @@ export default function DataModelListPage({
         }
         extra={
           <Space>
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              loading={saving}
-              onClick={handleDesignerSave}
-            >
-              保存
-            </Button>
+            {!designReadOnly && (
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                loading={saving}
+                onClick={handleDesignerSave}
+              >
+                保存
+              </Button>
+            )}
             <Button onClick={closeDesign}>关闭</Button>
           </Space>
         }
@@ -352,6 +375,7 @@ export default function DataModelListPage({
             ref={designerRef}
             dataModelId={designId}
             service={designerService}
+            readOnly={designReadOnly}
             onModelChange={(m) => setDesignerModel(m)}
           />
         )}

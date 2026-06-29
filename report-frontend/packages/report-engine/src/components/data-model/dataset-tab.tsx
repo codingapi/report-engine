@@ -11,54 +11,16 @@ import {
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import type {
-  DataModelDataset,
-  DataSourceBrief,
-  IntrospectedTable,
-} from '@coding-report/report-api';
-import type { DataType } from '@/types';
-import { genId } from '@/types';
+import type { DataModelDataset, DataSourceBrief } from '@coding-report/report-api';
 import { formatDatasetLabel } from '@/utils/dataset-label';
 import type { DataModelDesignerService } from './data-model-designer';
-
-const DATA_TYPES: DataType[] = [
-  'STRING',
-  'NUMBER',
-  'DATE',
-  'DATETIME',
-  'BOOLEAN',
-  'JSON',
-];
-
-function normalizeDataType(raw: string): DataType {
-  const upper = (raw ?? '').toUpperCase();
-  return (DATA_TYPES as string[]).includes(upper) ? (upper as DataType) : 'STRING';
-}
-
-/** 将数据源 + 探查表转成 DataModelDataset（kind=TABLE，前端生成 id） */
-function tableToDataset(
-  source: DataSourceBrief,
-  table: IntrospectedTable,
-): DataModelDataset {
-  return {
-    id: genId(),
-    alias: table.alias ?? table.name,
-    kind: 'TABLE',
-    datasourceId: source.id,
-    sourceTable: table.name,
-    fields: table.columns.map((c) => ({
-      name: c.name,
-      alias: c.remark || c.name,
-      dataType: normalizeDataType(c.dataType),
-      primaryKey: c.primaryKey,
-    })),
-  };
-}
 
 export interface DatasetTabProps {
   datasets: DataModelDataset[];
   onChange: (datasets: DataModelDataset[]) => void;
   service: DataModelDesignerService;
+  /** 只读模式：隐藏添加/移除操作 */
+  readOnly?: boolean;
 }
 
 /**
@@ -73,15 +35,17 @@ export default function DatasetTab({
   datasets,
   onChange,
   service,
+  readOnly = false,
 }: DatasetTabProps) {
   const { message } = AntdApp.useApp();
   const [sources, setSources] = useState<DataSourceBrief[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>();
-  const [tables, setTables] = useState<IntrospectedTable[]>([]);
-  const [tablesLoading, setTablesLoading] = useState(false);
-  const [pickedTableNames, setPickedTableNames] = useState<string[]>([]);
+  // 数据源已保存的数据集（物理表 + SQL 一视同仁）
+  const [available, setAvailable] = useState<DataModelDataset[]>([]);
+  const [availableLoading, setAvailableLoading] = useState(false);
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -113,23 +77,23 @@ export default function DatasetTab({
   const handleSourceChange = useCallback(
     (sourceId: string) => {
       setSelectedSourceId(sourceId);
-      setPickedTableNames([]);
-      setTables([]);
+      setPickedIds([]);
+      setAvailable([]);
       if (!sourceId) return;
       let active = true;
-      setTablesLoading(true);
+      setAvailableLoading(true);
       service
-        .introspectDatasets(sourceId)
+        .listDatasourceDatasets(sourceId)
         .then((list) => {
-          if (active) setTables(list);
+          if (active) setAvailable(list);
         })
         .catch((err: unknown) => {
           if (active) {
-            message.error(`解析数据集失败：${err instanceof Error ? err.message : String(err)}`);
+            message.error(`加载数据集失败：${err instanceof Error ? err.message : String(err)}`);
           }
         })
         .finally(() => {
-          if (active) setTablesLoading(false);
+          if (active) setAvailableLoading(false);
         });
       return () => {
         active = false;
@@ -141,23 +105,31 @@ export default function DatasetTab({
   const closeModal = () => {
     setModalOpen(false);
     setSelectedSourceId(undefined);
-    setTables([]);
-    setPickedTableNames([]);
+    setAvailable([]);
+    setPickedIds([]);
   };
 
   const handleConfirm = () => {
-    const source = selectedSourceId ? sourceMap.get(selectedSourceId) : undefined;
-    if (!source) {
+    if (!selectedSourceId) {
       message.warning('请先选择数据源');
       return;
     }
-    if (pickedTableNames.length === 0) {
+    if (pickedIds.length === 0) {
       message.warning('请至少选择一个数据集');
       return;
     }
-    const picked = tables.filter((t) => pickedTableNames.includes(t.name));
-    const newDatasets = picked.map((t) => tableToDataset(source, t));
-    onChange([...datasets, ...newDatasets]);
+    // 已添加的数据集（按 id）不重复添加
+    const existingIds = new Set(datasets.map((d) => d.id));
+    const picked = available.filter((d) => pickedIds.includes(d.id) && !existingIds.has(d.id));
+    if (picked.length === 0) {
+      message.warning('所选数据集均已添加');
+      return;
+    }
+    const skipped = pickedIds.length - picked.length;
+    onChange([...datasets, ...picked]);
+    if (skipped > 0) {
+      message.info(`已跳过 ${skipped} 个已添加的数据集`);
+    }
     closeModal();
   };
 
@@ -170,7 +142,7 @@ export default function DatasetTab({
       {
         title: '数据集名',
         key: 'alias',
-        render: (_v, r) => formatDatasetLabel(r.alias, r.sourceTable),
+        render: (_v, r) => formatDatasetLabel(r.alias, r.name),
       },
       {
         title: '数据源',
@@ -182,36 +154,41 @@ export default function DatasetTab({
           return `${ds.name} (${ds.type})`;
         },
       },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 80,
-        render: (_v, r) => (
-          <Popconfirm
-            title="确认移除该数据集？"
-            onConfirm={() => handleRemove(r.id)}
-            okText="移除"
-            cancelText="取消"
-          >
-            <a style={{ color: '#ff4d4f' }}>移除</a>
-          </Popconfirm>
-        ),
-      },
+      ...(readOnly
+        ? []
+        : [
+            {
+              title: '操作',
+              key: 'actions',
+              width: 80,
+              render: (_v: unknown, r: DataModelDataset) => (
+                <Popconfirm
+                  title="确认移除该数据集？"
+                  onConfirm={() => handleRemove(r.id)}
+                  okText="移除"
+                  cancelText="取消"
+                >
+                  <a style={{ color: '#ff4d4f' }}>移除</a>
+                </Popconfirm>
+              ),
+            },
+          ]),
     ],
-    [datasets, sourceMap],
+    [datasets, sourceMap, readOnly],
   );
 
   const sourceOptions = useMemo(
     () => sources.map((s) => ({ label: `${s.name} (${s.type})`, value: s.id })),
     [sources],
   );
-  const tableOptions = useMemo(
-    () => tables.map((t) => ({ label: formatDatasetLabel(t.alias, t.name), value: t.name })),
-    [tables],
+  const datasetOptions = useMemo(
+    () => available.map((d) => ({ label: formatDatasetLabel(d.alias, d.name), value: d.id })),
+    [available],
   );
 
   return (
     <div>
+      {!readOnly && (
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
         <Space>
           <Button
@@ -223,6 +200,7 @@ export default function DatasetTab({
           </Button>
         </Space>
       </div>
+      )}
       <Table<DataModelDataset>
         rowKey="id"
         size="small"
@@ -267,12 +245,12 @@ export default function DatasetTab({
             <Select
               mode="multiple"
               style={{ width: '100%' }}
-              loading={tablesLoading}
+              loading={availableLoading}
               placeholder={selectedSourceId ? '请选择数据集' : '请先选择数据源'}
               disabled={!selectedSourceId}
-              value={pickedTableNames}
-              onChange={setPickedTableNames}
-              options={tableOptions}
+              value={pickedIds}
+              onChange={setPickedIds}
+              options={datasetOptions}
             />
           </div>
         </div>

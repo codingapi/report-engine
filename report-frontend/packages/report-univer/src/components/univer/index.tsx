@@ -32,6 +32,15 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>((prop
   const onSelectionClearRef = useRef(props.onSelectionClear);
   onSelectionClearRef.current = props.onSelectionClear;
 
+  const onRowsColsChangedRef = useRef(props.onRowsColsChanged);
+  onRowsColsChangedRef.current = props.onRowsColsChanged;
+
+  const onUndoRedoStateChangeRef = useRef(props.onUndoRedoStateChange);
+  onUndoRedoStateChangeRef.current = props.onUndoRedoStateChange;
+
+  // 当前撤销/重做阶段：mutation 监听器据此标记结构变更来源
+  const undoRedoPhaseRef = useRef<'normal' | 'undo' | 'redo'>('normal');
+
   // 用 ref 保存最新的属性存储（供 cell-selection 回调查找）
   const cellPropsRef = useRef(props.cellProps);
   cellPropsRef.current = props.cellProps;
@@ -207,6 +216,63 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>((prop
       if (cellKeys.length > 0) cb(cellKeys);
     });
 
+    // 监听行/列删除/插入 mutation，通知父组件同步按坐标记录的属性。
+    // 用 mutation（非 command）：params 直接带 range，且 undo/redo 重放也会触发，保持属性与表格一致。
+    const ROWCOL_MUTATIONS: Record<string, { dimension: 'row' | 'col'; action: 'remove' | 'insert' }> = {
+      'sheet.mutation.remove-rows': { dimension: 'row', action: 'remove' },
+      'sheet.mutation.remove-col': { dimension: 'col', action: 'remove' },
+      'sheet.mutation.insert-row': { dimension: 'row', action: 'insert' },
+      'sheet.mutation.insert-col': { dimension: 'col', action: 'insert' },
+    };
+    const rowColDisposable = univerAPI.addEvent(
+      univerAPI.Event.CommandExecuted,
+      (event: {
+        id: string;
+        params?: {
+          subUnitId?: string;
+          range?: { startRow: number; endRow: number; startColumn: number; endColumn: number };
+        };
+      }) => {
+        const meta = ROWCOL_MUTATIONS[event.id];
+        if (!meta) return;
+        const cb = onRowsColsChangedRef.current;
+        if (!cb) return;
+        const range = event.params?.range;
+        if (!range) return;
+        const start = meta.dimension === 'row' ? range.startRow : range.startColumn;
+        const end = meta.dimension === 'row' ? range.endRow : range.endColumn;
+        const count = end - start + 1;
+        if (count <= 0) return;
+        cb({
+          sheetId: event.params?.subUnitId || '',
+          dimension: meta.dimension,
+          action: meta.action,
+          start,
+          count,
+          phase: undoRedoPhaseRef.current,
+        });
+      },
+    );
+
+    // 跟踪撤销/重做阶段：Before* 置位 → 重放 mutation 携带该 phase → After* 复位。
+    // 用微任务复位（queueMicrotask），确保同步重放的 mutation 监听器先读到 phase。
+    const setPhase = (phase: 'normal' | 'undo' | 'redo') => {
+      undoRedoPhaseRef.current = phase;
+      onUndoRedoStateChangeRef.current?.(phase);
+    };
+    const beforeUndoDisposable = univerAPI.addEvent(univerAPI.Event.BeforeUndo, () => {
+      setPhase('undo');
+    });
+    const afterUndoDisposable = univerAPI.addEvent(univerAPI.Event.Undo, () => {
+      queueMicrotask(() => setPhase('normal'));
+    });
+    const beforeRedoDisposable = univerAPI.addEvent(univerAPI.Event.BeforeRedo, () => {
+      setPhase('redo');
+    });
+    const afterRedoDisposable = univerAPI.addEvent(univerAPI.Event.Redo, () => {
+      queueMicrotask(() => setPhase('normal'));
+    });
+
     // 延迟通知父组件，确保 useImperativeHandle 已执行、ref 可用
     setTimeout(() => props.onReady?.(), 0);
 
@@ -214,6 +280,11 @@ export const UniverSheet = forwardRef<UniverSheetHandle, UniverSheetProps>((prop
       cleanupDragDrop();
       cellChangeDisposable?.dispose();
       clearDisposable?.dispose?.();
+      rowColDisposable?.dispose();
+      beforeUndoDisposable?.dispose();
+      afterUndoDisposable?.dispose();
+      beforeRedoDisposable?.dispose();
+      afterRedoDisposable?.dispose();
       highlightManagerRef.current?.dispose();
       highlightManagerRef.current = null;
       dispose();

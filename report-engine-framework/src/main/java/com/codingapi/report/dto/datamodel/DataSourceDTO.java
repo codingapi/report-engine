@@ -15,11 +15,23 @@ public record DataSourceDTO(
         String type,
         String typeConfigId,
         Map<String, Object> config,
-        List<DatasetDTO> datasets) {
+        List<DatasetDTO> datasets,
+        List<String> tableNames) {
 
     /** 兼容旧调用：不带 datasets 的 5 参构造（DataModel 链路 / 既有测试）。 */
     public DataSourceDTO(
             String id, String name, String type, String typeConfigId, Map<String, Object> config) {
-        this(id, name, type, typeConfigId, config, null);
+        this(id, name, type, typeConfigId, config, null, null);
+    }
+
+    /** 兼容旧调用：不带 tableNames 的 6 参构造。 */
+    public DataSourceDTO(
+            String id,
+            String name,
+            String type,
+            String typeConfigId,
+            Map<String, Object> config,
+            List<DatasetDTO> datasets) {
+        this(id, name, type, typeConfigId, config, datasets, null);
     }
 }

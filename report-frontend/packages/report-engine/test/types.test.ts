@@ -1,4 +1,11 @@
-import { findDataset, findField, dataTypeLabel, DATA_TYPE_LABELS, genId } from '@/types';
+import {
+  findDataset,
+  findField,
+  dataTypeLabel,
+  DATA_TYPE_LABELS,
+  genId,
+  operatorsForDataType,
+} from '@/types';
 import type { Dataset } from '@/types';
 
 const datasets: Dataset[] = [
@@ -54,5 +61,30 @@ describe('genId', () => {
     const a = genId();
     const b = genId();
     expect(a).not.toBe(b);
+  });
+});
+
+describe('operatorsForDataType — 按字段类型过滤算子', () => {
+  test('STRING：等值/包含/IN/空判定，不含大小比较与 BETWEEN', () => {
+    const ops = operatorsForDataType('STRING');
+    expect(ops).toContain('CONTAINS');
+    expect(ops).toContain('EQ');
+    expect(ops).not.toContain('GT');
+    expect(ops).not.toContain('BETWEEN');
+  });
+  test('NUMBER/DATE：含大小比较与 BETWEEN，不含 CONTAINS', () => {
+    for (const t of ['NUMBER', 'DATE', 'DATETIME'] as const) {
+      const ops = operatorsForDataType(t);
+      expect(ops).toContain('GT');
+      expect(ops).toContain('BETWEEN');
+      expect(ops).not.toContain('CONTAINS');
+    }
+  });
+  test('BOOLEAN：仅等值与空判定', () => {
+    const ops = operatorsForDataType('BOOLEAN');
+    expect(ops.sort()).toEqual(['EQ', 'IS_NOT_NULL', 'IS_NULL', 'NE'].sort());
+  });
+  test('类型未知：放开全部算子（不误伤）', () => {
+    expect(operatorsForDataType(undefined).length).toBe(13);
   });
 });

@@ -22,6 +22,7 @@ import {
   fromDatasetDto,
   fromIntrospected,
   mergeTables,
+  splitTableNames,
   tablesToDatasetDtos,
 } from './datasource-service';
 import type { DataSourceService, WizardTable } from './datasource-service';
@@ -76,6 +77,8 @@ export default function DataSourceWizard({
   const [uploading, setUploading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [introspecting, setIntrospecting] = useState(false);
+  // 指定解析的表名（逗号/空格分隔，空=全部）
+  const [parseTableNames, setParseTableNames] = useState('');
 
   const loadDrivers = useCallback(async () => {
     if (!service.listDriverTypes) return;
@@ -192,7 +195,9 @@ export default function DataSourceWizard({
     setIntrospecting(true);
     try {
       // 解析不落库（避免半成品数据源），直接按当前配置探查；只有「保存」才落库
-      const fresh = await service.introspectByConfig(buildDTO());
+      // 指定表名时只解析这些表（空=全部）
+      const names = splitTableNames(parseTableNames);
+      const fresh = await service.introspectByConfig(buildDTO(), names);
       setWizard((s) => ({
         ...s,
         tables: mergeTables(s.tables, fresh.map(fromIntrospected)),
@@ -352,12 +357,29 @@ export default function DataSourceWizard({
       onChange={(tables) => setWizard((s) => ({ ...s, tables }))}
       toolbar={
         wizard.kind === 'DB' ? (
-          <Space>
-            <Button type="primary" loading={introspecting} onClick={handleParse} disabled={!canConfig}>
-              {wizard.tables.length ? '重新解析' : '解析元数据'}
-            </Button>
-            {wizard.tables.length > 0 && <Text type="secondary">共 {wizard.tables.length} 张表</Text>}
-          </Space>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Text type="secondary">指定表名（多个用逗号或换行分隔，留空解析全部）</Text>
+            <Input.TextArea
+              autoSize={{ minRows: 2, maxRows: 6 }}
+              placeholder={'如：\nt_student\nt_student_class'}
+              value={parseTableNames}
+              onChange={(e) => setParseTableNames(e.target.value)}
+              allowClear
+            />
+            <Space>
+              <Button
+                type="primary"
+                loading={introspecting}
+                onClick={handleParse}
+                disabled={!canConfig}
+              >
+                {wizard.tables.length ? '重新解析表结构' : '解析表结构'}
+              </Button>
+              {wizard.tables.length > 0 && (
+                <Text type="secondary">共 {wizard.tables.length} 张表</Text>
+              )}
+            </Space>
+          </div>
         ) : (
           <Text type="secondary">
             上传文件后已自动解析，可在下方维护表/字段别名或删除不需要的表

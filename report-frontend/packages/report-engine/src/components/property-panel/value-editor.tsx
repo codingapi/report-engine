@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { Select, Input, Button, Empty, Typography, Form, Space } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import type { ReportValue, ValueType, Aggregation, Dataset, LoopBlock } from '@/types';
+import type { ReportValue, ValueType, Aggregation, Dataset, LoopBlock, ParamDTO } from '@/types';
 import { VALUE_TYPE_LABELS, AGG_LABELS, findDataset } from '@/types';
 import { templateToString, parseTemplate } from '@/value-text';
 import { datasetOptions, fieldOptions } from '@/utils/dataset-options';
@@ -11,6 +11,8 @@ interface ValueEditorProps {
   datasets: Dataset[];
   /** 当前 sheet 的循环块（用于循环字段级联：选循环块 → 选其数据集字段） */
   loopBlocks?: LoopBlock[];
+  /** 报表参数（用于 ParamValue 下拉选择） */
+  params?: ParamDTO[];
   onChange: (newValue: ReportValue) => void;
   compact?: boolean;
   /** 裸模式：不渲染内层 Form.Item / label，用于已在外层 Form.Item 包裹的场景（如条件弹窗） */
@@ -61,6 +63,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
   value,
   datasets,
   loopBlocks = [],
+  params = [],
   onChange,
   compact = false,
   bare = false,
@@ -149,11 +152,16 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
 
       case 'ParamValue': {
         const input = (
-          <Input
+          <Select
             size={size}
-            value={value.payload || ''}
-            onChange={(e) => update({ payload: e.target.value })}
-            placeholder="报表参数名称"
+            value={value.payload || undefined}
+            onChange={(name) => update({ payload: name })}
+            placeholder={params.length ? '选择报表参数' : '暂无参数（请在左侧「报表参数」添加）'}
+            options={params.map((p) => ({ value: p.name, label: p.alias || p.name }))}
+            showSearch
+            optionFilterProp="label"
+            style={{ width: '100%' }}
+            notFoundContent="暂无参数"
           />
         );
         if (compact || bare) return input;
@@ -293,6 +301,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                 value={operand}
                 datasets={datasets}
                 loopBlocks={loopBlocks}
+                params={params}
                 onChange={(newOperand) => update({ operand: newOperand })}
                 compact
               />
@@ -316,6 +325,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
               value={value.operand || { type: 'FieldValue', payload: '' }}
               datasets={datasets}
               loopBlocks={loopBlocks}
+              params={params}
               onChange={(operand) => update({ operand })}
               compact
             />
@@ -363,6 +373,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                       value={arg}
                       datasets={datasets}
                       loopBlocks={loopBlocks}
+                      params={params}
                       onChange={(newArg) => {
                         const newArgs = [...args];
                         newArgs[i] = newArg;
@@ -429,6 +440,7 @@ const ValueEditor: React.FC<ValueEditorProps> = ({
                       value={arg}
                       datasets={datasets}
                       loopBlocks={loopBlocks}
+                      params={params}
                       onChange={(newArg) => {
                         const newArgs = [...args];
                         newArgs[i] = newArg;

@@ -4,6 +4,7 @@ import type {
   DataModelDataset,
   DataModelSource,
   RelationshipInfo,
+  TransformItemInfo,
 } from './datamodel';
 import type { DataModelBrief } from './report';
 
@@ -57,9 +58,12 @@ export interface DatasetFieldDTO {
 /** 数据源下的数据集契约（对齐后端 DatasetDTO 的 TABLE 形态） */
 export interface DatasetDTO {
   id?: string;
+  /** 数据集标识名（物理表=表名，SQL 数据集=用户自定义） */
+  name?: string;
   alias: string;
   kind: 'TABLE';
   datasourceId?: string;
+  /** 取数来源：物理表名 或 一段 SELECT SQL */
   sourceTable: string;
   fields: DatasetFieldDTO[];
   members?: null;
@@ -126,6 +130,7 @@ export interface DataModelSaveDTO {
   datasources?: DataModelSource[];
   datasets?: DataModelDataset[];
   relationships?: RelationshipInfo[];
+  transforms?: TransformItemInfo[];
 }
 
 // ============================================================
@@ -232,15 +237,31 @@ export async function deleteDataSource(id: string): Promise<void> {
   await http.post(`/datasources/${id}/delete`);
 }
 
-/** 元数据解析：返回所有表/sheet + 列定义 */
-export async function introspectDatasets(id: string): Promise<IntrospectedTable[]> {
-  const res = await http.post(`/datasources/${id}/introspect`);
+/** 元数据解析：返回表/sheet + 列定义。tableNames 指定只解析哪些表（空=全部） */
+export async function introspectDatasets(
+  id: string,
+  tableNames?: string[],
+): Promise<IntrospectedTable[]> {
+  const res = await http.post(
+    `/datasources/${id}/introspect`,
+    tableNames && tableNames.length > 0 ? { tableNames } : {},
+  );
   return res.data.list;
 }
 
-/** 元数据解析：按配置直接解析（不落库），供数据源向导「解析」用 */
-export async function introspectByConfig(dto: DataSourceDTO): Promise<IntrospectedTable[]> {
-  const res = await http.post('/datasources/introspect', dto);
+/** 自定义 SQL 数据集探查：按连接 id 执行 SQL 推断列定义（不落库） */
+export async function introspectSql(id: string, sql: string): Promise<ColumnMeta[]> {
+  const res = await http.post(`/datasources/${id}/introspect-sql`, { sql });
+  return res.data.list;
+}
+
+/** 元数据解析：按配置直接解析（不落库），供数据源向导「解析」用。tableNames 指定只解析哪些表（空=全部） */
+export async function introspectByConfig(
+  dto: DataSourceDTO,
+  tableNames?: string[],
+): Promise<IntrospectedTable[]> {
+  const body = tableNames && tableNames.length > 0 ? { ...dto, tableNames } : dto;
+  const res = await http.post('/datasources/introspect', body);
   return res.data.list;
 }
 

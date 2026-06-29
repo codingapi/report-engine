@@ -1,16 +1,18 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
-import { App as AntdApp, Spin, Tabs } from 'antd';
+import { Alert, App as AntdApp, ConfigProvider, Spin, Tabs } from 'antd';
 import type {
   DataModelDataset,
   DataModelSource,
   DataSourceBrief,
   IntrospectedTable,
   RelationshipInfo,
+  TransformItemInfo,
 } from '@coding-report/report-api';
 import type { Relationship } from '@/types';
 import DatasetTab from './dataset-tab';
 import UnionEditor from './union-editor';
 import RelationTab from './relation-tab';
+import TransformTab from './transform-tab';
 
 /**
  * 数据模型设计页使用的完整 DTO。
@@ -30,6 +32,7 @@ export interface DataModelDTO {
   datasets: DataModelDataset[];
   relationships: RelationshipInfo[];
   datasources?: DataModelSource[];
+  transforms?: TransformItemInfo[];
 }
 
 /**
@@ -43,8 +46,10 @@ export interface DataModelDesignerService {
   saveDataModel: (dto: DataModelDTO) => Promise<void>;
   /** 数据源列表（添加数据集二级联动第一级） */
   listDataSources: () => Promise<DataSourceBrief[]>;
-  /** 探查数据源下所有表/列（添加数据集二级联动第二级） */
+  /** 探查数据源下所有表/列（添加数据集二级联动第二级；保留兼容，当前不用） */
   introspectDatasets: (sourceId: string) => Promise<IntrospectedTable[]>;
+  /** 列出数据源已保存的数据集（物理表 + SQL 一视同仁，添加数据集二级联动第二级） */
+  listDatasourceDatasets: (sourceId: string) => Promise<DataModelDataset[]>;
 }
 
 /** 命令式句柄：容器（如全屏抽屉 header 的保存按钮）通过它触发保存 */
@@ -58,6 +63,8 @@ export interface DataModelDesignerProps {
   service: DataModelDesignerService;
   /** 模型加载/变更时通知容器（容器据此渲染 header 的标题信息） */
   onModelChange?: (model: DataModelDTO | null) => void;
+  /** 只读模式（已发布模型查看）：禁用所有编辑操作，仅供查看 */
+  readOnly?: boolean;
 }
 
 /** RelationshipInfo（无 id）→ Relationship（带 id，编辑期稳定 rowKey 用），保存时再剥离 */
@@ -78,7 +85,7 @@ function stripIds(list: Relationship[]): RelationshipInfo[] {
  * 自行渲染到 header，避免出现两层标题栏。本组件只负责主体内容。
  */
 const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerProps>(
-  ({ dataModelId, service, onModelChange }, ref) => {
+  ({ dataModelId, service, onModelChange, readOnly = false }, ref) => {
     const { message } = AntdApp.useApp();
     const [loading, setLoading] = useState(false);
     const [model, setModel] = useState<DataModelDTO | null>(null);
@@ -125,6 +132,10 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
       [],
     );
 
+    const handleTransformsChange = useCallback((transforms: TransformItemInfo[]) => {
+      setModel((prev) => (prev ? { ...prev, transforms } : prev));
+    }, []);
+
     const handleSave = useCallback(async () => {
       if (!model) return;
       try {
@@ -146,8 +157,18 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
     }
 
     return (
-      <div style={{ padding: 16 }}>
-        <Tabs
+      <ConfigProvider componentDisabled={readOnly}>
+        <div style={{ padding: 16 }}>
+          {readOnly && (
+            <Alert
+              type="info"
+              showIcon
+              banner
+              message="该数据模型已发布，当前为只读查看模式。如需修改请先「转草稿」。"
+              style={{ marginBottom: 12 }}
+            />
+          )}
+          <Tabs
           items={[
             {
               key: 'datasets',
@@ -157,6 +178,7 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
                   datasets={model.datasets}
                   onChange={handleDatasetsChange}
                   service={service}
+                  readOnly={readOnly}
                 />
               ),
             },
@@ -164,7 +186,11 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
               key: 'unions',
               label: '数据合集',
               children: (
-                <UnionEditor datasets={model.datasets} onChange={handleDatasetsChange} />
+                <UnionEditor
+                  datasets={model.datasets}
+                  onChange={handleDatasetsChange}
+                  readOnly={readOnly}
+                />
               ),
             },
             {
@@ -175,12 +201,25 @@ const DataModelDesigner = forwardRef<DataModelDesignerHandle, DataModelDesignerP
                   datasets={model.datasets}
                   relationships={editingRelationships}
                   onChange={handleRelationshipsChange}
+                  readOnly={readOnly}
+                />
+              ),
+            },
+            {
+              key: 'transforms',
+              label: '转换项',
+              children: (
+                <TransformTab
+                  transforms={model.transforms ?? []}
+                  onChange={handleTransformsChange}
+                  readOnly={readOnly}
                 />
               ),
             },
           ]}
-        />
-      </div>
+          />
+        </div>
+      </ConfigProvider>
     );
   },
 );

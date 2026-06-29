@@ -8,6 +8,7 @@ import type {
   Relationship,
   ReportDTO,
   ReportEngineHandle,
+  TransformItem,
 } from '@coding-report/report-engine';
 import { ReportEngine } from '@coding-report/report-engine';
 import {
@@ -36,6 +37,7 @@ const AppReport = () => {
 
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [transforms, setTransforms] = useState<TransformItem[]>([]);
   const [dataModelId, setDataModelId] = useState<string>('default');
   const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,18 @@ const AppReport = () => {
               left: r.left,
               right: r.right,
               joinType: r.joinType,
+            })),
+          );
+          setTransforms(
+            (dm.transforms ?? []).map((t) => ({
+              id: t.id,
+              name: t.name,
+              alias: t.alias,
+              entries: (t.entries ?? []).map((e) => ({
+                code: e.code,
+                label: e.label,
+                parent: e.parent,
+              })),
             })),
           );
         }
@@ -124,6 +138,7 @@ const AppReport = () => {
     <ReportEngine
       datasets={datasets}
       relationships={relationships}
+      transforms={transforms}
       dataModelId={dataModelId}
       functions={functions}
       engineRef={engineRef}

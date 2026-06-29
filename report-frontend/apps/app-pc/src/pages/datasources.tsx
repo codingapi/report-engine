@@ -7,6 +7,7 @@ import {
   deleteDataSource,
   introspectDatasets,
   introspectByConfig,
+  introspectSql,
   uploadDataFile,
   testConnection,
 } from '@coding-report/report-api';
@@ -17,8 +18,9 @@ const service: DataSourceService = {
   get: (id) => getDataSource(id),
   save: (dto) => saveDataSource(dto),
   remove: (id) => deleteDataSource(id),
-  introspect: (id) => introspectDatasets(id),
-  introspectByConfig: (dto) => introspectByConfig(dto),
+  introspect: (id, tableNames) => introspectDatasets(id, tableNames),
+  introspectByConfig: (dto, tableNames) => introspectByConfig(dto, tableNames),
+  introspectSql: (id, sql) => introspectSql(id, sql),
   uploadDataFile: (file, type) => uploadDataFile(file, type),
   testConnection: (dto) => testConnection(dto),
   listDriverTypes: async () => {

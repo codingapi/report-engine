@@ -92,6 +92,34 @@ export const OPERATOR_LABELS: Record<CompareOperator, string> = {
   BETWEEN: '介于',
 };
 
+/**
+ * 按数据类型可用的比较算子（对齐后端 CompareOperator 的类型可用性表）。
+ * - 大小比较 GT/GE/LT/LE/BETWEEN 仅数值/日期（STRING 无自然排序，BOOLEAN 无区间）
+ * - CONTAINS/NOT_CONTAINS 仅 STRING（子串匹配）
+ * - IN/NOT_IN 排除 BOOLEAN
+ * - EQ/NE/IS_NULL/IS_NOT_NULL 全类型可用
+ * JSON 无明确规则，按 STRING 处理（仅等值/包含/空判定）。
+ */
+const ORDERABLE_OPS: CompareOperator[] = ['GT', 'GE', 'LT', 'LE', 'BETWEEN'];
+const COMMON_OPS: CompareOperator[] = ['EQ', 'NE', 'IS_NULL', 'IS_NOT_NULL'];
+
+export function operatorsForDataType(dataType?: DataType): CompareOperator[] {
+  switch (dataType) {
+    case 'NUMBER':
+    case 'DATE':
+    case 'DATETIME':
+      return ['EQ', 'NE', ...ORDERABLE_OPS, 'IN', 'NOT_IN', 'IS_NULL', 'IS_NOT_NULL'];
+    case 'BOOLEAN':
+      return [...COMMON_OPS];
+    case 'STRING':
+    case 'JSON':
+      return ['EQ', 'NE', 'CONTAINS', 'NOT_CONTAINS', 'IN', 'NOT_IN', 'IS_NULL', 'IS_NOT_NULL'];
+    default:
+      // 类型未知（如左值非字段引用）：放开全部，不误伤
+      return Object.keys(OPERATOR_LABELS) as CompareOperator[];
+  }
+}
+
 export const VALUE_TYPE_LABELS: Record<ValueType, string> = {
   Literal: '文本',
   FieldValue: '字段',
@@ -322,6 +350,25 @@ export interface RelationEditorProps {
   disabled?: boolean;
 }
 
+// ─── 转换项域 ──────────────────────────────────
+
+/** 转换项条目（编码 → 呈现，可带父级构成树形） */
+export interface TransformEntry {
+  code: string;
+  label: string;
+  parent?: string;
+}
+
+/** 数据转换项（数据模型下配置，报表中由 map(字段, 转换项id) 引用） */
+export interface TransformItem {
+  id: string;
+  /** 标识名（引用名） */
+  name: string;
+  /** 别名（中文名，展示用） */
+  alias?: string;
+  entries: TransformEntry[];
+}
+
 // ─── 参数域 ────────────────────────────────────
 
 /** 报表参数（报表级，设计时定义，可在表达式中以 ${name} 引用） */
@@ -518,6 +565,8 @@ export interface ReportEngineProps {
   datasets: Dataset[];
   /** 数据关系列表（由父组件从 API 获取后传入，只读展示） */
   relationships?: Relationship[];
+  /** 转换项列表（数据模型下配置，字段绑定时可选「转换」） */
+  transforms?: TransformItem[];
   /** 数据模型 ID（保存时写入配置） */
   dataModelId?: string;
   /** 可用公式目录（聚合 + 函数，由父组件从 API 获取后传入；缺省时构建器用内置聚合） */

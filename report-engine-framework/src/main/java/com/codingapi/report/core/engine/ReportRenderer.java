@@ -1,6 +1,8 @@
 package com.codingapi.report.core.engine;
 
 import com.codingapi.report.data.datamodel.DataModel;
+import com.codingapi.report.data.datamodel.TransformItem;
+import com.codingapi.report.expression.function.TransformRegistry;
 import com.codingapi.report.data.dataset.Dataset;
 import com.codingapi.report.data.dataset.Field;
 import com.codingapi.report.data.dataset.FieldRef;
@@ -164,16 +166,38 @@ public class ReportRenderer {
         this.cache.clear();
         this.drillCollector = drillCollector;
 
-        Canvas canvas = new Canvas();
-        seedTemplate(canvas, template);
+        // 装入本次渲染的转换项映射，供 map() 函数查；渲染结束清理（防 ThreadLocal 泄漏）
+        TransformRegistry.set(buildTransformMappings(dm));
+        try {
+            Canvas canvas = new Canvas();
+            seedTemplate(canvas, template);
 
-        renderFree(report, ctx, canvas);
-        if (report.getLoopBlocks() != null) {
-            for (LoopBlock loop : report.getLoopBlocks()) {
-                renderLoop(report, loop, ctx, canvas);
+            renderFree(report, ctx, canvas);
+            if (report.getLoopBlocks() != null) {
+                for (LoopBlock loop : report.getLoopBlocks()) {
+                    renderLoop(report, loop, ctx, canvas);
+                }
             }
+            return buildWorkbook(canvas);
+        } finally {
+            TransformRegistry.clear();
         }
-        return buildWorkbook(canvas);
+    }
+
+    /** 把 DataModel 的转换项摊成 {@code 转换项id → (编码 → 呈现)}，供 map() 函数查。 */
+    private static Map<String, Map<String, String>> buildTransformMappings(DataModel dm) {
+        Map<String, Map<String, String>> out = new HashMap<>();
+        if (dm == null || dm.getTransforms() == null) return out;
+        for (TransformItem t : dm.getTransforms()) {
+            Map<String, String> mapping = new HashMap<>();
+            if (t.entries() != null) {
+                for (TransformItem.TransformEntry e : t.entries()) {
+                    if (e.code() != null) mapping.put(e.code(), e.label());
+                }
+            }
+            out.put(t.id(), mapping);
+        }
+        return out;
     }
 
     // ============================================================

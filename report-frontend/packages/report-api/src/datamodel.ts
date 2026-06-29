@@ -48,6 +48,26 @@ export interface DataModelDataset {
   fields: DataModelField[];
 }
 
+/** 转换项条目（对齐后端 TransformItemDTO.EntryDTO：code/label/parent） */
+export interface TransformEntryInfo {
+  /** 原始编码（字段实际存储值） */
+  code: string;
+  /** 呈现文本（映射后展示） */
+  label: string;
+  /** 父级编码（树形用，顶层为空） */
+  parent?: string;
+}
+
+/** 数据转换项（对齐后端 TransformItemDTO）：编码 → 呈现映射，报表中由 map(字段, 转换项id) 引用 */
+export interface TransformItemInfo {
+  id: string;
+  /** 标识名（引用名） */
+  name: string;
+  /** 别名（中文名，展示用） */
+  alias?: string;
+  entries: TransformEntryInfo[];
+}
+
 export interface FieldRefInfo {
   datasetId: string;
   field: string;
@@ -74,4 +94,6 @@ export interface DataModelInfo {
   relationships: RelationshipInfo[];
   /** 数据源连接列表（仅 GET /api/datamodels/{id} 完整返回；精简视图不含） */
   datasources?: DataModelSource[];
+  /** 用户自定义转换项（在数据模型下配置，报表用 map() 引用） */
+  transforms?: TransformItemInfo[];
 }

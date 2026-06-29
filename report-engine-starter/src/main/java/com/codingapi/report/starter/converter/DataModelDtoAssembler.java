@@ -92,9 +92,32 @@ public final class DataModelDtoAssembler {
                                         })
                                 .toList();
 
+        List<Map<String, Object>> transforms = new java.util.ArrayList<>();
+        if (dataModel.getTransforms() != null) {
+            for (var t : dataModel.getTransforms()) {
+                List<Map<String, Object>> entries = new java.util.ArrayList<>();
+                if (t.entries() != null) {
+                    for (var e : t.entries()) {
+                        Map<String, Object> em = new LinkedHashMap<>();
+                        em.put("code", e.code());
+                        em.put("label", e.label());
+                        em.put("parent", e.parent());
+                        entries.add(em);
+                    }
+                }
+                Map<String, Object> tm = new LinkedHashMap<>();
+                tm.put("id", t.id());
+                tm.put("name", t.name());
+                tm.put("alias", t.alias());
+                tm.put("entries", entries);
+                transforms.add(tm);
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("datasets", datasets);
         result.put("relationships", relationships);
+        result.put("transforms", transforms);
         return result;
     }
 }

@@ -5,6 +5,8 @@ export type {
   UniverSheetHandle,
   FontConfig,
   FontItem,
+  RowsColsChange,
+  UndoRedoPhase,
 } from '@/components/univer/type';
 export { DefaultLoopBlockPanel } from '@/components/loop-block-panel';
 

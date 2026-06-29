@@ -18,6 +18,8 @@ import type {
   LoopBlockConfig,
   CellRange,
   MenuGroupDef,
+  RowsColsChange,
+  UndoRedoPhase,
 } from '@coding-report/report-univer';
 import DataModelPanel from './components/data-model';
 import SheetPanel from './components/sheet-panel';
@@ -43,6 +45,106 @@ import { useReportIO } from './hooks/use-report-io';
 import ReportPreview from './components/preview/preview';
 import type { ReportPreviewHandle } from './components/preview/preview';
 import { valueDisplayText, parseTemplate } from './value-text';
+
+/** config 三态快照（行列删/插的撤销重做用，与 Univer undo 栈对齐） */
+interface ConfigSnapshot {
+  cellBindings: CellBinding[];
+  loopBlocks: LoopBlock[];
+  summaries: SummaryRow[];
+}
+
+/**
+ * 按行/列删除或插入，对 config 三态做坐标位移（纯函数，不改原对象）。
+ * 删除范围内的记录被丢弃；范围后反向位移 count；插入点后正向位移 count。
+ */
+function shiftConfig(
+  snapshot: ConfigSnapshot,
+  change: { dimension: 'row' | 'col'; action: 'remove' | 'insert'; start: number; count: number },
+): ConfigSnapshot {
+  const { dimension, action, start, count } = change;
+  const end = start + count - 1;
+
+  // 单个索引位移：返回新值；删除范围内返回 null（该记录应丢弃）
+  const shiftIndex = (idx: number): number | null => {
+    if (action === 'insert') return idx >= start ? idx + count : idx;
+    if (idx < start) return idx;
+    if (idx > end) return idx - count;
+    return null;
+  };
+
+  const cellBindings: CellBinding[] = [];
+  for (const b of snapshot.cellBindings) {
+    const { sheetId, row, col } = parseCellKey(b.cellKey);
+    const target = dimension === 'row' ? row : col;
+    const moved = shiftIndex(target);
+    if (moved === null) continue; // 整格被删，丢弃绑定
+    const newRow = dimension === 'row' ? moved : row;
+    const newCol = dimension === 'col' ? moved : col;
+    // parentCell 同步位移（落在删除范围内则断开为 null）
+    let parentCell = b.parentCell;
+    if (parentCell) {
+      const p = parseCellKey(parentCell);
+      const pTarget = dimension === 'row' ? p.row : p.col;
+      const pMoved = shiftIndex(pTarget);
+      parentCell =
+        pMoved === null
+          ? null
+          : makeCellKey(
+              p.sheetId,
+              dimension === 'row' ? pMoved : p.row,
+              dimension === 'col' ? pMoved : p.col,
+            );
+    }
+    cellBindings.push({ ...b, cellKey: makeCellKey(sheetId, newRow, newCol), parentCell });
+  }
+
+  const loopBlocks: LoopBlock[] = [];
+  for (const lb of snapshot.loopBlocks) {
+    const s = dimension === 'row' ? lb.startRow : lb.startColumn;
+    const e = dimension === 'row' ? lb.endRow : lb.endColumn;
+    const ms = shiftIndex(s);
+    const me = shiftIndex(e);
+    // 起止任一端落入删除范围 → 块结构被破坏，丢弃整块（避免残留半块）
+    if (ms === null || me === null) continue;
+    loopBlocks.push(
+      dimension === 'row'
+        ? { ...lb, startRow: ms, endRow: me }
+        : { ...lb, startColumn: ms, endColumn: me },
+    );
+  }
+
+  const summaries: SummaryRow[] = [];
+  for (const s of snapshot.summaries) {
+    const axis = s.axis ?? 'VERTICAL';
+    // 汇总主轴：纵向汇总锚定在某行(mainPos=行)、交叉区间是列；横向反之。
+    const mainIsRow = axis === 'VERTICAL';
+    let mainPos = s.mainPos;
+    if ((mainIsRow && dimension === 'row') || (!mainIsRow && dimension === 'col')) {
+      const m = shiftIndex(s.mainPos);
+      if (m === null) continue; // 汇总锚定行/列被删，丢弃整条
+      mainPos = m;
+    }
+    let cells = s.cells;
+    let crossFrom = s.crossFrom;
+    let crossTo = s.crossTo;
+    const crossIsRow = !mainIsRow;
+    if ((crossIsRow && dimension === 'row') || (!crossIsRow && dimension === 'col')) {
+      cells = [];
+      for (const c of s.cells) {
+        const moved = shiftIndex(c.crossPos);
+        if (moved === null) continue;
+        cells.push({ ...c, crossPos: moved });
+      }
+      const cf = shiftIndex(s.crossFrom);
+      const ct = shiftIndex(s.crossTo);
+      crossFrom = cf ?? Math.max(start, 0);
+      crossTo = ct ?? Math.max(start - 1, 0);
+    }
+    summaries.push({ ...s, mainPos, crossFrom, crossTo, cells });
+  }
+
+  return { cellBindings, loopBlocks, summaries };
+}
 
 /** 旧格式 SummaryCell（kind/payload/aggregation）→ 新格式（value: ReportValue） */
 interface LegacySummaryCell {
@@ -101,6 +203,7 @@ export const ReportEngine: React.FC<
 > = ({
   datasets,
   relationships = [],
+  transforms = [],
   dataModelId,
   functions,
   title,
@@ -129,6 +232,25 @@ export const ReportEngine: React.FC<
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportName, setReportName] = useState<string>('未命名报表');
   const [_activeTemplate, setActiveTemplate] = useState<string | null>(null);
+
+  // ─── 撤销/重做对齐：config 是独立于 Univer 的平行存储，需自建快照栈与之对齐 ───
+  // 渲染期同步镜像最新三态（用户操作间必有渲染，故 undo 触发时 ref 已是最新提交值）
+  const cellBindingsRef = useRef(cellBindings);
+  cellBindingsRef.current = cellBindings;
+  const loopBlocksRef = useRef(loopBlocks);
+  loopBlocksRef.current = loopBlocks;
+  const summariesRef = useRef(summaries);
+  summariesRef.current = summaries;
+  // 行列删/插的配置快照栈（与 Univer undo/redo 对齐）
+  const undoConfigStackRef = useRef<ConfigSnapshot[]>([]);
+  const redoConfigStackRef = useRef<ConfigSnapshot[]>([]);
+  // 清除/删除内容的墓碑：cellKey → 被移除的绑定；撤销回写原内容时据此恢复
+  const clearedBindingsRef = useRef<Map<string, CellBinding>>(new Map());
+  // 当前撤销/重做阶段（由 report-univer 透出）
+  const undoRedoPhaseRef = useRef<UndoRedoPhase>('normal');
+  const handleUndoRedoStateChange = useCallback((phase: UndoRedoPhase) => {
+    undoRedoPhaseRef.current = phase;
+  }, []);
   const lastAppliedRef = useRef<TemplatePreset | null>(null);
 
   // ─── 面板收缩 ───
@@ -711,8 +833,10 @@ export const ReportEngine: React.FC<
       setCellBindings((prev) => {
         let changed = false;
         const next: CellBinding[] = [];
+        const consumed = new Set<string>(); // 已处理的 cellKey（避免重复恢复）
         for (const b of prev) {
           const { sheetId, row, col } = parseCellKey(b.cellKey);
+          consumed.add(b.cellKey);
           const change = changes.find(
             (c) => c.sheetId === sheetId && c.row === row && c.col === col,
           );
@@ -721,7 +845,8 @@ export const ReportEngine: React.FC<
             continue;
           }
           if (change.value === '') {
-            changed = true; // 用户清空 → 移除
+            changed = true; // 用户清空 → 移除并入墓碑（供撤销恢复）
+            clearedBindingsRef.current.set(b.cellKey, b);
             continue;
           }
           // 用户手敲
@@ -734,6 +859,21 @@ export const ReportEngine: React.FC<
             });
           } else {
             next.push(b); // 引用格（字段/聚合/参数）保护：改表达式请走属性面板
+          }
+        }
+        // 撤销恢复：内容被写回且匹配墓碑绑定的 displayText → 还原原绑定（仅撤销/重做期，避免手敲同文本误恢复）
+        if (undoRedoPhaseRef.current !== 'normal' && clearedBindingsRef.current.size > 0) {
+          for (const c of changes) {
+            if (!c.value) continue;
+            const key = makeCellKey(c.sheetId, c.row, c.col);
+            if (consumed.has(key)) continue;
+            const tomb = clearedBindingsRef.current.get(key);
+            if (tomb && (tomb.displayText ?? '') === c.value) {
+              next.push(tomb);
+              clearedBindingsRef.current.delete(key);
+              consumed.add(key);
+              changed = true;
+            }
           }
         }
         return changed ? next : prev;
@@ -792,6 +932,7 @@ export const ReportEngine: React.FC<
   );
 
   // ─── 选区清除（清除内容/格式/全部）→ 移除对应绑定 ───
+  // 被移除的绑定存入墓碑（按 cellKey），撤销时 Univer 把原内容写回 → handleCellValueChange 据 displayText 恢复
   const handleSelectionClear = useCallback((cellKeys: string[]) => {
     const keys = new Set(cellKeys);
     // 提取 row:col 用于匹配汇总行单元格（汇总行无 sheetId）
@@ -801,7 +942,17 @@ export const ReportEngine: React.FC<
         return `${parts[1]}:${parts[2]}`;
       }),
     );
-    setCellBindings((prev) => prev.filter((b) => !keys.has(b.cellKey)));
+    setCellBindings((prev) => {
+      const next: CellBinding[] = [];
+      for (const b of prev) {
+        if (keys.has(b.cellKey)) {
+          clearedBindingsRef.current.set(b.cellKey, b); // 入墓碑（供撤销恢复）
+        } else {
+          next.push(b);
+        }
+      }
+      return next;
+    });
     setSummaries((prev) =>
       prev.map((s) => ({
         ...s,
@@ -811,6 +962,47 @@ export const ReportEngine: React.FC<
         }),
       })),
     );
+  }, []);
+
+  // ─── 行/列删除/插入 → 同步按坐标记录的属性（带撤销/重做对齐） ───
+  // 表格删/插整行整列后，Univer 内容已位移，但 cellBindings/loopBlocks/summaries 仍按旧坐标记录。
+  // 删除会丢弃落在删除范围内的记录 → 该数据只能靠快照恢复，故维护与 Univer undo 对齐的配置快照栈：
+  //   normal → 操作前压栈 before，再做位移；undo → 弹 before 直接恢复；redo → 重压并重做位移。
+  const handleRowsColsChanged = useCallback((change: RowsColsChange) => {
+    const { phase } = change;
+
+    if (phase === 'undo') {
+      // 撤销：Univer 重放反向 mutation（删→插/插→删），此处不按表格推导，直接恢复操作前快照
+      const before = undoConfigStackRef.current.pop();
+      if (!before) return;
+      redoConfigStackRef.current.push({
+        cellBindings: cellBindingsRef.current,
+        loopBlocks: loopBlocksRef.current,
+        summaries: summariesRef.current,
+      });
+      setCellBindings(before.cellBindings);
+      setLoopBlocks(before.loopBlocks);
+      setSummaries(before.summaries);
+      setActiveTemplate(null);
+      return;
+    }
+
+    // normal / redo：先压 before 快照（redo 从 redo 栈取回的就是当时的 before），再做位移
+    const before: ConfigSnapshot = {
+      cellBindings: cellBindingsRef.current,
+      loopBlocks: loopBlocksRef.current,
+      summaries: summariesRef.current,
+    };
+    undoConfigStackRef.current.push(before);
+    if (phase === 'normal') {
+      redoConfigStackRef.current = []; // 新操作清空 redo 栈
+    }
+
+    const after = shiftConfig(before, change);
+    setCellBindings(after.cellBindings);
+    setLoopBlocks(after.loopBlocks);
+    setSummaries(after.summaries);
+    setActiveTemplate(null);
   }, []);
 
   return (
@@ -901,6 +1093,8 @@ export const ReportEngine: React.FC<
                 <DataModelPanel
                   datasets={datasets}
                   relationships={relationships}
+                  params={params}
+                  onParamsChange={setParams}
                 />
               </div>
             )}
@@ -919,6 +1113,8 @@ export const ReportEngine: React.FC<
               onFieldDrop={handleFieldDrop}
               onCellValueChange={handleCellValueChange}
               onSelectionClear={handleSelectionClear}
+              onRowsColsChanged={handleRowsColsChanged}
+              onUndoRedoStateChange={handleUndoRedoStateChange}
               onFontRequest={onFontRequest}
               onReady={() =>
                 console.log(
@@ -961,6 +1157,7 @@ export const ReportEngine: React.FC<
                 loopBlocks={loopBlocks}
                 datasets={datasets}
                 params={params}
+                transforms={transforms}
                 functions={functions}
                 onBindingChange={handleBindingChange}
                 onBindingCreate={handleBindingCreate}

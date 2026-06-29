@@ -36,6 +36,8 @@ export type {
   UnionMember,
   RelationshipInfo,
   FieldRefInfo,
+  TransformItemInfo,
+  TransformEntryInfo,
 } from './datamodel';
 export {
   listDataModelBriefs,
@@ -55,6 +57,7 @@ export {
   deleteDataSource,
   introspectDatasets,
   introspectByConfig,
+  introspectSql,
   uploadDataFile,
   testConnection,
 } from './datasource';

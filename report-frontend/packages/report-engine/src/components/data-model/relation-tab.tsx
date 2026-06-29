@@ -40,6 +40,8 @@ export interface RelationTabProps {
   datasets: DataModelDataset[];
   relationships: Relationship[];
   onChange: (next: Relationship[]) => void;
+  /** 只读模式：隐藏新建/编辑/删除操作 */
+  readOnly?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export default function RelationTab({
   datasets,
   relationships,
   onChange,
+  readOnly = false,
 }: RelationTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Relationship | null>(null);
@@ -128,35 +131,41 @@ export default function RelationTab({
       render: (_, r) =>
         fieldLabel(datasets.find((d) => d.id === r.right.datasetId), r.right.field),
     },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 100,
-      render: (_, r) => (
-        <Space>
-          <a onClick={() => openEdit(r)}>编辑</a>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r)}>
-            <a>删除</a>
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    ...(readOnly
+      ? []
+      : [
+          {
+            title: '操作',
+            key: 'actions',
+            width: 100,
+            render: (_: unknown, r: Relationship) => (
+              <Space>
+                <a onClick={() => openEdit(r)}>编辑</a>
+                <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r)}>
+                  <a>删除</a>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]),
   ];
 
   const canAdd = datasets.length >= 2;
 
   return (
     <>
-      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          icon={<PlusOutlined />}
-          type="primary"
-          onClick={openAdd}
-          disabled={!canAdd}
-        >
-          新建关系
-        </Button>
-      </div>
+      {!readOnly && (
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            icon={<PlusOutlined />}
+            type="primary"
+            onClick={openAdd}
+            disabled={!canAdd}
+          >
+            新建关系
+          </Button>
+        </div>
+      )}
       <Table<Relationship>
         rowKey={rowKey}
         columns={columns}
