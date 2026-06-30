@@ -41,6 +41,9 @@ const AppReport = () => {
   const [dataModelId, setDataModelId] = useState<string>('default');
   const [functions, setFunctions] = useState<ExpressionCatalog>();
   const [loading, setLoading] = useState(true);
+  // 加载到的配置先存入 state，待 ReportEngine 挂载（loading=false）后再经 effect 灌入，
+  // 否则 loading=true 时引擎尚未渲染，engineRef.current 为 null，loadReportConfig 会被静默吞掉。
+  const [pendingConfig, setPendingConfig] = useState<LoadedReportConfig | null>(null);
   const engineRef = useRef<ReportEngineHandle>(null);
 
   // 加载公式目录
@@ -96,7 +99,7 @@ const AppReport = () => {
           );
         }
         if (config.dataModelId) setDataModelId(config.dataModelId);
-        engineRef.current?.loadReportConfig(config);
+        setPendingConfig(config);
       } catch (e) {
         console.error('加载报表失败:', e);
       } finally {
@@ -105,6 +108,16 @@ const AppReport = () => {
     };
     init();
   }, [reportIdFromUrl, navigate]);
+
+  // ReportEngine 挂载后（loading=false）把配置灌入引擎；此时 datasets 等 props 已就绪，
+  // 别名能正确解析。effect 在 commit 后执行，engineRef.current 已绑定。
+  // loadedRef 去重：StrictMode 下 effect 会跑两次，避免重复灌入导致两次「已打开报表」提示。
+  const loadedRef = useRef<LoadedReportConfig | null>(null);
+  useEffect(() => {
+    if (loading || !pendingConfig || loadedRef.current === pendingConfig) return;
+    loadedRef.current = pendingConfig;
+    engineRef.current?.loadReportConfig(pendingConfig);
+  }, [loading, pendingConfig]);
 
   const handleImport = async (file: File) => {
     return importExcel(file);
