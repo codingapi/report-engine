@@ -4,7 +4,6 @@ import com.codingapi.report.core.Report;
 import com.codingapi.report.dto.report.ReportDTO;
 import com.codingapi.report.repository.PageResult;
 import com.codingapi.report.starter.service.ReportConfigService;
-import com.codingapi.springboot.framework.dto.request.SearchRequest;
 import com.codingapi.springboot.framework.dto.response.MultiResponse;
 import com.codingapi.springboot.framework.dto.response.SingleResponse;
 import java.util.List;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -50,9 +50,12 @@ public class ReportConfigController {
     }
 
     @GetMapping("/configs")
-    public MultiResponse<ReportBrief> list(SearchRequest searchRequest) {
-        PageResult<Report> result =
-                reportConfigService.page(searchRequest.getCurrent(), searchRequest.getPageSize());
+    public MultiResponse<ReportBrief> list(
+            @RequestParam(defaultValue = "1") int current,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        // 显式 @RequestParam 绑定分页参数，避免 SearchRequest 的 CurrentPageOffsetContext
+        // 把 current 规范化（该框架偏好 offset 分页）导致 ?current=N 被吞、切页数据不变。
+        PageResult<Report> result = reportConfigService.page(current, pageSize);
         List<ReportBrief> briefs =
                 result.content().stream()
                         .map(
