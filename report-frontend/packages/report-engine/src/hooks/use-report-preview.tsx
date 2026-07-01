@@ -92,6 +92,7 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
     } else {
       const blob = await renderService.export(request);
       downloadBlob(blob, `report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      messageApi.success('导出成功');
     }
   };
 
@@ -158,7 +159,7 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
     setExporting(true);
     try {
       await runRenderAction('export', config);
-      messageApi.success('导出成功');
+      // 成功提示改由 doRender 在真正下载完成后发出，避免参数弹窗路径下提前误报
     } catch (e) {
       messageApi.error(`导出失败: ${e}`);
     } finally {
@@ -173,8 +174,13 @@ export function useReportPreview({ renderService, messageApi, onClose }: UseRepo
 
   const confirmParams = async (values: Record<string, unknown>) => {
     setParamModalOpen(false);
+    const mode = pendingRef.current?.mode;
     const params = pendingRef.current?.config.params ?? [];
-    await doRender(buildParamValues(params, values));
+    try {
+      await doRender(buildParamValues(params, values));
+    } catch (e) {
+      messageApi.error(`${mode === 'export' ? '导出' : '预览'}失败: ${e}`);
+    }
   };
 
   const cancelParams = () => {

@@ -33,7 +33,8 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
 
   const handleConfirm = (param: ParamDTO) => {
     if (editingParam) {
-      onChange(params.map((p) => (p.id === editingParam.id ? { ...p, ...param } : p)));
+      // ParamDTO.id 在领域往返中不保留（重载后为 null），用稳定的 name 作唯一键
+      onChange(params.map((p) => (p.name === editingParam.name ? { ...p, ...param } : p)));
     } else {
       onChange([...params, { ...param, id: genId() }]);
     }
@@ -42,8 +43,8 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
   };
 
   const remove = useCallback(
-    (id: string) => {
-      onChange(params.filter((p) => p.id !== id));
+    (name: string) => {
+      onChange(params.filter((p) => p.name !== name));
     },
     [params, onChange],
   );
@@ -85,7 +86,7 @@ const ParamManager: React.FC<ParamManagerProps> = ({ params, onChange }) => {
                 <Popconfirm
                   key="del"
                   title="删除此参数？"
-                  onConfirm={() => remove(p.id)}
+                  onConfirm={() => remove(p.name)}
                   okText="删除"
                 >
                   <Button type="text" size="small" danger icon={<DeleteOutlined />} />
