@@ -8,5 +8,10 @@
     "left": { "datasetId": "employees", "field": "id" },
     "right": { "datasetId": "salaries", "field": "emp_id" },
     "joinType": "INNER"
+  },
+  {
+    "left": { "datasetId": "student_info", "field": "name" },
+    "right": { "datasetId": "student_scores", "field": "student" },
+    "joinType": "INNER"
   }
 ]

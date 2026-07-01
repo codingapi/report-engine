@@ -1,0 +1,7 @@
+{
+  "alias": "学生信息",
+  "fields": [
+    { "name": "name", "alias": "姓名", "dataType": "STRING", "primaryKey": true },
+    { "name": "sex", "alias": "性别", "dataType": "STRING" }
+  ]
+}

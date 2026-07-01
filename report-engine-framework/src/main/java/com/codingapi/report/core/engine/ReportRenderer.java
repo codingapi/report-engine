@@ -426,7 +426,7 @@ public class ReportRenderer {
         // 3a-M. 交叉表（矩阵）：行维纵向 × 列维横向 → 交叉格聚合。同时产生行位移与列位移，
         //   汇入两轴的 shift 账本（bandRecords / bandColRecords），使矩阵下方/右侧内容正确避让。
         for (Matrix mx : matrices) {
-            int[] dims = renderMatrix(mx, ctx, canvas);
+            int[] dims = renderMatrix(mx, ctx, canvas, summaryOutputRows);
             int rowBase = mx.rowDim.getCell().row();
             int colBase = mx.colDim.getCell().column();
             int rowInsertion = Math.max(0, dims[0] - 1);
@@ -1124,9 +1124,13 @@ public class ReportRenderer {
     /**
      * 渲染一个交叉表：行表头(纵向) + 列表头(横向) + 交叉格(每个 行值×列值 的聚合) + 可选行/列/总合计。
      *
+     * @param summaryOutputRows 汇总/合计行的「设计行→输出行」映射（由 renderFree 传入）。矩阵有底合计行时，
+     *     把合计设计行（交叉格下一行）映射到其输出行，使该行的模板 merge 走直接定位、 不被并列带的 shift
+     *     重复累加（矩阵与同源并列带占同一段行范围，按堆叠带累加会双计）。
      * @return {@code {占据行数, 占据列数}}（含合计行/列），供 renderFree 计算行/列位移
      */
-    private int[] renderMatrix(Matrix mx, ParamContext ctx, Canvas canvas) {
+    private int[] renderMatrix(
+            Matrix mx, ParamContext ctx, Canvas canvas, Map<Integer, Integer> summaryOutputRows) {
         List<CellBinding> dataCells = List.of(mx.rowDim, mx.colDim, mx.crossCell);
         RawTable combined = buildCombinedTable(dataCells);
         RawTable filtered = Operators.filter(combined, collectConditions(dataCells), ctx, engine);
@@ -1148,6 +1152,11 @@ public class ReportRenderer {
                 mx.rowTotalCell != null || mx.grandTotalCell != null || mx.rowTotalHeader != null;
         boolean hasBottomRow =
                 mx.colTotalCell != null || mx.grandTotalCell != null || mx.colTotalHeader != null;
+        // 底合计行（列合计/总计/底合计表头）的设计行 = 交叉格下一行；映射到输出行 totalRow，
+        // 让该行的模板 merge 精确跟随（与 SummaryRow 的 summaryOutputRows 机制一致）。
+        if (hasBottomRow && summaryOutputRows != null) {
+            summaryOutputRows.put(mx.crossCell.getCell().row() + 1, totalRow);
+        }
 
         // 行表头：沿 rowDim 列向下
         for (int i = 0; i < rowVals.size(); i++) {
@@ -1546,9 +1555,11 @@ public class ReportRenderer {
         canvas.dynamic.add(key(outRow, outCol));
         if (source != null) {
             Cell src = canvas.template.get(key(source.row(), source.column()));
-            if (src != null && src.getStyle() != null) {
-                cell.setStyle(src.getStyle());
-            }
+            // 整体覆盖样式（含 null）：动态值的样式完全取自声明格 source，
+            // 清掉输出位上可能残留的模板格样式（如合计行被位移后，原设计位被
+            // 别的动态值复用，不应继承合计行的居中/边框等样式）。source 在模板中
+            // 无对应格（纯绑定无模板格）时按无样式处理，同样清空。
+            cell.setStyle(src != null ? src.getStyle() : null);
         }
     }
 

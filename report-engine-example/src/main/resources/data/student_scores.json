@@ -1,0 +1,8 @@
+{
+  "alias": "学生成绩",
+  "fields": [
+    { "name": "student", "alias": "学生", "dataType": "STRING" },
+    { "name": "subject", "alias": "科目", "dataType": "STRING" },
+    { "name": "score", "alias": "成绩", "dataType": "NUMBER" }
+  ]
+}
