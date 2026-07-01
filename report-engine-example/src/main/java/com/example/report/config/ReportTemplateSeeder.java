@@ -59,6 +59,7 @@ public class ReportTemplateSeeder {
         seedIndependentBandsWithSummary();
         seedCrossTab();
         seedHorizontalSummary();
+        seedStudentScoreCrossTab();
         log.info("已预存 {} 个示例报表", count);
     }
 
@@ -488,8 +489,7 @@ public class ReportTemplateSeeder {
     // 10. 横向带 + 横向汇总：商品横向铺开，右侧追加合计列（纵向汇总的转置）
     // ============================================================
 
-    private void seedHorizontalSummary() {
-        // 商品名/单价各占一行（row0/row1），沿列向右逐个商品铺开（HORIZONTAL）。
+    private void seedHorizontalSummary() {        // 商品名/单价各占一行（row0/row1），沿列向右逐个商品铺开（HORIZONTAL）。
         // 横向汇总（summaryColumn）在带右侧追加一列合计：行区间 [0,1]，row0 标签、row1=SUM(单价)。
         String ds = "products";
         save(
@@ -507,6 +507,55 @@ public class ReportTemplateSeeder {
                                 null,
                                 List.of(labelCell(0, "合计"), aggCell(1, "products.price", "SUM")))
                         .template(8, 8, cell(0, 0, "商品名"), cell(1, 0, "单价"), cell(0, 2, "合计"))
+                        .build());
+    }
+
+    // ============================================================
+    // 11. 学生成绩交叉表（双表 JOIN）：学生信息(行维) × 科目(列维) → SUM(成绩)
+    //     数据正规化为两张表：student_info（姓名/性别）+ student_scores（学生/科目/成绩），
+    //     由 relationships.json 按 student_info.name = student_scores.student 关联。
+    //     交叉表经 buildCombinedTable 自动 JOIN 两表取数——行维姓名来自 student_info，
+    //     科目/成绩来自 student_scores。性别作为行维右侧的普通纵向列（与矩阵行同源、行数一致）。
+    //     演示「固定对象横向铺开成列」的正确范式：科目拆列靠列维 HORIZONTAL+GROUP，
+    //     不要给每列写死 subject=xxx 条件（会 AND 冲突返回 0 行）。
+    // ============================================================
+
+    private void seedStudentScoreCrossTab() {
+        // 几何约定（紧邻交叉格，后端 detectMatrices 自动识别）：
+        //   行维 student_info.name 纵向GROUP@(2,0) × 列维 student_scores.subject 横向GROUP@(1,2)
+        //   → 交叉格 SUM(student_scores.score)@(2,2)
+        //   行合计(总成绩)@(2,3)[cross右]  列合计@(3,2)[cross下]  总计@(3,3)[右下]
+        //   右合计列头(总成绩)@(1,3)[列维行]  底合计行头(合计)@(3,0)[行维列]
+        //   性别@(2,1) 为矩阵未消费的普通纵向列，与行维同源（student_info）、行数一致、自然对齐
+        String info = "student_info";
+        String score = "student_scores";
+        save(
+                "example-student-score-cross-tab",
+                new ReportConfigBuilder("学生成绩交叉表")
+                        .binding(0, 0, literal("学生成绩交叉表"), "NONE", "LIST")
+                        .binding(1, 0, literal("姓名"), "NONE", "LIST")
+                        .binding(1, 1, literal("性别"), "NONE", "LIST")
+                        // 列维（横向）+ 行维（纵向）
+                        .binding(1, 2, fieldValue(score, "subject"), "HORIZONTAL", "GROUP")
+                        .binding(2, 0, fieldValue(info, "name"), "VERTICAL", "GROUP")
+                        // 性别：行维右侧普通纵向列（与矩阵行同源对齐）
+                        .binding(2, 1, fieldValue(info, "sex"), "VERTICAL", "LIST")
+                        // 交叉格 + 行/列/总合计（均为聚合）
+                        .binding(2, 2, aggregate("SUM", score, "score"), "NONE", "LIST")
+                        .binding(2, 3, aggregate("SUM", score, "score"), "NONE", "LIST")
+                        .binding(3, 2, aggregate("SUM", score, "score"), "NONE", "LIST")
+                        .binding(3, 3, aggregate("SUM", score, "score"), "NONE", "LIST")
+                        // 合计表头标签
+                        .binding(1, 3, literal("总成绩"), "NONE", "LIST")
+                        .binding(3, 0, literal("合计"), "NONE", "LIST")
+                        .template(
+                                8,
+                                8,
+                                cell(0, 0, "学生成绩交叉表"),
+                                cell(1, 0, "姓名"),
+                                cell(1, 1, "性别"),
+                                cell(1, 3, "总成绩"),
+                                cell(3, 0, "合计"))
                         .build());
     }
 
